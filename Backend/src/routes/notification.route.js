@@ -4,10 +4,16 @@ import {
   getNotifications,
   deleteNotification,
 } from "../controllers/notification.controller.js";
+import { arcjetMiddleware } from "../middleware/arcjet.middleware.js";
 
 const router = express.Router();
 
-router.get("/", protectRoute, getNotifications);
-router.delete("/:notificationId", protectRoute, deleteNotification);
+router.get("/", arcjetMiddleware, protectRoute, getNotifications);
+router.delete(
+  "/:notificationId",
+  arcjetMiddleware,
+  protectRoute,
+  deleteNotification
+);
 
 export default router;
