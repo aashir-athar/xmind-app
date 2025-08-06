@@ -27,31 +27,54 @@ export const createComment = asyncHandler(async (req, res) => {
   const user = await User.findOne({ clerkId: userId });
   const post = await Post.findById(postId);
 
-  if (!user || !post) return res.status(404).json({ error: "User or post not found" });
+  if (!user || !post)
+    return res.status(404).json({ error: "User or post not found" });
 
-  const comment = await Comment.create({
-    user: user._id,
-    post: postId,
-    content,
-  });
+  const session = await Comment.startSession();
 
-  // link the comment to the post
-  await Post.findByIdAndUpdate(postId, {
-    $push: { comments: comment._id },
-  });
+  try {
+    await session.withTransaction(async () => {
+      const comment = await Comment.create(
+        [
+          {
+            user: user._id,
+            post: postId,
+            content,
+          },
+        ],
+        { session }
+      );
 
-  // create notification if not commenting on own post
-  if (post.user.toString() !== user._id.toString()) {
-    await Notification.create({
-      from: user._id,
-      to: post.user,
-      type: "comment",
-      post: postId,
-      comment: comment._id,
+      // link the comment to the post
+      await Post.findByIdAndUpdate(
+        postId,
+        {
+          $push: { comments: comment[0]._id },
+        },
+        { session }
+      );
+
+      // create notification if not commenting on own post
+      if (post.user.toString() !== user._id.toString()) {
+        await Notification.create(
+          [
+            {
+              from: user._id,
+              to: post.user,
+              type: "comment",
+              post: postId,
+              comment: comment[0]._id,
+            },
+          ],
+          { session }
+        );
+      }
+
+      res.status(201).json({ comment: comment[0] });
     });
+  } finally {
+    await session.endSession();
   }
-
-  res.status(201).json({ comment });
 });
 
 export const deleteComment = asyncHandler(async (req, res) => {
@@ -66,16 +89,38 @@ export const deleteComment = asyncHandler(async (req, res) => {
   }
 
   if (comment.user.toString() !== user._id.toString()) {
-    return res.status(403).json({ error: "You can only delete your own comments" });
+    return res
+      .status(403)
+      .json({ error: "You can only delete your own comments" });
   }
 
-  // remove comment from post
-  await Post.findByIdAndUpdate(comment.post, {
-    $pull: { comments: commentId },
-  });
+  const session = await Comment.startSession();
 
-  // delete the comment
-  await Comment.findByIdAndDelete(commentId);
+  try {
+    await session.withTransaction(async () => {
+      // remove comment from post
+      await Post.findByIdAndUpdate(
+        comment.post,
+        {
+          $pull: { comments: commentId },
+        },
+        { session }
+      );
 
-  res.status(200).json({ message: "Comment deleted successfully" });
+      // clean up related notifications
+      await Notification.deleteMany(
+        {
+          comment: commentId,
+        },
+        { session }
+      );
+
+      // delete the comment
+      await Comment.findByIdAndDelete(commentId, { session });
+    });
+
+    res.status(200).json({ message: "Comment deleted successfully" });
+  } finally {
+    await session.endSession();
+  }
 });
