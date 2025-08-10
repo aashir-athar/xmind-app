@@ -4,7 +4,7 @@ import {
   MessageType,
 } from "@/data/conversations";
 import { Feather } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ const MessagesScreen = () => {
     useState<ConversationType | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [newMessage, setNewMessage] = useState("");
+  const messagesRef = useRef<ScrollView>(null);
 
   const deleteConversation = (conversationId: number) => {
     Alert.alert(
@@ -96,7 +97,8 @@ const MessagesScreen = () => {
       );
       // Optional: keep most recent conversation on top
       return updated.sort(
-        (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+        (a, b) =>
+          (b.timestamp?.getTime?.() ?? 0) - (a.timestamp?.getTime?.() ?? 0)
       );
     });
     setSelectedConversation((prev) =>
@@ -122,6 +124,13 @@ const MessagesScreen = () => {
       )
     );
   }, [searchText, conversationsList]);
+
+  // effect to scroll on new message or when opening chat
+  useEffect(() => {
+    if (!selectedConversation) return;
+    // Delay to ensure layout is committed before scrolling
+    setTimeout(() => messagesRef.current?.scrollToEnd({ animated: true }), 0);
+  }, [selectedConversation?.messages.length, isChatOpen]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -209,6 +218,7 @@ const MessagesScreen = () => {
         visible={isChatOpen}
         animationType="slide"
         presentationStyle="pageSheet"
+        onRequestClose={closeChatModal}
       >
         {selectedConversation && (
           <SafeAreaView className="flex-1">
@@ -237,7 +247,7 @@ const MessagesScreen = () => {
             </View>
 
             {/* Chat Messages Area */}
-            <ScrollView className="flex-1 px-4 py-4">
+            <ScrollView className="flex-1 px-4 py-4" ref={messagesRef}>
               <View className="mb-4">
                 <Text className="text-center text-gray-400 text-sm mb-4">
                   This is the beginning of your conversation with{" "}
