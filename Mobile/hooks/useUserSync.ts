@@ -1,27 +1,26 @@
 import { useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
-import { useApiClient, userApi } from "@/utils/api";
-import type { AxiosResponse } from "axios";
+import { useApiClient, userApi } from "../utils/api";
 
 export const useUserSync = () => {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn } = useAuth();
   const api = useApiClient();
 
-  const syncUserMutation = useMutation<AxiosResponse<{ message: string }>>({
-    mutationKey: ["user", "sync"],
+  const syncUserMutation = useMutation({
     mutationFn: () => userApi.syncUser(api),
-    retry: 2,
     onSuccess: (response: any) =>
-      console.log("User synced successfully:", response.data.message),
+      console.log("User synced successfully:", response.data.user),
     onError: (error) => console.error("User sync failed:", error),
   });
 
+  // auto-sync user when signed in
   useEffect(() => {
-    if (isLoaded && isSignedIn && syncUserMutation.status === "idle") {
+    // if user is signed in and user is not synced yet, sync user
+    if (isSignedIn && !syncUserMutation.data) {
       syncUserMutation.mutate();
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isSignedIn]);
 
   return null;
 };

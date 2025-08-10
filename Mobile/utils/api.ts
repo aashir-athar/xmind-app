@@ -1,13 +1,17 @@
 import axios, { AxiosInstance } from "axios";
 import { useAuth } from "@clerk/clerk-expo";
-import { useMemo } from "react";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  "https://x-clone-react-native-seven.vercel.app/api";
+// ! 🔥 localhost api would not work on your actual physical device
+// const API_BASE_URL = "http://localhost:5001/api";
 
+// this will basically create an authenticated api, pass the token into our headers
 export const createApiClient = (
   getToken: () => Promise<string | null>
 ): AxiosInstance => {
-  const api = axios.create({ baseURL: API_BASE_URL, timeout: 10000 });
+  const api = axios.create({ baseURL: API_BASE_URL });
 
   api.interceptors.request.use(async (config) => {
     const token = await getToken();
@@ -22,12 +26,12 @@ export const createApiClient = (
 
 export const useApiClient = (): AxiosInstance => {
   const { getToken } = useAuth();
-  return useMemo(() => createApiClient(getToken), [getToken]);
+  return createApiClient(getToken);
 };
 
 export const userApi = {
   syncUser: (api: AxiosInstance) => api.post("/users/sync"),
-  getCurrentUser: (api: AxiosInstance) => api.post("/users/me"),
+  getCurrentUser: (api: AxiosInstance) => api.get("/users/me"),
   updateProfile: (api: AxiosInstance, data: any) =>
-    api.post("/users/profile", data),
+    api.put("/users/profile", data),
 };
