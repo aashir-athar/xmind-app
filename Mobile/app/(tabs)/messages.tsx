@@ -15,6 +15,8 @@ import {
   Image,
   Modal,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import {
   SafeAreaView,
@@ -280,7 +282,11 @@ const MessagesScreen = () => {
             </ScrollView>
 
             {/* Message Input */}
-            <View className="flex-row items-center px-4 py-3 border-t border-gray-100">
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              keyboardVerticalOffset={insets.bottom + 60} // adjust if needed
+              className="flex-row items-center px-4 py-3 border-t border-gray-100"
+            >
               <View className="flex-1 flex-row items-center bg-gray-100 rounded-full px-4 py-3 mr-3">
                 <TextInput
                   className="flex-1 text-base"
@@ -300,7 +306,7 @@ const MessagesScreen = () => {
               >
                 <Feather name="send" size={20} color="white" />
               </TouchableOpacity>
-            </View>
+            </KeyboardAvoidingView>
           </SafeAreaView>
         )}
       </Modal>
