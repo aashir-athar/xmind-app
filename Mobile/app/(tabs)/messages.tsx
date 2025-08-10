@@ -120,7 +120,9 @@ const MessagesScreen = () => {
     if (!q) return conversationsList;
     return conversationsList.filter((c) =>
       [c.user.name, c.user.username, c.lastMessage].some((v) =>
-        v.toLowerCase().includes(q)
+        String(v ?? "")
+          .toLowerCase()
+          .includes(q)
       )
     );
   }, [searchText, conversationsList]);
