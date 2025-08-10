@@ -7,7 +7,7 @@ export const useSignOut = () => {
   const { signOut } = useClerk();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const confirmAndSignOut = async () => {
+  const confirmAndSignOut = useCallback(async () => {
     try {
       setIsSigningOut(true);
       await signOut();
@@ -17,7 +17,7 @@ export const useSignOut = () => {
     } finally {
       setIsSigningOut(false);
     }
-  };
+  }, [signOut]);
 
   const handleSignOut = useCallback(() => {
     if (isSigningOut) return;
@@ -29,7 +29,7 @@ export const useSignOut = () => {
         onPress: () => void confirmAndSignOut(),
       },
     ]);
-  }, [confirmAndSignOut]);
+  }, [isSigningOut, confirmAndSignOut]);
 
   return { handleSignOut, isSigningOut };
 };
