@@ -135,23 +135,23 @@ const MessagesScreen = () => {
   }, [selectedConversation?.messages.length, isChatOpen]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       {/* HEADER */}
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-gray-100">
+      <View className="flex-row items-center justify-between px-4 py-3 border-b border-borderLight">
         <Text className="text-xl font-bold text-gray-900">Messages</Text>
         <TouchableOpacity>
-          <Feather name="edit" size={24} color="#1DA1F2" />
+          <Feather name="edit" size={24} color="#FF5A5F" />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
-      <View className="px-4 py-3 border-b border-gray-100">
+      <View className="px-4 py-3 border-b border-borderLight">
         <View className="flex-row items-center bg-gray-100 rounded-full px-4 py-3">
-          <Feather name="search" size={20} color="#657786" />
+          <Feather name="search" size={20} color="#8A8A8A" />
           <TextInput
             placeholder="Search for people and groups"
-            className="flex-1 ml-3 text-base"
-            placeholderTextColor="#657786"
+            className="flex-1 ml-3 text-base text-textPrimary"
+            placeholderTextColor="#8A8A8A"
             value={searchText}
             onChangeText={setSearchText}
           />
@@ -167,11 +167,11 @@ const MessagesScreen = () => {
         {filteredConversations.map((conversation) => (
           <Pressable
             key={conversation.id}
-            className="flex-row items-center p-4 border-b border-gray-50 pressed:bg-gray-50"
+            className="flex-row items-center p-4 border-b border-borderLight pressed:bg-surface"
             onPress={() => openConversation(conversation)}
             onLongPress={() => deleteConversation(conversation.id)}
             style={({ pressed }) => [
-              { backgroundColor: pressed ? "#F8FAFC" : "transparent" },
+              { backgroundColor: pressed ? "#FAFAFA" : "transparent" },
             ]}
           >
             <Image
@@ -182,26 +182,26 @@ const MessagesScreen = () => {
             <View className="flex-1">
               <View className="flex-row items-center justify-between mb-1">
                 <View className="flex-row items-center gap-1">
-                  <Text className="font-semibold text-gray-900">
+                  <Text className="font-semibold text-textPrimary">
                     {conversation.user.name}
                   </Text>
                   {conversation.user.verified && (
                     <Feather
                       name="check-circle"
                       size={16}
-                      color="#1DA1F2"
+                      color="#FF5A5F"
                       className="ml-1"
                     />
                   )}
-                  <Text className="text-gray-500 text-sm ml-1">
+                  <Text className="text-textSecondary text-sm ml-1">
                     @{conversation.user.username}
                   </Text>
                 </View>
-                <Text className="text-gray-500 text-sm">
+                <Text className="text-textSecondary text-sm">
                   {conversation.time}
                 </Text>
               </View>
-              <Text className="text-sm text-gray-500" numberOfLines={1}>
+              <Text className="text-sm text-textSecondary" numberOfLines={1}>
                 {conversation.lastMessage}
               </Text>
             </View>
@@ -210,8 +210,8 @@ const MessagesScreen = () => {
       </ScrollView>
 
       {/* Quick Actions */}
-      <View className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-        <Text className="text-xs text-gray-500 text-center">
+      <View className="px-4 py-2 border-t border-borderLight bg-surface">
+        <Text className="text-xs text-textSecondary text-center">
           Tap to open • Long press to delete
         </Text>
       </View>
@@ -225,9 +225,9 @@ const MessagesScreen = () => {
         {selectedConversation && (
           <SafeAreaView className="flex-1">
             {/* Chat Header */}
-            <View className="flex-row items-center px-4 py-3 border-b border-gray-100">
+            <View className="flex-row items-center px-4 py-3 border-b border-borderLight">
               <TouchableOpacity onPress={closeChatModal} className="mr-3">
-                <Feather name="arrow-left" size={24} color="#1DA1F2" />
+                <Feather name="arrow-left" size={24} color="#FF5A5F" />
               </TouchableOpacity>
               <Image
                 source={{ uri: selectedConversation.user.avatar }}
@@ -235,14 +235,14 @@ const MessagesScreen = () => {
               />
               <View className="flex-1">
                 <View className="flex-row items-center">
-                  <Text className="font-semibold text-gray-900 mr-1">
+                  <Text className="font-semibold text-textPrimary mr-1">
                     {selectedConversation.user.name}
                   </Text>
                   {selectedConversation.user.verified && (
-                    <Feather name="check-circle" size={16} color="#1DA1F2" />
+                    <Feather name="check-circle" size={16} color="#FF5A5F" />
                   )}
                 </View>
-                <Text className="text-gray-500 text-sm">
+                <Text className="text-textSecondary text-sm">
                   @{selectedConversation.user.username}
                 </Text>
               </View>
@@ -251,7 +251,7 @@ const MessagesScreen = () => {
             {/* Chat Messages Area */}
             <ScrollView className="flex-1 px-4 py-4" ref={messagesRef}>
               <View className="mb-4">
-                <Text className="text-center text-gray-400 text-sm mb-4">
+                <Text className="text-center text-textSecondary text-sm mb-4">
                   This is the beginning of your conversation with{" "}
                   {selectedConversation.user.name}
                 </Text>
@@ -273,18 +273,18 @@ const MessagesScreen = () => {
                     >
                       <View
                         className={`rounded-2xl px-4 py-3 max-w-xs ${
-                          message.fromUser ? "bg-blue-500" : "bg-gray-100"
+                          message.fromUser ? "bg-primary" : "bg-gray-100"
                         }`}
                       >
                         <Text
                           className={
-                            message.fromUser ? "text-white" : "text-gray-900"
+                            message.fromUser ? "text-white" : "text-textPrimary"
                           }
                         >
                           {message.text}
                         </Text>
                       </View>
-                      <Text className="text-xs text-gray-400 mt-1">
+                      <Text className="text-xs text-textSecondary mt-1">
                         {message.time}
                       </Text>
                     </View>
@@ -297,13 +297,13 @@ const MessagesScreen = () => {
             <KeyboardAvoidingView
               behavior={Platform.OS === "ios" ? "padding" : "height"}
               keyboardVerticalOffset={insets.bottom + 60} // adjust if needed
-              className="flex-row items-center px-4 py-3 border-t border-gray-100"
+              className="flex-row items-center px-4 py-3 border-t border-borderLight"
             >
               <View className="flex-1 flex-row items-center bg-gray-100 rounded-full px-4 py-3 mr-3">
                 <TextInput
-                  className="flex-1 text-base"
+                  className="flex-1 text-base text-textPrimary"
                   placeholder="Start a message..."
-                  placeholderTextColor="#657786"
+                  placeholderTextColor="#8A8A8A"
                   value={newMessage}
                   onChangeText={setNewMessage}
                   multiline
@@ -312,7 +312,7 @@ const MessagesScreen = () => {
               <TouchableOpacity
                 onPress={sendMessage}
                 className={`size-10 rounded-full items-center justify-center ${
-                  newMessage.trim() ? "bg-blue-500" : "bg-gray-300"
+                  newMessage.trim() ? "bg-primary" : "bg-gray-300"
                 }`}
                 disabled={!newMessage.trim()}
               >

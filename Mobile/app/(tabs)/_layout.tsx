@@ -14,12 +14,16 @@ const TabsLayout = () => {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#1DA1F2",
-        tabBarInactiveTintColor: "#657786",
+        // Active Tab Color (brand coral instead of Twitter blue)
+        tabBarActiveTintColor: "#FF5A5F", // Coral Red
+
+        // Inactive Tab Color (soft charcoal for readability)
+        tabBarInactiveTintColor: "#8A8A8A", // Medium neutral gray
+
         tabBarStyle: {
-          backgroundColor: "#fff",
+          backgroundColor: "#FFFFFF", // White tab background for light theme
           borderTopWidth: 1,
-          borderTopColor: "#E1E8ED",
+          borderTopColor: "#F0F0F0", // Softer border than Twitter’s gray
           height: 50 + insets.bottom,
           paddingTop: 8,
         },
