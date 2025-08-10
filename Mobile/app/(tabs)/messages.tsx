@@ -1,4 +1,8 @@
-import { CONVERSATIONS, ConversationType } from "@/data/conversations";
+import {
+  CONVERSATIONS,
+  ConversationType,
+  MessageType,
+} from "@/data/conversations";
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import {
@@ -10,11 +14,13 @@ import {
   ScrollView,
   Image,
   Modal,
+  Pressable,
 } from "react-native";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { useMemo } from "react";
 
 const MessagesScreen = () => {
   const insets = useSafeAreaInsets();
@@ -38,6 +44,11 @@ const MessagesScreen = () => {
             setConversationsList((prev) =>
               prev.filter((conv) => conv.id !== conversationId)
             );
+            if (selectedConversation?.id === conversationId) {
+              setIsChatOpen(false);
+              setSelectedConversation(null);
+              setNewMessage("");
+            }
           },
         },
       ]
@@ -56,22 +67,59 @@ const MessagesScreen = () => {
   };
 
   const sendMessage = () => {
-    if (newMessage.trim() && selectedConversation) {
-      // update last message in conversation
-      setConversationsList((prev) =>
-        prev.map((conv) =>
-          conv.id === selectedConversation.id
-            ? { ...conv, lastMessage: newMessage, time: "now" }
-            : conv
-        )
+    const text = newMessage.trim();
+    if (!text || !selectedConversation) return;
+    const now = new Date();
+    const nextId =
+      (selectedConversation.messages[selectedConversation.messages.length - 1]
+        ?.id ?? 0) + 1;
+    const outgoing = {
+      id: nextId,
+      text,
+      fromUser: true,
+      timestamp: now,
+      time: "now",
+    } as MessageType;
+    setConversationsList((prev) => {
+      const updated = prev.map((conv) =>
+        conv.id === selectedConversation.id
+          ? {
+              ...conv,
+              lastMessage: text,
+              time: "now",
+              timestamp: now,
+              messages: [...conv.messages, outgoing],
+            }
+          : conv
       );
-      setNewMessage("");
-      Alert.alert(
-        "Message Sent!",
-        `Your message has been sent to ${selectedConversation.user.name}`
+      // Optional: keep most recent conversation on top
+      return updated.sort(
+        (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
       );
-    }
+    });
+    setSelectedConversation((prev) =>
+      prev
+        ? {
+            ...prev,
+            lastMessage: text,
+            time: "now",
+            timestamp: now,
+            messages: [...prev.messages, outgoing],
+          }
+        : prev
+    );
+    setNewMessage("");
   };
+
+  const filteredConversations = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!q) return conversationsList;
+    return conversationsList.filter((c) =>
+      [c.user.name, c.user.username, c.lastMessage].some((v) =>
+        v.toLowerCase().includes(q)
+      )
+    );
+  }, [searchText, conversationsList]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -103,12 +151,15 @@ const MessagesScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
       >
-        {conversationsList.map((conversation) => (
-          <TouchableOpacity
+        {filteredConversations.map((conversation) => (
+          <Pressable
             key={conversation.id}
-            className="flex-row items-center p-4 border-b border-gray-50 active:bg-gray-50"
+            className="flex-row items-center p-4 border-b border-gray-50 pressed:bg-gray-50"
             onPress={() => openConversation(conversation)}
             onLongPress={() => deleteConversation(conversation.id)}
+            style={({ pressed }) => [
+              { backgroundColor: pressed ? "#F8FAFC" : "transparent" },
+            ]}
           >
             <Image
               source={{ uri: conversation.user.avatar }}
@@ -141,7 +192,7 @@ const MessagesScreen = () => {
                 {conversation.lastMessage}
               </Text>
             </View>
-          </TouchableOpacity>
+          </Pressable>
         ))}
       </ScrollView>
 
