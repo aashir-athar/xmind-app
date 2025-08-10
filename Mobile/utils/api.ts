@@ -1,12 +1,13 @@
 import axios, { AxiosInstance } from "axios";
-import { useAuth, useClerk } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
+import { useMemo } from "react";
 
-const API_BASE_URL = "https://x-clone-react-native-seven.vercel.app/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export const createApiClient = (
   getToken: () => Promise<string | null>
 ): AxiosInstance => {
-  const api = axios.create({ baseURL: API_BASE_URL });
+  const api = axios.create({ baseURL: API_BASE_URL, timeout: 10000 });
 
   api.interceptors.request.use(async (config) => {
     const token = await getToken();
@@ -21,7 +22,7 @@ export const createApiClient = (
 
 export const useApiClient = (): AxiosInstance => {
   const { getToken } = useAuth();
-  return createApiClient(getToken);
+  return useMemo(() => createApiClient(getToken), [getToken]);
 };
 
 export const userApi = {
