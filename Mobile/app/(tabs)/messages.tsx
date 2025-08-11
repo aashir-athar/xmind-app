@@ -3,7 +3,7 @@ import {
   ConversationType,
   MessageType,
 } from "@/data/conversations";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -186,8 +186,8 @@ const MessagesScreen = () => {
                     {conversation.user.name}
                   </Text>
                   {conversation.user.verified && (
-                    <Feather
-                      name="check-circle"
+                    <MaterialCommunityIcons
+                      name="check-decagram"
                       size={16}
                       color="#FF5A5F"
                       className="ml-1"
