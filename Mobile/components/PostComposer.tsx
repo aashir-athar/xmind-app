@@ -54,7 +54,7 @@ const PostComposer = () => {
               resizeMode="cover"
             />
             <TouchableOpacity
-              className="absolute top-2 right-2 w-8 h-8 bg-black bg-opacity-40 rounded-full items-center justify-center"
+              className="absolute top-2 right-2 w-8 h-8 bg-black/40 rounded-full items-center justify-center"
               onPress={removeImage}
             >
               <Feather name="x" size={16} color={"white"} />

@@ -26,10 +26,11 @@ export const useCreatePost = () => {
           webp: "image/webp",
         };
         const mimeType = mimeTypeMap[fileType] || "image/jpeg";
+        const normalizedExt = mimeType.split("/")[1]; // e.g., "jpeg", "png"
 
         formData.append("image", {
           uri: postData.imageUri,
-          name: `image.${fileType}`,
+          name: `image.${normalizedExt}`,
           type: mimeType,
         } as any);
       }
