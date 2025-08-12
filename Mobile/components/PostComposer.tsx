@@ -26,7 +26,7 @@ const PostComposer = () => {
   const { user } = useUser();
 
   return (
-    <View className="border-b border-borderLight p-4 bg-background">
+    <View className="border-b border-borderLight p-4 bg-surface">
       <View className="flex-row">
         <Image
           source={{ uri: user?.imageUrl }}
