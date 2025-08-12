@@ -63,7 +63,9 @@ const PostsList = () => {
             post={item}
             onLike={toggleLike}
             onDelete={deletePost}
-            isLiked={checkIsLiked(item.likes, currentUser)}
+            isLiked={
+              currentUser ? checkIsLiked(item.likes, currentUser) : false
+            }
             currentUser={currentUser}
           />
         )}

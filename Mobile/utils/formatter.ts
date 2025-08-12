@@ -14,6 +14,9 @@ export const formatNumber = (num: number): string => {
 export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
+  if (isNaN(date.getTime())) {
+    return "Invalid date";
+  }
 
   const minutes = differenceInMinutes(now, date);
   const hours = differenceInHours(now, date);

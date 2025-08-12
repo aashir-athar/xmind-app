@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, postApi } from "../utils/api";
+import { Alert } from "react-native";
+import { User } from "@/types";
 
 export const usePosts = (username?: string) => {
   const api = useApiClient();
@@ -25,6 +27,9 @@ export const usePosts = (username?: string) => {
         queryClient.invalidateQueries({ queryKey: ["userPosts", username] });
       }
     },
+    onError: (error: unknown) => {
+      Alert.alert("Error", "Failed to like post. Please try again.");
+    },
   });
 
   const deletePostMutation = useMutation({
@@ -35,11 +40,16 @@ export const usePosts = (username?: string) => {
         queryClient.invalidateQueries({ queryKey: ["userPosts", username] });
       }
     },
+    onError: (error: unknown) => {
+      Alert.alert("Error", "Failed to delete post. Please try again.");
+    },
   });
 
-  const checkIsLiked = (postLikes: string[], currentUser: any) => {
-    const isLiked = currentUser && postLikes.includes(currentUser._id);
-    return isLiked;
+  const checkIsLiked = (
+    postLikes: string[] | undefined,
+    currentUser: User | undefined
+  ): boolean => {
+    return Boolean(currentUser && postLikes?.includes(currentUser._id));
   };
 
   return {

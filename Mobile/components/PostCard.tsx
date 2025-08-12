@@ -19,9 +19,7 @@ const PostCard = ({
   onDelete,
   isLiked,
 }: PostCardProps) => {
-  const isOwnPost = post.user._id === currentUser._id;
-  
-  
+  const isOwnPost = currentUser ? post.user._id === currentUser._id : false;
 
   const handleDelete = () => {
     Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
@@ -67,7 +65,11 @@ const PostCard = ({
     <View className="border-b border-borderLight bg-surface">
       <View className="flex-row p-4">
         <Image
-          source={{ uri: post.user.profilePicture || "" }}
+          source={
+            post.user.profilePicture
+              ? { uri: post.user.profilePicture }
+              : require("@/assets/images/default-avatar.jpeg")
+          }
           className="w-12 h-12 rounded-full mr-3"
         />
         <View className="flex-1">
