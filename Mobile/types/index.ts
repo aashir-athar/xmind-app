@@ -44,3 +44,33 @@ export interface Notification {
   };
   createdAt: string;
 }
+
+// Main exports
+export { default } from "../components/CustomTabBar";
+export { default as CustomTabBar } from "../components/CustomTabBar";
+
+// Component exports for advanced customization
+export { TabIcon } from "../components/TabIcon";
+export { TabBackground } from "../components/TabBackground";
+export { AnimatedTabContainer } from "../components/AnimatedTabContainer";
+
+// Types (if you want to extend them)
+export interface TabRoute {
+  name: string;
+  key: string;
+}
+
+export interface TabIconConfig {
+  iconName: string;
+  gradientColors: [string, string];
+}
+
+export interface CustomTabBarConfig {
+  routes: TabRoute[];
+  tabWidth?: number;
+  animationDuration?: number;
+  springConfig?: {
+    damping: number;
+    stiffness: number;
+  };
+}

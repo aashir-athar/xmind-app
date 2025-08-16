@@ -32,11 +32,11 @@ const SearchScreen = () => {
       {/* HEADER */}
       <View className="px-4 py-3 border-b border-borderLight">
         <View className="flex-row items-center bg-surface rounded-full px-4 py-3">
-          <Feather name="search" size={20} color="#8A8A8A" />
+          <Feather name="search" size={20} color="#B0BEC5" />
           <TextInput
             placeholder="Search xMind..."
             className="flex-1 ml-3 text-base text-textPrimary"
-            placeholderTextColor="#8A8A8A"
+            placeholderTextColor="#B0BEC5"
           />
         </View>
       </View>

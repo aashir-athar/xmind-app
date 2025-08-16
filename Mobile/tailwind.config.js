@@ -6,34 +6,36 @@ module.exports = {
     extend: {
       colors: {
         // Brand
-        primary: "#FF6B57", // Warm Optimistic Coral - brand & primary action
-        primaryLight: "#FF8A78", // Softer coral for hover states
-        primaryDark: "#E85A46", // Slightly deeper coral for pressed states
+        primary: "#4527A0", // Deep Purple - creativity, intelligence, trustworthy
+        primaryLight: "#7E57C2", // Soft Lavender - hover state, approachable & uplifting
+        primaryDark: "#311B92", // Dark Indigo - pressed state, deep stability
 
-        secondary: "#FFE8D1", // Soft Honey Beige - calming secondary
-        accentMint: "#3AC6A8", // Fresh Mint - success, positive feedback
-        accentYellow: "#FFC85C", // Soft Amber Glow - notifications, highlights
+        secondary: "#1565C0", // Trust Blue - reliable, calm navigation & links
+        secondaryLight: "#42A5F5", // Sky Blue - hover state, fresh & inviting
+        secondaryDark: "#0D47A1", // Navy Blue - pressed state, professional depth
+
+        accent: "#FF7043", // Warm Orange - energetic highlights, notifications, CTAs
 
         // Semantic status
-        success: "#3AC6A8", // Matches accentMint
-        warning: "#FFC85C", // Matches accentYellow
-        danger: "#E64B46", // Softer than pure red, still noticeable
+        success: "#43A047", // Forest Green - positive feedback, growth
+        warning: "#FFB300", // Amber Yellow - cautious alerts, warm attention
+        danger: "#E53935", // Soft Red - urgent errors, serious but not alarming
 
         // Neutral palette
-        background: "#FAFAF7", // Cloud White - off-white, easy on eyes
-        surface: "#FFFFFF", // Pure white for cards & content areas
-        surfaceMuted: "#F5F6F4", // Very light neutral for muted areas
-        borderLight: "#EFEFEA", // Subtle light borders
-        borderDark: "#E2E2DD", // Darker neutral border
+        background: "#FAFAFA", // Soft White-Gray - serene, easy on eyes
+        surface: "#FFFFFF", // Pure White - clean content surfaces
+        surfaceMuted: "#F5F5F5", // Light Gray - muted elements, subtle depth
+        borderLight: "#E0E0E0", // Light Gray - minimal, clean borders
+        borderDark: "#B0BEC5", // Slate Gray - stronger borders, professional
 
         // Text
-        textPrimary: "#1E1E1E", // Deep Graphite - softer than pure black
-        textSecondary: "#6A6A6A", // Muted graphite for less important text
+        textPrimary: "#424242", // Dark Gray - readable, softer than black
+        textSecondary: "#757575", // Medium Gray - secondary text, less emphasis
 
         // Icons & placeholders
-        iconPrimary: "#FF6B57", // Matches primary brand color
-        iconSecondary: "#7A7A7A", // Neutral mid-gray for secondary icons
-        placeholder: "#A0A0A0", // Softer gray for placeholders
+        iconPrimary: "#4527A0", // Deep Purple - brand-aligned icons
+        iconSecondary: "#90A4AE", // Blue-Gray - secondary icons, subtle
+        placeholder: "#B0BEC5", // Slate Gray - placeholders, calm & unobtrusive
       },
     },
   },

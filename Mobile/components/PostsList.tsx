@@ -1,5 +1,5 @@
 import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
-import React from "react";
+import React, { useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePosts } from "@/hooks/usePosts";
 import { Post } from "@/types";
@@ -9,6 +9,7 @@ import {
   ListRenderItem,
   ListRenderItemInfo,
 } from "@shopify/flash-list";
+import CommentsModal from "./CommentsModal";
 
 const PostsList = () => {
   const { currentUser } = useCurrentUser();
@@ -21,11 +22,16 @@ const PostsList = () => {
     deletePost,
     checkIsLiked,
   } = usePosts();
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  const selectedPost = selectedPostId
+    ? posts.find((p: Post) => p._id === selectedPostId)
+    : null;
 
   if (isLoading) {
     return (
       <View className="p-8 items-center">
-        <ActivityIndicator size={"large"} color={"#FF6B57"} />
+        <ActivityIndicator size={"large"} color={"#4527A0"} />
         <Text className="text-textSecondary mt-2">Loading...</Text>
       </View>
     );
@@ -63,6 +69,7 @@ const PostsList = () => {
             post={item}
             onLike={toggleLike}
             onDelete={deletePost}
+            onComment={(post: Post) => setSelectedPostId(post._id)}
             isLiked={
               currentUser ? checkIsLiked(item.likes, currentUser) : false
             }
@@ -71,6 +78,9 @@ const PostsList = () => {
         )}
         keyExtractor={(item) => item._id}
       />
+
+
+      <CommentsModal selectedPost={selectedPost} onClose={() => setSelectedPostId(null)} />
     </>
   );
 };

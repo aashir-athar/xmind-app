@@ -140,18 +140,18 @@ const MessagesScreen = () => {
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-borderLight">
         <Text className="text-xl font-bold text-gray-900">Messages</Text>
         <TouchableOpacity>
-          <Feather name="edit" size={24} color="#FF5A5F" />
+          <Feather name="edit" size={24} color="#4527A0" />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View className="px-4 py-3 border-b border-borderLight">
         <View className="flex-row items-center bg-gray-100 rounded-full px-4 py-3">
-          <Feather name="search" size={20} color="#8A8A8A" />
+          <Feather name="search" size={20} color="#B0BEC5" />
           <TextInput
             placeholder="Search for people and groups"
             className="flex-1 ml-3 text-base text-textPrimary"
-            placeholderTextColor="#8A8A8A"
+            placeholderTextColor="#B0BEC5"
             value={searchText}
             onChangeText={setSearchText}
           />
@@ -189,7 +189,7 @@ const MessagesScreen = () => {
                     <MaterialCommunityIcons
                       name="check-decagram"
                       size={16}
-                      color="#FF5A5F"
+                      color="#4527A0"
                       className="ml-1"
                     />
                   )}
@@ -227,7 +227,7 @@ const MessagesScreen = () => {
             {/* Chat Header */}
             <View className="flex-row items-center px-4 py-3 border-b border-borderLight">
               <TouchableOpacity onPress={closeChatModal} className="mr-3">
-                <Feather name="arrow-left" size={24} color="#FF5A5F" />
+                <Feather name="arrow-left" size={24} color="#4527A0" />
               </TouchableOpacity>
               <Image
                 source={{ uri: selectedConversation.user.avatar }}
@@ -239,7 +239,12 @@ const MessagesScreen = () => {
                     {selectedConversation.user.name}
                   </Text>
                   {selectedConversation.user.verified && (
-                    <Feather name="check-circle" size={16} color="#FF5A5F" />
+                    <MaterialCommunityIcons
+                      name="check-decagram"
+                      size={16}
+                      color="#4527A0"
+                      className="ml-1"
+                    />
                   )}
                 </View>
                 <Text className="text-textSecondary text-sm">
@@ -303,7 +308,7 @@ const MessagesScreen = () => {
                 <TextInput
                   className="flex-1 text-base text-textPrimary"
                   placeholder="Start a message..."
-                  placeholderTextColor="#8A8A8A"
+                  placeholderTextColor="#B0BEC5"
                   value={newMessage}
                   onChangeText={setNewMessage}
                   multiline

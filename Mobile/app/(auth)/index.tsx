@@ -64,7 +64,7 @@ export default function Index() {
               }}
             >
               {isLoading ? (
-                <ActivityIndicator size={"small"} color={"#FF5A5F"} />
+                <ActivityIndicator size={"small"} color={"#4527A0"} />
               ) : (
                 <View className="flex-row items-center justify-center">
                   <Image
