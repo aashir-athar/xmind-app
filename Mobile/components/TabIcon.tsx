@@ -102,7 +102,6 @@ export const TabIcon: React.FC<TabIconProps> = ({
     transform: [
       { scale: scale.value },
       { translateY: translateY.value },
-      { rotate: `${rotation.value}deg` },
     ],
   }));
 
@@ -140,53 +139,42 @@ export const TabIcon: React.FC<TabIconProps> = ({
         animatedIconStyle,
       ]}
     >
-      {/* Overlay for ripple + glow (centered) */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {/* Ripple Effect */}
+      {/* Ripple Effect */}
+      <Animated.View
+        style={[
+          {
+            position: "absolute",
+            width: 50,
+            height: 50,
+            borderRadius: 25,
+            backgroundColor: gradientColors[0],
+          },
+          animatedRippleStyle,
+        ]}
+      />
+
+      {/* Glow Effect */}
+      {isFocused && (
         <Animated.View
           style={[
             {
-              width: 50,
-              height: 50,
-              borderRadius: 25,
+              position: "absolute",
+              width: 60,
+              height: 60,
+              borderRadius: 30,
               backgroundColor: gradientColors[0],
+              opacity: 0.3,
+              shadowColor: gradientColors[0],
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.8,
+              shadowRadius: 20,
+              elevation: 15,
             },
-            animatedRippleStyle,
+            animatedGlowStyle,
           ]}
         />
+      )}
 
-        {/* Glow Effect */}
-        {isFocused && (
-          <Animated.View
-            style={[
-              {
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                backgroundColor: gradientColors[0],
-                opacity: 0.3,
-                shadowColor: gradientColors[0],
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.8,
-                shadowRadius: 20,
-                elevation: 15,
-              },
-              animatedGlowStyle,
-            ]}
-          />
-        )}
-      </View>
       {/* Main Icon Container */}
       {isFocused ? (
         <AnimatedLinearGradient
