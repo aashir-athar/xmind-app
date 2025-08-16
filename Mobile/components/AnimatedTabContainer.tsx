@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { Dimensions } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,6 +8,13 @@ import Animated, {
   withDelay,
 } from "react-native-reanimated";
 import { TAB_CONFIG } from "../constants/colors";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+const scale = Math.min(
+  Math.max((SCREEN_WIDTH / 430) * (aspectRatio > 2 ? 0.9 : 1), 0.85),
+  1.2
+);
 
 interface AnimatedTabContainerProps {
   children: React.ReactNode;
@@ -18,12 +25,11 @@ export const AnimatedTabContainer: React.FC<AnimatedTabContainerProps> = ({
   children,
   insets,
 }) => {
-  const slideUpAnimation = useSharedValue(100);
+  const slideUpAnimation = useSharedValue(100 * scale);
   const scaleAnimation = useSharedValue(0.8);
   const opacityAnimation = useSharedValue(0);
 
   useEffect(() => {
-    // Initial entrance animation with staggered timing
     slideUpAnimation.value = withDelay(
       300,
       withSpring(0, { damping: 12, stiffness: 100 })
@@ -48,10 +54,10 @@ export const AnimatedTabContainer: React.FC<AnimatedTabContainerProps> = ({
       style={[
         {
           position: "absolute",
-          left: 20,
-          right: 20,
-          bottom: insets.bottom + 20,
-          borderRadius: TAB_CONFIG.BORDER_RADIUS,
+          left: 20 * scale,
+          right: 20 * scale,
+          bottom: insets.bottom * scale,
+          borderRadius: TAB_CONFIG.BORDER_RADIUS * scale,
           overflow: "hidden",
         },
         animatedContainerStyle,

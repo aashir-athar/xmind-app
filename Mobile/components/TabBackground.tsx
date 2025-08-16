@@ -20,8 +20,7 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
   const animatedBackgroundStyle = useAnimatedStyle(() => {
     const denom = Math.max(1, routesLength - 1);
     const colorProgress = backgroundMorph.value / denom;
-    // Create gradient between brand colors
-    const hue = interpolate(colorProgress, [0, 1], [16, 170]); // From coral hue to mint hue
+    const hue = interpolate(colorProgress, [0, 1], [16, 170]);
     return {
       backgroundColor: `hsla(${hue}, 65%, 70%, 0.1)`,
     };
@@ -29,7 +28,6 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
 
   return (
     <>
-      {/* Blur Background */}
       <BlurView
         intensity={TAB_CONFIG.BLUR_INTENSITY}
         tint="light"
@@ -41,8 +39,6 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           bottom: 0,
         }}
       />
-
-      {/* Base Background */}
       <View
         style={{
           position: "absolute",
@@ -54,8 +50,6 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           opacity: 0.95,
         }}
       />
-
-      {/* Dynamic Background Gradient */}
       <Animated.View
         style={[
           {
@@ -69,8 +63,6 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           animatedBackgroundStyle,
         ]}
       />
-
-      {/* Glass overlay */}
       <View
         style={{
           position: "absolute",
@@ -78,14 +70,12 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: `${BRAND_COLORS.SECONDARY}20`, // Secondary with 20% opacity
+          backgroundColor: `${BRAND_COLORS.SECONDARY}20`,
           borderWidth: 1,
           borderColor: BRAND_COLORS.BORDER_LIGHT,
           borderRadius: TAB_CONFIG.BORDER_RADIUS,
         }}
       />
-
-      {/* Bottom accent line */}
       <LinearGradient
         colors={["transparent", BRAND_COLORS.PRIMARY, "transparent"]}
         start={{ x: 0, y: 0 }}
@@ -95,7 +85,7 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           bottom: 0,
           left: 0,
           right: 0,
-          height: 2,
+          height: 0,
           opacity: 0.6,
         }}
       />

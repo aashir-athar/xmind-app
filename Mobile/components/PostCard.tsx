@@ -86,7 +86,7 @@ const PostCard = ({
             </View>
             {isOwnPost && (
               <TouchableOpacity onPress={handleDelete}>
-                <Feather name="trash" color={"#7A7A7A"} />
+                <Feather name="trash" color={"#E53935"} />
               </TouchableOpacity>
             )}
           </View>
