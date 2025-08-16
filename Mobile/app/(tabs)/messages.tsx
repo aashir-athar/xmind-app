@@ -138,7 +138,7 @@ const MessagesScreen = () => {
     <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
       {/* HEADER */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-borderLight">
-        <Text className="text-xl font-bold text-gray-900">Messages</Text>
+        <Text className="text-xl font-bold text-textPrimary">Messages</Text>
         <TouchableOpacity>
           <Feather name="edit" size={24} color="#4527A0" />
         </TouchableOpacity>

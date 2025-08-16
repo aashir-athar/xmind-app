@@ -8,7 +8,12 @@ import { TabBackground } from "./TabBackground";
 import { AnimatedTabContainer } from "./AnimatedTabContainer";
 import { TAB_CONFIG } from "../constants/colors";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+const scale = Math.min(
+  Math.max((SCREEN_WIDTH / 430) * (aspectRatio > 2 ? 0.9 : 1), 0.85),
+  1.2
+);
 
 export default function CustomTabBar({
   state,
@@ -16,13 +21,12 @@ export default function CustomTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const TAB_WIDTH = (SCREEN_WIDTH - 80) / Math.max(1, state.routes.length);
+  const TAB_WIDTH =
+    (SCREEN_WIDTH - 80 * scale) / Math.max(1, state.routes.length);
 
-  // Background morphing animation
   const backgroundMorph = useSharedValue(0);
 
   useEffect(() => {
-    // Background morphing based on focused tab
     backgroundMorph.value = withSpring(state.index, {
       damping: 15,
       stiffness: 120,
@@ -47,16 +51,14 @@ export default function CustomTabBar({
         backgroundMorph={backgroundMorph}
         routesLength={state.routes.length}
       />
-
-      {/* Tab Icons Container */}
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-around",
           alignItems: "center",
-          paddingHorizontal: 10,
-          paddingVertical: 15,
-          minHeight: TAB_CONFIG.CONTAINER_HEIGHT,
+          paddingHorizontal: 10 * scale,
+          paddingVertical: 15 * scale,
+          minHeight: TAB_CONFIG.CONTAINER_HEIGHT * scale,
         }}
       >
         {state.routes.map((route, index) => {
