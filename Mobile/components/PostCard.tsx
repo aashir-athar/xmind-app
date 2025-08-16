@@ -8,6 +8,7 @@ interface PostCardProps {
   post: Post;
   onLike: (postId: string) => void;
   onDelete: (postId: string) => void;
+  onComment: (post: Post) => void;
   isLiked?: boolean;
   currentUser: User;
 }
@@ -17,6 +18,7 @@ const PostCard = ({
   post,
   onLike,
   onDelete,
+  onComment,
   isLiked,
 }: PostCardProps) => {
   const isOwnPost = currentUser ? post.user._id === currentUser._id : false;
@@ -40,7 +42,7 @@ const PostCard = ({
             return (
               <Text
                 key={`${lineIndex}-${wordIndex}`}
-                className="text-primaryLight"
+                className="text-primary font-semibold"
                 onPress={() => console.log(`Clicked hashtag: ${word}`)}
               >
                 {word + " "}
@@ -105,7 +107,7 @@ const PostCard = ({
           <View className="flex-row justify-between max-w-xs">
             <TouchableOpacity
               className="flex-row items-center"
-              onPress={() => {}}
+              onPress={() => onComment(post)}
             >
               <Feather name="message-circle" size={18} color={"#7A7A7A"} />
               <Text className="text-textSecondary text-sm ml-2">
@@ -126,7 +128,7 @@ const PostCard = ({
               onPress={() => onLike(post._id)}
             >
               {isLiked ? (
-                <AntDesign name="heart" size={18} color={"#FF8A78"} />
+                <AntDesign name="heart" size={18} color={"#7E57C2"} />
               ) : (
                 <Feather name="heart" size={18} color={"#7A7A7A"} />
               )}

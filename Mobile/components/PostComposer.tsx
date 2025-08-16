@@ -36,7 +36,7 @@ const PostComposer = () => {
           <TextInput
             className="text-textPrimary text-lg"
             placeholder="What's on your mind?"
-            placeholderTextColor={"#A0A0A0"}
+            placeholderTextColor={"#B0BEC5"}
             multiline
             value={content}
             onChangeText={setContent}
@@ -66,10 +66,10 @@ const PostComposer = () => {
       <View className="flex-row justify-between items-center mt-3">
         <View className="flex-row">
           <TouchableOpacity className="mr-4" onPress={pickImageFromGallery}>
-            <Feather name="image" size={20} color={"#FF6B57"} />
+            <Feather name="image" size={20} color={"#4527A0"} />
           </TouchableOpacity>
           <TouchableOpacity className="mr-4" onPress={takePhoto}>
-            <Feather name="camera" size={20} color={"#FF6B57"} />
+            <Feather name="camera" size={20} color={"#4527A0"} />
           </TouchableOpacity>
         </View>
         <View className="flex-row items-center">
