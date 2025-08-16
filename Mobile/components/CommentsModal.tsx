@@ -14,7 +14,7 @@ import { useComments } from "@/hooks/useComments";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 interface CommentsModalProps {
-  selectedPost: Post;
+  selectedPost: Post | null;
   onClose: () => void;
 }
 
@@ -105,32 +105,38 @@ const CommentsModal = ({ selectedPost, onClose }: CommentsModalProps) => {
             </View>
           </View>
 
-          {selectedPost?.comments.map((comment) => (
-            <View
-              key={comment._id}
-              className="border-b border-borderLight bg-mutedSurface p-4"
-            >
-              <View className="flex-row">
-                <Image
-                  className="w-10 h-10 rounded-full mr-3"
-                  source={{ uri: comment.user.profilePicture }}
-                />
-                <View className="flex-1">
-                  <View className="flex-row items-center mb-1">
-                    <Text className="font-bold text-textPrimary mr-1">
-                      {comment.user.firstName} {comment.user.lastName}
-                    </Text>
-                    <Text className="text-textSecondary text-sm ml-1">
-                      @{comment.user.username}
+          {selectedPost.comments && selectedPost.comments.length > 0 ? (
+            selectedPost?.comments.map((comment) => (
+              <View
+                key={comment._id}
+                className="border-b border-borderLight bg-mutedSurface p-4"
+              >
+                <View className="flex-row">
+                  <Image
+                    className="w-10 h-10 rounded-full mr-3"
+                    source={{ uri: comment.user.profilePicture }}
+                  />
+                  <View className="flex-1">
+                    <View className="flex-row items-center mb-1">
+                      <Text className="font-bold text-textPrimary mr-1">
+                        {comment.user.firstName} {comment.user.lastName}
+                      </Text>
+                      <Text className="text-textSecondary text-sm ml-1">
+                        @{comment.user.username}
+                      </Text>
+                    </View>
+                    <Text className="text-textPrimary text-base leading-5 mb-2">
+                      {comment.content}
                     </Text>
                   </View>
-                  <Text className="text-textPrimary text-base leading-5 mb-2">
-                    {comment.content}
-                  </Text>
                 </View>
               </View>
+            ))
+          ) : (
+            <View className="p-4 text-center">
+              <Text className="text-textSecondary">No comments yet</Text>
             </View>
-          ))}
+          )}
 
           <View className="p-4 border-t border-borderLight">
             <View className="flex-row">

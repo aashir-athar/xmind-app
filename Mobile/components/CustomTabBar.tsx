@@ -9,7 +9,6 @@ import { AnimatedTabContainer } from "./AnimatedTabContainer";
 import { TAB_CONFIG } from "../constants/colors";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const TAB_WIDTH = (SCREEN_WIDTH - 80) / 5; // Accounting for padding and margins
 
 export default function CustomTabBar({
   state,
@@ -17,6 +16,7 @@ export default function CustomTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const TAB_WIDTH = (SCREEN_WIDTH - 80) / Math.max(1, state.routes.length);
 
   // Background morphing animation
   const backgroundMorph = useSharedValue(0);

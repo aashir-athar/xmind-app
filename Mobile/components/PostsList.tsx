@@ -79,8 +79,12 @@ const PostsList = () => {
         keyExtractor={(item) => item._id}
       />
 
-
-      <CommentsModal selectedPost={selectedPost} onClose={() => setSelectedPostId(null)} />
+      {selectedPost && (
+        <CommentsModal
+          selectedPost={selectedPost}
+          onClose={() => setSelectedPostId(null)}
+        />
+      )}
     </>
   );
 };

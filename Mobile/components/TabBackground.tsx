@@ -18,7 +18,8 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
   routesLength,
 }) => {
   const animatedBackgroundStyle = useAnimatedStyle(() => {
-    const colorProgress = backgroundMorph.value / (routesLength - 1);
+    const denom = Math.max(1, routesLength - 1);
+    const colorProgress = backgroundMorph.value / denom;
     // Create gradient between brand colors
     const hue = interpolate(colorProgress, [0, 1], [16, 170]); // From coral hue to mint hue
     return {

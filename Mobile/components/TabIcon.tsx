@@ -12,7 +12,8 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_COLORS, TAB_GRADIENTS, TAB_CONFIG } from "../constants/colors";
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 interface TabIconProps {
@@ -107,9 +108,7 @@ export const TabIcon: React.FC<TabIconProps> = ({
 
   const animatedGlowStyle = useAnimatedStyle(() => ({
     opacity: glowOpacity.value,
-    transform: [
-      { scale: interpolate(glowOpacity.value, [0, 1], [0.8, 1.2]) },
-    ],
+    transform: [{ scale: interpolate(glowOpacity.value, [0, 1], [0.8, 1.2]) }],
   }));
 
   const animatedRippleStyle = useAnimatedStyle(() => ({
@@ -141,42 +140,53 @@ export const TabIcon: React.FC<TabIconProps> = ({
         animatedIconStyle,
       ]}
     >
-      {/* Ripple Effect */}
-      <Animated.View
-        style={[
-          {
-            position: "absolute",
-            width: 50,
-            height: 50,
-            borderRadius: 25,
-            backgroundColor: gradientColors[0],
-          },
-          animatedRippleStyle,
-        ]}
-      />
-
-      {/* Glow Effect */}
-      {isFocused && (
+      {/* Overlay for ripple + glow (centered) */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* Ripple Effect */}
         <Animated.View
           style={[
             {
-              position: "absolute",
-              width: 60,
-              height: 60,
-              borderRadius: 30,
+              width: 50,
+              height: 50,
+              borderRadius: 25,
               backgroundColor: gradientColors[0],
-              opacity: 0.3,
-              shadowColor: gradientColors[0],
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.8,
-              shadowRadius: 20,
-              elevation: 15,
             },
-            animatedGlowStyle,
+            animatedRippleStyle,
           ]}
         />
-      )}
 
+        {/* Glow Effect */}
+        {isFocused && (
+          <Animated.View
+            style={[
+              {
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: gradientColors[0],
+                opacity: 0.3,
+                shadowColor: gradientColors[0],
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.8,
+                shadowRadius: 20,
+                elevation: 15,
+              },
+              animatedGlowStyle,
+            ]}
+          />
+        )}
+      </View>
       {/* Main Icon Container */}
       {isFocused ? (
         <AnimatedLinearGradient
