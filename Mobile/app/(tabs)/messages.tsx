@@ -23,6 +23,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useMemo } from "react";
+import { BRAND_COLORS } from "@/constants/colors";
 
 const MessagesScreen = () => {
   const insets = useSafeAreaInsets();
@@ -186,12 +187,26 @@ const MessagesScreen = () => {
                     {conversation.user.name}
                   </Text>
                   {conversation.user.verified && (
-                    <MaterialCommunityIcons
-                      name="check-decagram"
-                      size={16}
-                      color="#4527A0"
-                      className="ml-1"
-                    />
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 12,
+                        backgroundColor: BRAND_COLORS.PRIMARY,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        shadowColor: BRAND_COLORS.PRIMARY,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 4,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={9}
+                        color={BRAND_COLORS.SURFACE}
+                      />
+                    </View>
                   )}
                   <Text className="text-textSecondary text-sm ml-1">
                     @{conversation.user.username}
@@ -239,12 +254,26 @@ const MessagesScreen = () => {
                     {selectedConversation.user.name}
                   </Text>
                   {selectedConversation.user.verified && (
-                    <MaterialCommunityIcons
-                      name="check-decagram"
-                      size={16}
-                      color="#4527A0"
-                      className="ml-1"
-                    />
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 12,
+                        backgroundColor: BRAND_COLORS.PRIMARY,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        shadowColor: BRAND_COLORS.PRIMARY,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 4,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={9}
+                        color={BRAND_COLORS.SURFACE}
+                      />
+                    </View>
                   )}
                 </View>
                 <Text className="text-textSecondary text-sm">
