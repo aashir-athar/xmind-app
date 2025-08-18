@@ -4,14 +4,10 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePosts } from "@/hooks/usePosts";
 import { Post } from "@/types";
 import PostCard from "./PostCard";
-import {
-  FlashList,
-  ListRenderItem,
-  ListRenderItemInfo,
-} from "@shopify/flash-list";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import CommentsModal from "./CommentsModal";
 
-const PostsList = () => {
+const PostsList = ({ username }: { username?: string }) => {
   const { currentUser } = useCurrentUser();
   const {
     posts,
@@ -21,7 +17,7 @@ const PostsList = () => {
     toggleLike,
     deletePost,
     checkIsLiked,
-  } = usePosts();
+  } = usePosts(username);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const selectedPost = selectedPostId
@@ -31,8 +27,8 @@ const PostsList = () => {
   if (isLoading) {
     return (
       <View className="p-8 items-center">
-        <ActivityIndicator size={"large"} color={"#4527A0"} />
-        <Text className="text-textSecondary mt-2">Loading...</Text>
+        <ActivityIndicator size="large" color="#4527A0" />
+        <Text className="text-gray-500 mt-2">Loading posts...</Text>
       </View>
     );
   }
@@ -69,11 +65,9 @@ const PostsList = () => {
             post={item}
             onLike={toggleLike}
             onDelete={deletePost}
-            onComment={(post: Post) => setSelectedPostId(post._id)}
-            isLiked={
-              currentUser ? checkIsLiked(item.likes, currentUser) : false
-            }
+            onComment={(item: Post) => setSelectedPostId(item._id)}
             currentUser={currentUser}
+            isLiked={checkIsLiked(item.likes, currentUser)}
           />
         )}
         keyExtractor={(item) => item._id}
