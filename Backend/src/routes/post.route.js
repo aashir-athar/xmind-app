@@ -15,7 +15,7 @@ const router = express.Router();
 // public routes
 router.get("/", getPosts);
 router.get("/:postId", getPost);
-router.get("/users/posts/:username", getUserPosts);
+router.get("/user/:username", getUserPosts);
 
 // protected proteced
 router.post("/", protectRoute, upload.single("image"), createPost);
