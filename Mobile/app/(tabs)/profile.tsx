@@ -6,8 +6,9 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  RefreshControl,
 } from "react-native";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -40,6 +41,7 @@ const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 const ProfileScreen = () => {
   const { currentUser, isLoading } = useCurrentUser();
   const insets = useSafeAreaInsets();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const {
     posts: userPosts,
@@ -90,6 +92,10 @@ const ProfileScreen = () => {
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollY.value = event.contentOffset.y;
+
+      // Dynamic header effects based on scroll
+      const progress = Math.min(event.contentOffset.y / 100, 1);
+      headerOpacity.value = interpolate(progress, [0, 1], [1, 0.8]);
     },
   });
 
@@ -145,6 +151,12 @@ const ProfileScreen = () => {
   const editButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: editButtonScale.value }],
   }));
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([refetchProfile(), refetchPosts()]);
+    setIsRefreshing(false);
+  };
 
   if (isLoading || !currentUser._id) {
     return (
@@ -257,6 +269,18 @@ const ProfileScreen = () => {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing} // Add this prop
+              onRefresh={handleRefresh} // Use the new async handler
+              tintColor={BRAND_COLORS.PRIMARY_LIGHT}
+              title="Syncing your mind..."
+              titleColor={BRAND_COLORS.TEXT_SECONDARY}
+              progressBackgroundColor={BRAND_COLORS.SURFACE}
+              colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
+            />
+          }
         >
           {/* Enhanced Banner */}
           <Animated.View
