@@ -11,8 +11,7 @@ export const arcjetMiddleware = async (req, res, next) => {
     // handle denied requests
     if (decision.isDenied()) {
       if (decision.reason.isRateLimit()) {
-        const retryAfter = decision.reason.resetInSeconds || 10;
-        return res.status(429).header("Retry-After", retryAfter).json({
+        return res.status(429).json({
           error: "Too Many Requests",
           message: "Rate limit exceeded. Please try again later.",
         });
@@ -30,11 +29,7 @@ export const arcjetMiddleware = async (req, res, next) => {
     }
 
     // check for spoofed bots
-    if (
-      decision.results.some(
-        (result) => result.reason.isBot() && result.reason.isSpoofed()
-      )
-    ) {
+    if (decision.results.some((result) => result.reason.isBot() && result.reason.isSpoofed())) {
       return res.status(403).json({
         error: "Spoofed bot detected",
         message: "Malicious bot activity detected.",
