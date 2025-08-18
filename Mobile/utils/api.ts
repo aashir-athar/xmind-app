@@ -3,7 +3,7 @@ import { useAuth } from "@clerk/clerk-expo";
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  "http://x-clone-react-native-seven.vercel.app/api";
+  "https://x-clone-react-native-seven.vercel.app/api";
 // ! 🔥 localhost api would not work on your actual physical device
 // const API_BASE_URL = "http://localhost:5001/api";
 
