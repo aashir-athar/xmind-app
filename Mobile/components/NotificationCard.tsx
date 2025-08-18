@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Dimensions,
 } from "react-native";
 import { Notification } from "@/types";
 import { Feather } from "@expo/vector-icons";
@@ -23,6 +24,13 @@ interface NotificationCardProps {
   notification: Notification;
   onDelete: (notificationId: string) => void;
 }
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+const scale = Math.min(
+  Math.max((SCREEN_WIDTH / 430) * (aspectRatio > 2 ? 0.9 : 1), 0.85),
+  1.2
+);
 
 const NotificationCard = ({
   notification,

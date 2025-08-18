@@ -367,7 +367,7 @@ const ProfileScreen = () => {
                       letterSpacing: 0.3,
                     }}
                   >
-                    Edit Mind
+                    Edit Profile
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -388,26 +388,28 @@ const ProfileScreen = () => {
                   >
                     {currentUser.firstName} {currentUser.lastName}
                   </Text>
-                  <View
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      backgroundColor: BRAND_COLORS.PRIMARY,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      shadowColor: BRAND_COLORS.PRIMARY,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 4,
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name="check"
-                      size={14}
-                      color={BRAND_COLORS.SURFACE}
-                    />
-                  </View>
+                  {currentUser.user?.verified && (
+                    <View
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: BRAND_COLORS.PRIMARY,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        shadowColor: BRAND_COLORS.PRIMARY,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 4,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={14}
+                        color={BRAND_COLORS.SURFACE}
+                      />
+                    </View>
+                  )}
                 </View>
 
                 <Text
@@ -488,7 +490,7 @@ const ProfileScreen = () => {
                         fontWeight: "500",
                       }}
                     >
-                      Mind joined{" "}
+                      Joined{" "}
                       {format(new Date(currentUser.createdAt), "MMMM yyyy")}
                     </Text>
                   </View>

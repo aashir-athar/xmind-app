@@ -98,6 +98,7 @@ const PostComposer = () => {
       [0, 1],
       [BRAND_COLORS.SURFACE_MUTED, BRAND_COLORS.PRIMARY]
     ),
+    borderRadius: borderRadius.value,
   }));
 
   const progressAnimatedStyle = useAnimatedStyle(() => ({
@@ -379,7 +380,7 @@ const PostComposer = () => {
                       letterSpacing: 0.5,
                     }}
                   >
-                    Share Mind
+                    Share
                   </Text>
                 )}
               </TouchableOpacity>

@@ -39,6 +39,13 @@ interface PostCardProps {
 const AnimatedTouchableOpacity =
   Animated.createAnimatedComponent(TouchableOpacity);
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const aspectRatio = SCREEN_HEIGHT / SCREEN_WIDTH;
+const scale = Math.min(
+  Math.max((SCREEN_WIDTH / 430) * (aspectRatio > 2 ? 0.9 : 1), 0.85),
+  1.2
+);
+
 const PostCard = ({
   currentUser,
   post,
@@ -272,12 +279,31 @@ const PostCard = ({
                     >
                       {post.user.firstName} {post.user.lastName}
                     </Text>
-                    <MaterialCommunityIcons
-                      name="check-decagram"
-                      size={16}
-                      color={BRAND_COLORS.PRIMARY}
-                      style={{ marginLeft: 4 }}
-                    />
+                    {post.user?.verified && (
+                      <>
+                        <Text> </Text>
+                        <View
+                          style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 12,
+                            backgroundColor: BRAND_COLORS.PRIMARY,
+                            justifyContent: "center",
+                            alignItems: "center",
+                            shadowColor: BRAND_COLORS.PRIMARY,
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 4,
+                          }}
+                        >
+                          <MaterialCommunityIcons
+                            name="check"
+                            size={9}
+                            color={BRAND_COLORS.SURFACE}
+                          />
+                        </View>
+                      </>
+                    )}
                     <Text
                       style={{
                         fontSize: 14,
