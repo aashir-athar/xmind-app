@@ -28,11 +28,19 @@ const ProfileScreen = () => {
     isLoading: isRefetching,
   } = usePosts(currentUser?.username);
 
-  if (isLoading || !currentUser || !currentUser._id) {
+  if (isLoading || !currentUser._id) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator size={"large"} color={"#4527A0"} />
         <Text className="text-textSecondary mt-2">Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <View className="flex-1 bg-background items-center justify-center">
+        <Text className="text-textSecondary mt-2">No user found.</Text>
       </View>
     );
   }
@@ -73,7 +81,11 @@ const ProfileScreen = () => {
           <View className="flex-row justify-between items-end -mt-16 mb-4">
             <Image
               className="size-32 rounded-full border-4 border-primary"
-              source={{ uri: currentUser.profilePicture }}
+              source={
+                currentUser.profilePicture
+                  ? { uri: currentUser.profilePicture }
+                  : require("../../assets/images/default-avatar.jpeg")
+              }
             />
             <TouchableOpacity className="border border-borderLight px-6 py-2 rounded-full">
               <Text className="font-semibold text-textPrimary">
@@ -95,10 +107,14 @@ const ProfileScreen = () => {
             <Text className="text-textSecondary mb-2">
               @{currentUser.username}
             </Text>
-            <Text className="text-textPrimary mb-3">Hello World</Text>
+            <Text className="text-textPrimary mb-3">
+              {currentUser.bio || "No bio"}
+            </Text>
             <View className="flex-row items-center mb-2">
               <Feather name="map-pin" size={16} color={"#90A4AE"} />
-              <Text className="text-textSecondary ml-2">Lahore, Pak</Text>
+              <Text className="text-textSecondary ml-2">
+                {currentUser.location || "No location"}
+              </Text>
             </View>
             <View className="flex-row items-center mb-3">
               <Feather name="calendar" size={16} color={"#90A4AE"} />
