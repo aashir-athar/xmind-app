@@ -1,14 +1,14 @@
 import {
   View,
   Text,
-  ActivityIndicator,
   ScrollView,
   Image,
   TouchableOpacity,
   Dimensions,
   RefreshControl,
+  Alert,
 } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -32,8 +32,25 @@ import PostsList from "@/components/PostsList";
 import { format } from "date-fns";
 import { usePosts } from "@/hooks/usePosts";
 import { useProfile } from "@/hooks/useProfile";
+import { useProfileUpdate } from "@/hooks/useProfileUpdate";
+import { useAutoVerification } from "@/hooks/useAutoVerification";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
 import EditProfileModal from "@/components/EditProfileModal";
-import { BRAND_COLORS } from "@/constants/colors";
+import CustomAlert from "@/components/CustomAlert";
+import ProfileImageEditButton from "@/components/ProfileImageEditButton";
+import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
+import { 
+  responsiveSize, 
+  responsivePadding, 
+  responsiveMargin, 
+  responsiveBorderRadius, 
+  responsiveFontSize, 
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
+import CustomLoading from "@/components/CustomLoading";
+import VerificationProgress from "@/components/VerificationProgress";
+import { formatNumber } from "@/utils/formatter";
 
 const { width, height } = Dimensions.get("window");
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
@@ -59,6 +76,27 @@ const ProfileScreen = () => {
     isUpdating,
     refetch: refetchProfile,
   } = useProfile();
+
+  const {
+    showImageSourceDialog,
+    isUpdating: isUpdatingImages,
+    updateType,
+  } = useProfileUpdate();
+
+  const { showInfo, showConfirmation, showSuccess, showError, alertConfig, isVisible, hideAlert } = useCustomAlert();
+
+  // Auto-verification hook
+  const {
+    verificationResult,
+    progress,
+    isChecking,
+    isEligible,
+    isVerified,
+    statusMessage,
+    missingRequirements,
+    checkVerification,
+    handleAutoVerification,
+  } = useAutoVerification();
 
   // Animation values
   const scrollY = useSharedValue(0);
@@ -89,30 +127,15 @@ const ProfileScreen = () => {
     }
   }, [isLoading, currentUser]);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-
-      // Dynamic header effects based on scroll
-      const progress = Math.min(event.contentOffset.y / 100, 1);
-      headerOpacity.value = interpolate(progress, [0, 1], [1, 0.8]);
-    },
-  });
-
   const headerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(scrollY.value, [0, 100], [0, -10]),
-      },
-    ],
+    // Header stays fixed, no scroll effects
   }));
 
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: bannerScale.value },
       {
-        translateY: interpolate(scrollY.value, [0, 200], [0, -50]),
+        translateY: interpolate(scrollY.value, [0, 200], [0, -50 * baseScale]),
       },
     ],
   }));
@@ -125,7 +148,7 @@ const ProfileScreen = () => {
     transform: [
       { scale: avatarScale.value },
       {
-        translateY: interpolate(scrollY.value, [0, 100], [0, -20]),
+        translateY: interpolate(scrollY.value, [0, 100], [0, -20 * baseScale]),
       },
     ],
   }));
@@ -134,7 +157,11 @@ const ProfileScreen = () => {
     opacity: profileInfoOpacity.value,
     transform: [
       {
-        translateY: interpolate(profileInfoOpacity.value, [0, 1], [20, 0]),
+        translateY: interpolate(
+          profileInfoOpacity.value,
+          [0, 1],
+          [20 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -143,7 +170,11 @@ const ProfileScreen = () => {
     opacity: statsOpacity.value,
     transform: [
       {
-        translateY: interpolate(statsOpacity.value, [0, 1], [15, 0]),
+        translateY: interpolate(
+          statsOpacity.value,
+          [0, 1],
+          [15 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -158,6 +189,28 @@ const ProfileScreen = () => {
     setIsRefreshing(false);
   };
 
+  const handleVerificationRequest = useCallback(async () => {
+    try {
+      if (isEligible) {
+        // User meets all criteria - trigger automatic verification
+        await handleAutoVerification();
+      } else {
+        // Show what's missing
+        const missingList = missingRequirements.join('\n• ');
+        showInfo(
+          "Verification Requirements",
+          `You need to complete these requirements:\n\n• ${missingList}\n\nKeep building your profile and you'll be automatically verified when ready!`
+        );
+      }
+    } catch (error) {
+      console.error("Verification request failed:", error);
+      showError(
+        "Request Failed",
+        "Something went wrong. Please try again later."
+      );
+    }
+  }, [isEligible, missingRequirements, handleAutoVerification, showInfo, showError]);
+
   if (isLoading || !currentUser._id) {
     return (
       <View
@@ -168,28 +221,14 @@ const ProfileScreen = () => {
           alignItems: "center",
         }}
       >
-        <LinearGradient
-          colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
-          style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <ActivityIndicator size="large" color={BRAND_COLORS.SURFACE} />
-        </LinearGradient>
-        <Text
-          style={{
-            color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: 16,
-            fontWeight: "500",
-          }}
-        >
-          Loading your mind...
-        </Text>
+        <CustomLoading
+          message="Loading notifications..."
+          size="large"
+          variant="screen"
+          colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
+          showDots={true}
+          accessibilityLabel="Custom loading spinner"
+        />
       </View>
     );
   }
@@ -207,7 +246,7 @@ const ProfileScreen = () => {
         <Text
           style={{
             color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: 16,
+            fontSize: responsiveFontSize(16),
           }}
         >
           Mind not found.
@@ -224,19 +263,27 @@ const ProfileScreen = () => {
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       />
 
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={["top"]}>
         {/* Enhanced Header */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView
-            intensity={15}
+            intensity={HEADER_CONFIG.BLUR_INTENSITY}
             tint="light"
-            style={{ paddingHorizontal: 16, paddingVertical: 12 }}
+            style={{ 
+              paddingHorizontal: responsivePadding(
+                HEADER_CONFIG.PADDING_HORIZONTAL
+              ),
+              paddingVertical: responsivePadding(
+                HEADER_CONFIG.PADDING_VERTICAL
+              ),
+              paddingTop: responsivePadding(HEADER_CONFIG.PADDING_VERTICAL + 8), // Extra padding for status bar
+            }}
           >
             <View className="flex-row items-center justify-between">
               <View>
                 <Text
                   style={{
-                    fontSize: 20,
+                    fontSize: responsiveFontSize(HEADER_CONFIG.TITLE_SIZE),
                     fontWeight: "800",
                     color: BRAND_COLORS.TEXT_PRIMARY,
                     letterSpacing: 0.5,
@@ -246,9 +293,12 @@ const ProfileScreen = () => {
                 </Text>
                 <Text
                   style={{
-                    fontSize: 13,
+                    fontSize: responsiveFontSize(HEADER_CONFIG.SUBTITLE_SIZE),
                     color: BRAND_COLORS.TEXT_SECONDARY,
                     fontWeight: "500",
+                    marginTop: responsiveMargin(
+                      HEADER_CONFIG.TITLE_MARGIN_BOTTOM
+                    ),
                   }}
                 >
                   {userPosts.length === 0
@@ -264,10 +314,10 @@ const ProfileScreen = () => {
         </Animated.View>
 
         <AnimatedScrollView
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+          contentContainerStyle={{
+            paddingBottom: responsiveSize(120) + insets.bottom,
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           refreshControl={
@@ -275,8 +325,6 @@ const ProfileScreen = () => {
               refreshing={isRefreshing} // Add this prop
               onRefresh={handleRefresh} // Use the new async handler
               tintColor={BRAND_COLORS.PRIMARY_LIGHT}
-              title="Syncing your mind..."
-              titleColor={BRAND_COLORS.TEXT_SECONDARY}
               progressBackgroundColor={BRAND_COLORS.SURFACE}
               colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
             />
@@ -292,7 +340,7 @@ const ProfileScreen = () => {
                   ? { uri: currentUser.bannerImage }
                   : require("../../assets/images/default-banner.jpeg")
               }
-              style={{ width: "100%", height: 200 }}
+              style={{ width: "100%", height: responsiveSize(200) }}
               resizeMode="cover"
             />
 
@@ -313,45 +361,58 @@ const ProfileScreen = () => {
                 }}
               />
             </Animated.View>
+
+            {/* Banner Edit Button */}
+            <ProfileImageEditButton
+              onPress={() => showImageSourceDialog("bannerImage")}
+              isLoading={isUpdatingImages && updateType === "bannerImage"}
+              size="medium"
+              position="top-right"
+              variant="banner"
+            />
           </Animated.View>
 
           {/* Enhanced Profile Section */}
           <View
             style={{
-              paddingHorizontal: 20,
-              paddingBottom: 24,
+              paddingHorizontal: responsivePadding(20),
+              paddingBottom: responsivePadding(24),
               backgroundColor: BRAND_COLORS.SURFACE,
-              marginHorizontal: 12,
-              marginTop: -20,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
+              marginHorizontal: responsiveMargin(12),
+              marginTop: responsiveMargin(-20),
+              borderTopLeftRadius: responsiveBorderRadius(24),
+              borderTopRightRadius: responsiveBorderRadius(24),
               shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: -4 },
+              shadowOffset: { width: 0, height: responsiveSize(-4) },
               shadowOpacity: 0.1,
-              shadowRadius: 20,
+              shadowRadius: responsiveSize(20),
               elevation: 12,
             }}
           >
             <View
               className="flex-row justify-between items-end"
-              style={{ marginTop: -40, marginBottom: 20 }}
+              style={{ 
+                marginTop: responsiveMargin(-40), 
+                marginBottom: responsiveMargin(20),
+              }}
             >
               <Animated.View style={avatarAnimatedStyle}>
                 <View
                   style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: 60,
+                    width: responsiveSize(120),
+                    height: responsiveSize(120),
+                    borderRadius: responsiveBorderRadius(60),
                     borderWidth: 4,
                     borderColor: BRAND_COLORS.SURFACE,
                     overflow: "hidden",
                     shadowColor: BRAND_COLORS.PRIMARY,
-                    shadowOffset: { width: 0, height: 8 },
+                    shadowOffset: { width: 0, height: responsiveSize(8) },
                     shadowOpacity: 0.2,
-                    shadowRadius: 16,
+                    shadowRadius: responsiveSize(16),
                     elevation: 10,
                     alignItems: "center",
                     justifyContent: "center",
+                    position: "relative",
                   }}
                 >
                   <Image
@@ -360,32 +421,46 @@ const ProfileScreen = () => {
                         ? { uri: currentUser.profilePicture }
                         : require("../../assets/images/default-avatar.jpeg")
                     }
-                    style={{ width: 120, height: 120 }}
+                    style={{ 
+                      width: responsiveSize(120), 
+                      height: responsiveSize(120),
+                    }}
                     resizeMode="cover"
                   />
                 </View>
+
+                {/* Profile Picture Edit Button - Positioned Above */}
+                <ProfileImageEditButton
+                  onPress={() => showImageSourceDialog("profilePicture")}
+                  isLoading={
+                    isUpdatingImages && updateType === "profilePicture"
+                  }
+                  size="small"
+                  position="bottom-right"
+                  variant="profile"
+                />
               </Animated.View>
 
               <Animated.View style={editButtonAnimatedStyle}>
                 <TouchableOpacity
                   onPress={openEditModal}
                   style={{
-                    paddingHorizontal: 24,
-                    paddingVertical: 12,
-                    borderRadius: 24,
+                    paddingHorizontal: responsivePadding(24),
+                    paddingVertical: responsivePadding(12),
+                    borderRadius: responsiveBorderRadius(24),
                     backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
                     borderWidth: 1,
                     borderColor: `${BRAND_COLORS.PRIMARY}30`,
                     shadowColor: BRAND_COLORS.PRIMARY,
-                    shadowOffset: { width: 0, height: 4 },
+                    shadowOffset: { width: 0, height: responsiveSize(4) },
                     shadowOpacity: 0.1,
-                    shadowRadius: 8,
+                    shadowRadius: responsiveSize(8),
                     elevation: 4,
                   }}
                 >
                   <Text
                     style={{
-                      fontSize: 15,
+                      fontSize: responsiveFontSize(15),
                       fontWeight: "700",
                       color: BRAND_COLORS.PRIMARY,
                       letterSpacing: 0.3,
@@ -403,10 +478,10 @@ const ProfileScreen = () => {
                 <View className="flex-row items-center mb-2">
                   <Text
                     style={{
-                      fontSize: 22,
+                      fontSize: responsiveFontSize(22),
                       fontWeight: "800",
                       color: BRAND_COLORS.TEXT_PRIMARY,
-                      marginRight: 8,
+                      marginRight: responsiveMargin(8),
                       letterSpacing: 0.3,
                     }}
                   >
@@ -415,21 +490,21 @@ const ProfileScreen = () => {
                   {currentUser.user?.verified && (
                     <View
                       style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 12,
+                        width: responsiveSize(24),
+                        height: responsiveSize(24),
+                        borderRadius: responsiveBorderRadius(12),
                         backgroundColor: BRAND_COLORS.PRIMARY,
                         justifyContent: "center",
                         alignItems: "center",
                         shadowColor: BRAND_COLORS.PRIMARY,
-                        shadowOffset: { width: 0, height: 2 },
+                        shadowOffset: { width: 0, height: responsiveSize(2) },
                         shadowOpacity: 0.3,
-                        shadowRadius: 4,
+                        shadowRadius: responsiveSize(4),
                       }}
                     >
                       <MaterialCommunityIcons
                         name="check"
-                        size={14}
+                        size={responsiveIconSize(14)}
                         color={BRAND_COLORS.SURFACE}
                       />
                     </View>
@@ -438,9 +513,9 @@ const ProfileScreen = () => {
 
                 <Text
                   style={{
-                    fontSize: 15,
+                    fontSize: responsiveFontSize(15),
                     color: BRAND_COLORS.TEXT_SECONDARY,
-                    marginBottom: 12,
+                    marginBottom: responsiveMargin(12),
                     fontWeight: "500",
                   }}
                 >
@@ -449,10 +524,10 @@ const ProfileScreen = () => {
 
                 <Text
                   style={{
-                    fontSize: 16,
+                    fontSize: responsiveFontSize(16),
                     color: BRAND_COLORS.TEXT_PRIMARY,
-                    lineHeight: 24,
-                    marginBottom: 16,
+                    lineHeight: responsiveSize(24),
+                    marginBottom: responsiveMargin(16),
                   }}
                 >
                   {currentUser?.bio ||
@@ -463,24 +538,24 @@ const ProfileScreen = () => {
                   <View className="flex-row items-center">
                     <View
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
+                        width: responsiveSize(32),
+                        height: responsiveSize(32),
+                        borderRadius: responsiveBorderRadius(16),
                         backgroundColor: `${BRAND_COLORS.ACCENT_MINT}15`,
                         justifyContent: "center",
                         alignItems: "center",
-                        marginRight: 12,
+                        marginRight: responsiveMargin(12),
                       }}
                     >
                       <Feather
                         name="map-pin"
-                        size={16}
+                        size={responsiveIconSize(16)}
                         color={BRAND_COLORS.ACCENT_MINT}
                       />
                     </View>
                     <Text
                       style={{
-                        fontSize: 15,
+                        fontSize: responsiveFontSize(15),
                         color: BRAND_COLORS.TEXT_SECONDARY,
                         fontWeight: "500",
                       }}
@@ -492,24 +567,24 @@ const ProfileScreen = () => {
                   <View className="flex-row items-center">
                     <View
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
+                        width: responsiveSize(32),
+                        height: responsiveSize(32),
+                        borderRadius: responsiveBorderRadius(16),
                         backgroundColor: `${BRAND_COLORS.SECONDARY}15`,
                         justifyContent: "center",
                         alignItems: "center",
-                        marginRight: 12,
+                        marginRight: responsiveMargin(12),
                       }}
                     >
                       <Feather
                         name="calendar"
-                        size={16}
+                        size={responsiveIconSize(16)}
                         color={BRAND_COLORS.SECONDARY}
                       />
                     </View>
                     <Text
                       style={{
-                        fontSize: 15,
+                        fontSize: responsiveFontSize(15),
                         color: BRAND_COLORS.TEXT_SECONDARY,
                         fontWeight: "500",
                       }}
@@ -528,8 +603,8 @@ const ProfileScreen = () => {
                 style={{
                   flexDirection: "row",
                   backgroundColor: `${BRAND_COLORS.BACKGROUND}60`,
-                  borderRadius: 20,
-                  padding: 16,
+                  borderRadius: responsiveBorderRadius(20),
+                  padding: responsivePadding(16),
                   borderWidth: 1,
                   borderColor: `${BRAND_COLORS.BORDER_LIGHT}40`,
                 }}
@@ -537,28 +612,28 @@ const ProfileScreen = () => {
                 <TouchableOpacity style={{ flex: 1, alignItems: "center" }}>
                   <View
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
+                      width: responsiveSize(44),
+                      height: responsiveSize(44),
+                      borderRadius: responsiveBorderRadius(22),
                       backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
                       justifyContent: "center",
                       alignItems: "center",
-                      marginBottom: 8,
+                      marginBottom: responsiveMargin(8),
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: responsiveFontSize(18),
                         fontWeight: "800",
                         color: BRAND_COLORS.PRIMARY,
                       }}
                     >
-                      {currentUser.following?.length || 0}
+                      {formatNumber(currentUser.following?.length) || 0}
                     </Text>
                   </View>
                   <Text
                     style={{
-                      fontSize: 13,
+                      fontSize: responsiveFontSize(13),
                       color: BRAND_COLORS.TEXT_SECONDARY,
                       fontWeight: "600",
                     }}
@@ -570,7 +645,7 @@ const ProfileScreen = () => {
                 <View
                   style={{
                     width: 1,
-                    height: 40,
+                    height: responsiveSize(40),
                     backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
                     alignSelf: "center",
                   }}
@@ -579,28 +654,28 @@ const ProfileScreen = () => {
                 <TouchableOpacity style={{ flex: 1, alignItems: "center" }}>
                   <View
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
+                      width: responsiveSize(44),
+                      height: responsiveSize(44),
+                      borderRadius: responsiveBorderRadius(22),
                       backgroundColor: `${BRAND_COLORS.ACCENT_MINT}15`,
                       justifyContent: "center",
                       alignItems: "center",
-                      marginBottom: 8,
+                      marginBottom: responsiveMargin(8),
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: responsiveFontSize(18),
                         fontWeight: "800",
                         color: BRAND_COLORS.ACCENT_MINT,
                       }}
                     >
-                      {currentUser.followers?.length || 0}
+                      {formatNumber(currentUser.followers?.length) || 0}
                     </Text>
                   </View>
                   <Text
                     style={{
-                      fontSize: 13,
+                      fontSize: responsiveFontSize(13),
                       color: BRAND_COLORS.TEXT_SECONDARY,
                       fontWeight: "600",
                     }}
@@ -612,7 +687,7 @@ const ProfileScreen = () => {
                 <View
                   style={{
                     width: 1,
-                    height: 40,
+                    height: responsiveSize(40),
                     backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
                     alignSelf: "center",
                   }}
@@ -621,28 +696,28 @@ const ProfileScreen = () => {
                 <View style={{ flex: 1, alignItems: "center" }}>
                   <View
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
+                      width: responsiveSize(44),
+                      height: responsiveSize(44),
+                      borderRadius: responsiveBorderRadius(22),
                       backgroundColor: `${BRAND_COLORS.ACCENT_YELLOW}15`,
                       justifyContent: "center",
                       alignItems: "center",
-                      marginBottom: 8,
+                      marginBottom: responsiveMargin(8),
                     }}
                   >
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: responsiveFontSize(18),
                         fontWeight: "800",
                         color: BRAND_COLORS.ACCENT_YELLOW,
                       }}
                     >
-                      {userPosts.length}
+                      {formatNumber(userPosts.length)}
                     </Text>
                   </View>
                   <Text
                     style={{
-                      fontSize: 13,
+                      fontSize: responsiveFontSize(13),
                       color: BRAND_COLORS.TEXT_SECONDARY,
                       fontWeight: "600",
                     }}
@@ -652,20 +727,31 @@ const ProfileScreen = () => {
                 </View>
               </View>
             </Animated.View>
+
+            {/* Verification Status */}
+            <VerificationProgress
+              isVerified={currentUser?.verified}
+              progress={progress}
+              statusMessage={statusMessage}
+              isEligible={isEligible}
+              onVerificationRequest={handleVerificationRequest}
+              isChecking={isChecking}
+              missingRequirements={missingRequirements}
+            />
           </View>
 
           {/* Posts Section with Enhanced Styling */}
           <View
             style={{
-              marginTop: 20,
+              marginTop: responsiveMargin(20),
               backgroundColor: BRAND_COLORS.SURFACE,
-              marginHorizontal: 12,
-              borderRadius: 24,
-              paddingTop: 16,
+              marginHorizontal: responsiveMargin(12),
+              borderRadius: responsiveBorderRadius(24),
+              paddingTop: responsivePadding(16),
               shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: 4 },
+              shadowOffset: { width: 0, height: responsiveSize(4) },
               shadowOpacity: 0.08,
-              shadowRadius: 12,
+              shadowRadius: responsiveSize(12),
               elevation: 8,
             }}
           >
@@ -681,6 +767,18 @@ const ProfileScreen = () => {
           updateFormField={updateFormField}
           isUpdating={isUpdating}
         />
+
+        {/* Custom Alert */}
+        {alertConfig && (
+          <CustomAlert
+            visible={isVisible}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            type={alertConfig.type}
+            onDismiss={hideAlert}
+          />
+        )}
       </SafeAreaView>
     </View>
   );

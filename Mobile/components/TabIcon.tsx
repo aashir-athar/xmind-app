@@ -142,7 +142,7 @@ export const TabIcon: React.FC<TabIconProps> = ({
             width: 50 * scale,
             height: 50 * scale,
             borderRadius: 25 * scale,
-            backgroundColor: gradientColors[0],
+            backgroundColor: `${gradientColors[0]}40`,
           },
           animatedRippleStyle,
         ]}
@@ -157,12 +157,12 @@ export const TabIcon: React.FC<TabIconProps> = ({
               height: 60 * scale,
               borderRadius: 30 * scale,
               backgroundColor: gradientColors[0],
-              opacity: 0.3,
+              opacity: 0.2,
               shadowColor: gradientColors[0],
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.8,
-              shadowRadius: 20 * scale,
-              elevation: 15,
+              shadowOpacity: 0.6,
+              shadowRadius: 16 * scale,
+              elevation: 12,
             },
             animatedGlowStyle,
           ]}
@@ -181,9 +181,9 @@ export const TabIcon: React.FC<TabIconProps> = ({
             alignItems: "center",
             justifyContent: "center",
             shadowColor: gradientColors[1],
-            shadowOffset: { width: 0, height: 8 * scale },
-            shadowOpacity: 0.4,
-            shadowRadius: 12 * scale,
+            shadowOffset: { width: 0, height: 6 * scale },
+            shadowOpacity: 0.3,
+            shadowRadius: 10 * scale,
             elevation: TAB_CONFIG.SHADOW_ELEVATION,
           }}
         >
@@ -199,22 +199,22 @@ export const TabIcon: React.FC<TabIconProps> = ({
             width: 48 * scale,
             height: 48 * scale,
             borderRadius: 24 * scale,
-            backgroundColor: BRAND_COLORS.SURFACE_MUTED,
+            backgroundColor: `${BRAND_COLORS.PRIMARY}08`,
             alignItems: "center",
             justifyContent: "center",
             borderWidth: 1,
-            borderColor: BRAND_COLORS.BORDER_LIGHT,
+            borderColor: `${BRAND_COLORS.PRIMARY}20`,
             shadowColor: BRAND_COLORS.PRIMARY,
             shadowOffset: { width: 0, height: 2 * scale },
-            shadowOpacity: 0.08,
+            shadowOpacity: 0.15,
             shadowRadius: 4 * scale,
-            elevation: 2,
+            elevation: 3,
           }}
         >
           <Ionicons
             name={iconName as keyof typeof Ionicons.glyphMap}
             size={TAB_CONFIG.ICON_SIZE_INACTIVE * scale}
-            color={BRAND_COLORS.ICON_SECONDARY}
+            color={BRAND_COLORS.PRIMARY}
           />
         </View>
       )}

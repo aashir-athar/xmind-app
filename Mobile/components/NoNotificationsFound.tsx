@@ -9,6 +9,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { BRAND_COLORS } from "@/constants/colors";
 import { BlurView } from "expo-blur";
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
 
 const NoNotificationsFound = () => {
   const pulse = useSharedValue(1);
@@ -35,7 +44,11 @@ const NoNotificationsFound = () => {
   return (
     <View style={styles.container}>
       <Animated.View style={animatedIconStyle}>
-        <Feather name="bell" size={80} color={BRAND_COLORS.ICON_SECONDARY} />
+        <Feather
+          name="bell"
+          size={responsiveIconSize(80)}
+          color={BRAND_COLORS.ICON_SECONDARY}
+        />
       </Animated.View>
       <Text style={styles.title}>No notifications yet</Text>
       <Text style={styles.description}>
@@ -50,13 +63,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 32,
+    padding: responsivePadding(32),
     minHeight: 400,
   },
   blurContainer: {
     alignItems: "center",
-    padding: 24,
-    borderRadius: 60,
+    padding: responsivePadding(24),
+    borderRadius: responsiveBorderRadius(60),
     backgroundColor: `${BRAND_COLORS.SURFACE}80`,
     shadowColor: BRAND_COLORS.PRIMARY_DARK,
     shadowOffset: { width: 0, height: 4 },
@@ -64,14 +77,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: responsiveFontSize(24),
     fontWeight: "600",
     color: BRAND_COLORS.TEXT_SECONDARY,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: responsiveMargin(16),
+    marginBottom: responsiveMargin(8),
   },
   description: {
-    fontSize: 16,
+    fontSize: responsiveFontSize(16),
     color: BRAND_COLORS.PLACEHOLDER,
     textAlign: "center",
     maxWidth: 240,

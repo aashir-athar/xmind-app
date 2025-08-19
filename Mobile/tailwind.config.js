@@ -37,6 +37,53 @@ module.exports = {
         iconSecondary: "#90A4AE", // Blue-Gray - secondary icons, subtle
         placeholder: "#B0BEC5", // Slate Gray - placeholders, calm & unobtrusive
       },
+      // Responsive spacing scale
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '16px',
+        'lg': '24px',
+        'xl': '32px',
+        'xxl': '48px',
+        'xxxl': '64px',
+      },
+      // Responsive font sizes
+      fontSize: {
+        'xs': ['12px', { lineHeight: '16px' }],
+        'sm': ['14px', { lineHeight: '20px' }],
+        'md': ['16px', { lineHeight: '24px' }],
+        'lg': ['18px', { lineHeight: '28px' }],
+        'xl': ['20px', { lineHeight: '28px' }],
+        'xxl': ['24px', { lineHeight: '32px' }],
+        'xxxl': ['32px', { lineHeight: '40px' }],
+      },
+      // Responsive border radius
+      borderRadius: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
+        'xxl': '24px',
+        'xxxl': '32px',
+      },
+      // Responsive icon sizes
+      width: {
+        'icon-xs': '12px',
+        'icon-sm': '16px',
+        'icon-md': '20px',
+        'icon-lg': '24px',
+        'icon-xl': '32px',
+        'icon-xxl': '48px',
+      },
+      height: {
+        'icon-xs': '12px',
+        'icon-sm': '16px',
+        'icon-md': '20px',
+        'icon-lg': '24px',
+        'icon-xl': '32px',
+        'icon-xxl': '48px',
+      },
     },
   },
   plugins: [],

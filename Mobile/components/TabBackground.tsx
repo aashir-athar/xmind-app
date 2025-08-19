@@ -22,14 +22,14 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
     const colorProgress = backgroundMorph.value / denom;
     const hue = interpolate(colorProgress, [0, 1], [16, 170]);
     return {
-      backgroundColor: `hsla(${hue}, 65%, 70%, 0.1)`,
+      backgroundColor: `${BRAND_COLORS.PRIMARY}08`,
     };
   });
 
   return (
     <>
       <BlurView
-        intensity={TAB_CONFIG.BLUR_INTENSITY}
+        intensity={20}
         tint="light"
         style={{
           position: "absolute",
@@ -58,7 +58,7 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
             left: 0,
             right: 0,
             bottom: 0,
-            opacity: 0.8,
+            opacity: 0.6,
           },
           animatedBackgroundStyle,
         ]}
@@ -70,9 +70,9 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: `${BRAND_COLORS.SECONDARY}20`,
+          backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
           borderWidth: 1,
-          borderColor: BRAND_COLORS.BORDER_LIGHT,
+          borderColor: `${BRAND_COLORS.PRIMARY}20`,
           borderRadius: TAB_CONFIG.BORDER_RADIUS,
         }}
       />
@@ -85,8 +85,8 @@ export const TabBackground: React.FC<TabBackgroundProps> = ({
           bottom: 0,
           left: 0,
           right: 0,
-          height: 0,
-          opacity: 0.6,
+          height: 1,
+          opacity: 0.3,
         }}
       />
     </>

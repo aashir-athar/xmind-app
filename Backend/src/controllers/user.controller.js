@@ -23,6 +23,57 @@ export const updateProfile = asyncHandler(async (req, res) => {
   res.status(200).json({ user });
 });
 
+export const updateUsername = asyncHandler(async (req, res) => {
+  const { userId } = getAuth(req);
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+
+  // Check for uniqueness
+  const existingUser = await User.findOne({ username });
+  if (existingUser && existingUser.clerkId !== userId) {
+    return res.status(400).json({ error: "Username already taken" });
+  }
+  
+  // Validate username format - match frontend validation
+  if (username.length < 4 || username.length > 15) {
+    return res.status(400).json({ error: "Username must be between 4 and 15 characters" });
+  }
+  
+  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    return res.status(400).json({ error: "Username can only contain letters, numbers, and underscores" });
+  }
+  
+  // No leading/trailing underscores
+  if (username.startsWith('_') || username.endsWith('_')) {
+    return res.status(400).json({ error: "Username cannot start or end with an underscore" });
+  }
+  
+  // No consecutive underscores
+  if (username.includes('__')) {
+    return res.status(400).json({ error: "Username cannot have consecutive underscores" });
+  }
+  
+  // Check for reserved words
+  const reservedWords = ['admin', 'administrator', 'moderator', 'system', 'root', 'official', 'support', 'help', 'twitter', 'x', 'facebook', 'instagram', 'tiktok', 'youtube', 'twitch', 'discord', 'reddit', 'pinterest', 'linkedin', 'github', 'gitlab', 'bitbucket', 'heroku', 'vercel', 'netlify'];
+  const lowerUsername = username.toLowerCase();
+  if (reservedWords.some(word => lowerUsername.includes(word))) {
+    return res.status(400).json({ error: "Username contains a reserved word" });
+  }
+
+  const user = await User.findOneAndUpdate(
+    { clerkId: userId }, 
+    { username }, 
+    { new: true }
+  );
+
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  res.status(200).json({ user });
+});
+
 export const syncUser = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
 
@@ -42,6 +93,7 @@ export const syncUser = asyncHandler(async (req, res) => {
     lastName: clerkUser.lastName || "",
     username: clerkUser.emailAddresses[0].emailAddress.split("@")[0],
     profilePicture: clerkUser.imageUrl || "",
+    verified: false,
   };
 
   const user = await User.create(userData);
@@ -98,5 +150,29 @@ export const followUser = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     message: isFollowing ? "User unfollowed successfully" : "User followed successfully",
+  });
+});
+
+export const toggleVerification = asyncHandler(async (req, res) => {
+  const { userId } = getAuth(req);
+  const { targetUserId } = req.params;
+
+  const currentUser = await User.findOne({ clerkId: userId });
+  const targetUser = await User.findById(targetUserId);
+
+  if (!currentUser || !targetUser) return res.status(404).json({ error: "User not found" });
+
+  // Toggle verification status
+  const newVerificationStatus = !targetUser.verified;
+  
+  const updatedUser = await User.findByIdAndUpdate(
+    targetUserId,
+    { verified: newVerificationStatus },
+    { new: true }
+  );
+
+  res.status(200).json({
+    message: `User ${newVerificationStatus ? 'verified' : 'unverified'} successfully`,
+    user: updatedUser,
   });
 });

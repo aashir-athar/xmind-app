@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, userApi } from "../utils/api";
 import { useCurrentUser } from "./useCurrentUser";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
 
 export const useProfile = () => {
   const api = useApiClient();
+  const { showSuccess, showError } = useCustomAlert();
 
   const queryClient = useQueryClient();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -20,12 +21,12 @@ export const useProfile = () => {
   const updateProfileMutation = useMutation({
     mutationFn: (profileData: any) => userApi.updateProfile(api, profileData),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       setIsEditModalVisible(false);
-      Alert.alert("Success", "Profile updated successfully!");
+      showSuccess("Success", "Profile updated successfully!");
     },
     onError: (error: any) => {
-      Alert.alert(
+      showError(
         "Error",
         error.response?.data?.error || "Failed to update profile"
       );
@@ -56,6 +57,6 @@ export const useProfile = () => {
     saveProfile: () => updateProfileMutation.mutate(formData),
     updateFormField,
     isUpdating: updateProfileMutation.isPending,
-    refetch: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
+    refetch: () => queryClient.invalidateQueries({ queryKey: ["currentUser"] }),
   };
 };

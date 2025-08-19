@@ -1,7 +1,6 @@
 import {
   View,
   Text,
-  Alert,
   Image,
   TouchableOpacity,
   Dimensions,
@@ -24,6 +23,19 @@ import { Post, User } from "@/types";
 import { formatDate, formatNumber } from "@/utils/formatter";
 import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { BRAND_COLORS } from "@/constants/colors";
+import { useRouter } from "expo-router";
+import ImageModal from "./ImageModal";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "./CustomAlert";
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
 
 const { width } = Dimensions.get("window");
 
@@ -54,7 +66,15 @@ const PostCard = ({
   onComment,
   isLiked,
 }: PostCardProps) => {
+  const router = useRouter();
+  const {
+    showDeleteConfirmation,
+    alertConfig,
+    isVisible,
+    hideAlert,
+  } = useCustomAlert();
   const isOwnPost = currentUser ? post.user._id === currentUser._id : false;
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
 
   // Animation values
   const cardScale = useSharedValue(1);
@@ -80,23 +100,16 @@ const PostCard = ({
   }, []);
 
   const handleDelete = () => {
-    Alert.alert(
+    showDeleteConfirmation(
       "Delete Mind",
       "Are you sure you want to delete this thought?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteScale.value = withSequence(
-              withTiming(1.1, { duration: 100 }),
-              withTiming(0, { duration: 200 })
-            );
-            runOnJS(onDelete)(post._id);
-          },
-        },
-      ]
+      () => {
+        deleteScale.value = withSequence(
+          withTiming(1.1, { duration: 100 }),
+          withTiming(0, { duration: 200 })
+        );
+        runOnJS(onDelete)(post._id);
+      }
     );
   };
 
@@ -116,12 +129,27 @@ const PostCard = ({
     onComment(post);
   };
 
-  const handleAvatarPress = () => {
+  const handleUserProfilePress = () => {
     avatarScale.value = withSequence(
       withTiming(0.95, { duration: 100 }),
       withTiming(1.05, { duration: 150 }),
       withTiming(1, { duration: 100 })
     );
+
+    // Check if user is clicking on their own profile
+    if (isOwnPost) {
+      // Navigate to own profile (tabs/profile)
+      router.push("/(tabs)/profile");
+    } else {
+      // Navigate to other user's profile
+      router.push({
+        pathname: "/user-profile",
+        params: {
+          userId: post.user._id,
+          username: post.user.username,
+        },
+      });
+    }
   };
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
@@ -173,7 +201,13 @@ const PostCard = ({
                   color: BRAND_COLORS.PRIMARY,
                   fontWeight: "700",
                 }}
-                onPress={() => console.log(`Clicked hashtag: ${word}`)}
+                onPress={() => {
+                  const hashtag = word;
+                  router.push({
+                    pathname: "/hashtag-posts",
+                    params: { hashtag },
+                  });
+                }}
               >
                 {word + " "}
               </Text>
@@ -194,323 +228,371 @@ const PostCard = ({
   };
 
   return (
-    <Animated.View
-      style={[
-        {
-          marginHorizontal: 12,
-          marginVertical: 8,
-          shadowColor: BRAND_COLORS.PRIMARY,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          elevation: 8,
-        },
-        cardAnimatedStyle,
-      ]}
-    >
-      <BlurView
-        intensity={5}
-        tint="light"
-        style={{ borderRadius: 20, overflow: "hidden" }}
+    <>
+      <Animated.View
+        style={[
+          {
+            marginHorizontal: responsiveMargin(12),
+            marginVertical: responsiveMargin(8),
+            shadowColor: BRAND_COLORS.PRIMARY,
+            shadowOffset: { width: 0, height: responsiveSize(4) },
+            shadowOpacity: 0.08,
+            shadowRadius: responsiveSize(12),
+            elevation: 8,
+          },
+          cardAnimatedStyle,
+        ]}
       >
-        <LinearGradient
-          colors={[`${BRAND_COLORS.SURFACE}95`, `${BRAND_COLORS.SURFACE}85`]}
-          style={{ padding: 20 }}
+        <BlurView
+          intensity={5}
+          tint="light"
+          style={{
+            borderRadius: responsiveBorderRadius(20),
+            overflow: "hidden",
+          }}
         >
-          {/* Animated Border */}
-          <Animated.View
-            style={[
-              {
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 2,
-                backgroundColor: BRAND_COLORS.PRIMARY_LIGHT,
-                borderRadius: 1,
-              },
-              borderAnimatedStyle,
-            ]}
-          />
+          <LinearGradient
+            colors={[`${BRAND_COLORS.SURFACE}95`, `${BRAND_COLORS.SURFACE}85`]}
+            style={{ padding: responsivePadding(20) }}
+          >
+            {/* Animated Border */}
+            <Animated.View
+              style={[
+                {
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: responsiveSize(2),
+                  backgroundColor: BRAND_COLORS.PRIMARY_LIGHT,
+                  borderRadius: responsiveBorderRadius(1),
+                },
+                borderAnimatedStyle,
+              ]}
+            />
 
-          <View className="flex-row">
-            <Pressable onPress={handleAvatarPress}>
-              <Animated.View style={[avatarAnimatedStyle]}>
-                <View
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    marginRight: 16,
-                    overflow: "hidden",
-                    borderWidth: 2,
-                    borderColor: `${BRAND_COLORS.PRIMARY}25`,
-                    shadowColor: BRAND_COLORS.PRIMARY,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 4,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Image
-                    source={
-                      post.user.profilePicture
-                        ? { uri: post.user.profilePicture }
-                        : require("@/assets/images/default-avatar.jpeg")
-                    }
-                    style={{ width: 48, height: 48 }}
-                    resizeMode="cover"
-                  />
-                </View>
-              </Animated.View>
-            </Pressable>
+            <View className="flex-row">
+              <TouchableOpacity onPress={handleUserProfilePress}>
+                <Animated.View style={[avatarAnimatedStyle]}>
+                  <View
+                    style={{
+                      width: responsiveSize(48),
+                      height: responsiveSize(48),
+                      borderRadius: responsiveBorderRadius(24),
+                      marginRight: responsiveMargin(16),
+                      overflow: "hidden",
+                      borderWidth: 2,
+                      borderColor: `${BRAND_COLORS.PRIMARY}25`,
+                      shadowColor: BRAND_COLORS.PRIMARY,
+                      shadowOffset: { width: 0, height: responsiveSize(2) },
+                      shadowOpacity: 0.15,
+                      shadowRadius: responsiveSize(4),
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Image
+                      source={
+                        post.user.profilePicture
+                          ? { uri: post.user.profilePicture }
+                          : require("@/assets/images/default-avatar.jpeg")
+                      }
+                      style={{
+                        width: responsiveSize(48),
+                        height: responsiveSize(48),
+                      }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                </Animated.View>
+              </TouchableOpacity>
 
-            <View className="flex-1">
-              <Animated.View style={contentAnimatedStyle}>
-                <View className="flex-row items-center justify-between mb-2">
-                  <View className="flex-row items-center flex-1">
+              <View className="flex-1">
+                <Animated.View style={contentAnimatedStyle}>
+                  <View className="flex-row items-center justify-between mb-2">
+                    <View className="flex-row items-center flex-1">
+                      <TouchableOpacity onPress={handleUserProfilePress}>
+                        <Text
+                          style={{
+                            fontSize: responsiveFontSize(16),
+                            fontWeight: "700",
+                            color: BRAND_COLORS.TEXT_PRIMARY,
+                          }}
+                        >
+                          {post.user.firstName} {post.user.lastName}
+                        </Text>
+                      </TouchableOpacity>
+                      {post.user?.verified && (
+                        <>
+                          <Text> </Text>
+                          <View
+                            style={{
+                              width: responsiveSize(16),
+                              height: responsiveSize(16),
+                              borderRadius: responsiveBorderRadius(12),
+                              backgroundColor: BRAND_COLORS.PRIMARY,
+                              justifyContent: "center",
+                              alignItems: "center",
+                              shadowColor: BRAND_COLORS.PRIMARY,
+                              shadowOffset: {
+                                width: 0,
+                                height: responsiveSize(2),
+                              },
+                              shadowOpacity: 0.3,
+                              shadowRadius: responsiveSize(4),
+                            }}
+                          >
+                            <MaterialCommunityIcons
+                              name="check"
+                              size={responsiveIconSize(9)}
+                              color={BRAND_COLORS.SURFACE}
+                            />
+                          </View>
+                        </>
+                      )}
+                      <TouchableOpacity onPress={handleUserProfilePress}>
+                        <Text
+                          style={{
+                            fontSize: responsiveFontSize(14),
+                            color: BRAND_COLORS.PRIMARY,
+                            marginLeft: responsiveMargin(8),
+                          }}
+                        >
+                          @{post.user.username}
+                        </Text>
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          fontSize: responsiveFontSize(14),
+                          color: BRAND_COLORS.TEXT_SECONDARY,
+                          marginLeft: responsiveMargin(4),
+                        }}
+                      >
+                        • {formatDate(post.createdAt)}
+                      </Text>
+                    </View>
+                    {isOwnPost && (
+                      <AnimatedTouchableOpacity
+                        style={deleteAnimatedStyle}
+                        onPress={handleDelete}
+                      >
+                        <View
+                          style={{
+                            width: responsiveSize(32),
+                            height: responsiveSize(32),
+                            borderRadius: responsiveBorderRadius(16),
+                            backgroundColor: `${BRAND_COLORS.DANGER}15`,
+                            justifyContent: "center",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Feather
+                            name="trash"
+                            size={responsiveIconSize(16)}
+                            color={BRAND_COLORS.DANGER}
+                          />
+                        </View>
+                      </AnimatedTouchableOpacity>
+                    )}
+                  </View>
+
+                  {post.content && (
                     <Text
                       style={{
-                        fontSize: 16,
-                        fontWeight: "700",
+                        fontSize: responsiveFontSize(15),
+                        lineHeight: responsiveSize(22),
+                        marginBottom: responsiveMargin(2),
                         color: BRAND_COLORS.TEXT_PRIMARY,
                       }}
                     >
-                      {post.user.firstName} {post.user.lastName}
+                      {renderContentWithHashtagsAndNewlines(post.content)}
                     </Text>
-                    {post.user?.verified && (
-                      <>
-                        <Text> </Text>
-                        <View
-                          style={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: 12,
-                            backgroundColor: BRAND_COLORS.PRIMARY,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            shadowColor: BRAND_COLORS.PRIMARY,
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 4,
-                          }}
-                        >
-                          <MaterialCommunityIcons
-                            name="check"
-                            size={9}
-                            color={BRAND_COLORS.SURFACE}
-                          />
-                        </View>
-                      </>
-                    )}
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: BRAND_COLORS.TEXT_SECONDARY,
-                        marginLeft: 8,
-                      }}
-                    >
-                      @{post.user.username} • {formatDate(post.createdAt)}
-                    </Text>
-                  </View>
-                  {isOwnPost && (
-                    <AnimatedTouchableOpacity
-                      style={deleteAnimatedStyle}
-                      onPress={handleDelete}
-                    >
-                      <View
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
-                          backgroundColor: `${BRAND_COLORS.DANGER}15`,
-                          justifyContent: "center",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Feather
-                          name="trash"
-                          size={16}
-                          color={BRAND_COLORS.DANGER}
-                        />
-                      </View>
-                    </AnimatedTouchableOpacity>
                   )}
-                </View>
-
-                {post.content && (
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      lineHeight: 22,
-                      marginBottom: 16,
-                      color: BRAND_COLORS.TEXT_PRIMARY,
-                    }}
-                  >
-                    {renderContentWithHashtagsAndNewlines(post.content)}
-                  </Text>
-                )}
-              </Animated.View>
-
-              {post.image && (
-                <Animated.View
-                  style={[
-                    {
-                      marginBottom: 16,
-                      borderRadius: 16,
-                      overflow: "hidden",
-                      shadowColor: BRAND_COLORS.PRIMARY,
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 10,
-                      elevation: 6,
-                    },
-                    imageAnimatedStyle,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: post.image }}
-                    style={{ width: "100%", height: 200 }}
-                    resizeMode="cover"
-                  />
                 </Animated.View>
-              )}
 
-              {/* Enhanced Action Bar */}
-              <Animated.View style={[actionBarAnimatedStyle]}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    maxWidth: 280,
-                    paddingTop: 8,
-                  }}
-                >
-                  <AnimatedTouchableOpacity
+                {post.image && (
+                  <Animated.View
                     style={[
                       {
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 20,
-                        backgroundColor: `${BRAND_COLORS.SECONDARY}08`,
+                        marginBottom: responsiveMargin(16),
+                        borderRadius: responsiveBorderRadius(16),
+                        overflow: "hidden",
+                        shadowColor: BRAND_COLORS.PRIMARY,
+                        shadowOffset: { width: 0, height: responsiveSize(6) },
+                        shadowOpacity: 0.12,
+                        shadowRadius: responsiveSize(10),
+                        elevation: 6,
                       },
-                      commentAnimatedStyle,
+                      imageAnimatedStyle,
                     ]}
-                    onPress={handleComment}
                   >
-                    <Feather
-                      name="message-circle"
-                      size={18}
-                      color={BRAND_COLORS.ICON_SECONDARY}
-                    />
-                    <Text
-                      style={{
-                        color: BRAND_COLORS.TEXT_SECONDARY,
-                        fontSize: 13,
-                        fontWeight: "600",
-                        marginLeft: 6,
-                      }}
+                    <TouchableOpacity
+                      onPress={() => setIsImageModalVisible(true)}
+                      activeOpacity={0.9}
                     >
-                      {formatNumber(post.comments?.length || 0)}
-                    </Text>
-                  </AnimatedTouchableOpacity>
+                      <Image
+                        source={{ uri: post.image }}
+                        style={{ width: "100%", height: responsiveSize(200) }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  </Animated.View>
+                )}
 
-                  <TouchableOpacity
+                {/* Enhanced Action Bar */}
+                <Animated.View style={[actionBarAnimatedStyle]}>
+                  <View
                     style={{
                       flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor: `${BRAND_COLORS.ACCENT_YELLOW}08`,
+                      justifyContent: "space-between",
+                      maxWidth: responsiveSize(280),
+                      paddingTop: responsivePadding(8),
                     }}
                   >
-                    <Feather
-                      name="repeat"
-                      size={18}
-                      color={BRAND_COLORS.ICON_SECONDARY}
-                    />
-                    <Text
-                      style={{
-                        color: BRAND_COLORS.TEXT_SECONDARY,
-                        fontSize: 13,
-                        fontWeight: "600",
-                        marginLeft: 6,
-                      }}
+                    <AnimatedTouchableOpacity
+                      style={[
+                        {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: responsivePadding(12),
+                          paddingVertical: responsivePadding(8),
+                          borderRadius: responsiveBorderRadius(20),
+                          backgroundColor: `${BRAND_COLORS.SECONDARY}08`,
+                        },
+                        commentAnimatedStyle,
+                      ]}
+                      onPress={handleComment}
                     >
-                      0
-                    </Text>
-                  </TouchableOpacity>
-
-                  <AnimatedTouchableOpacity
-                    style={[
-                      {
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 20,
-                        backgroundColor: isLiked
-                          ? `${BRAND_COLORS.PRIMARY}12`
-                          : `${BRAND_COLORS.ACCENT_MINT}08`,
-                      },
-                      likeAnimatedStyle,
-                    ]}
-                    onPress={handleLike}
-                  >
-                    {isLiked ? (
-                      <AntDesign
-                        name="heart"
-                        size={18}
-                        color={BRAND_COLORS.PRIMARY}
-                      />
-                    ) : (
                       <Feather
-                        name="heart"
-                        size={18}
+                        name="message-circle"
+                        size={responsiveIconSize(18)}
                         color={BRAND_COLORS.ICON_SECONDARY}
                       />
-                    )}
-                    <Text
+                      <Text
+                        style={{
+                          color: BRAND_COLORS.TEXT_SECONDARY,
+                          fontSize: responsiveFontSize(13),
+                          fontWeight: "600",
+                          marginLeft: responsiveMargin(6),
+                        }}
+                      >
+                        {formatNumber(post.comments?.length || 0)}
+                      </Text>
+                    </AnimatedTouchableOpacity>
+
+                    <TouchableOpacity
                       style={{
-                        color: isLiked
-                          ? BRAND_COLORS.PRIMARY
-                          : BRAND_COLORS.TEXT_SECONDARY,
-                        fontSize: 13,
-                        fontWeight: "600",
-                        marginLeft: 6,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: responsivePadding(12),
+                        paddingVertical: responsivePadding(8),
+                        borderRadius: responsiveBorderRadius(20),
+                        backgroundColor: `${BRAND_COLORS.ACCENT_YELLOW}08`,
                       }}
                     >
-                      {formatNumber(post.likes?.length || 0)}
-                    </Text>
-                  </AnimatedTouchableOpacity>
+                      <Feather
+                        name="repeat"
+                        size={responsiveIconSize(18)}
+                        color={BRAND_COLORS.ICON_SECONDARY}
+                      />
+                      <Text
+                        style={{
+                          color: BRAND_COLORS.TEXT_SECONDARY,
+                          fontSize: responsiveFontSize(13),
+                          fontWeight: "600",
+                          marginLeft: responsiveMargin(6),
+                        }}
+                      >
+                        0
+                      </Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor: `${BRAND_COLORS.PRIMARY}08`,
-                    }}
-                  >
-                    <Feather
-                      name="share"
-                      size={18}
-                      color={BRAND_COLORS.ICON_SECONDARY}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+                    <AnimatedTouchableOpacity
+                      style={[
+                        {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: responsivePadding(12),
+                          paddingVertical: responsivePadding(8),
+                          borderRadius: responsiveBorderRadius(20),
+                          backgroundColor: isLiked
+                            ? `${BRAND_COLORS.PRIMARY}12`
+                            : `${BRAND_COLORS.ACCENT_MINT}08`,
+                        },
+                        likeAnimatedStyle,
+                      ]}
+                      onPress={handleLike}
+                    >
+                      {isLiked ? (
+                        <AntDesign
+                          name="heart"
+                          size={responsiveIconSize(18)}
+                          color={BRAND_COLORS.PRIMARY}
+                        />
+                      ) : (
+                        <Feather
+                          name="heart"
+                          size={responsiveIconSize(18)}
+                          color={BRAND_COLORS.ICON_SECONDARY}
+                        />
+                      )}
+                      <Text
+                        style={{
+                          color: isLiked
+                            ? BRAND_COLORS.PRIMARY
+                            : BRAND_COLORS.TEXT_SECONDARY,
+                          fontSize: responsiveFontSize(13),
+                          fontWeight: "600",
+                          marginLeft: responsiveMargin(6),
+                        }}
+                      >
+                        {formatNumber(post.likes?.length || 0)}
+                      </Text>
+                    </AnimatedTouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: responsivePadding(12),
+                        paddingVertical: responsivePadding(8),
+                        borderRadius: responsiveBorderRadius(20),
+                        backgroundColor: `${BRAND_COLORS.PRIMARY}08`,
+                      }}
+                    >
+                      <Feather
+                        name="share"
+                        size={responsiveIconSize(18)}
+                        color={BRAND_COLORS.ICON_SECONDARY}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </View>
             </View>
-          </View>
-        </LinearGradient>
-      </BlurView>
-    </Animated.View>
+          </LinearGradient>
+        </BlurView>
+      </Animated.View>
+
+      <ImageModal
+        isVisible={isImageModalVisible}
+        onClose={() => setIsImageModalVisible(false)}
+        imageUrl={post.image || ""}
+        imageTitle="Post Image"
+      />
+
+      {/* Custom Alert */}
+      {alertConfig && (
+        <CustomAlert
+          visible={isVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          type={alertConfig.type}
+          onDismiss={hideAlert}
+        />
+      )}
+    </>
   );
 };
 

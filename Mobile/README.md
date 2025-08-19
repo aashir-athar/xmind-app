@@ -1,10 +1,18 @@
-# Welcome to your Expo app 👋
+# Welcome to xMind App 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is the xMind social media app built with [Expo](https://expo.dev) and [React Native](https://reactnative.dev).
+
+## About xMind
+
+xMind is a modern social media platform built with React Native and Expo, featuring:
+
+- **Real-time Social Feed**: Dynamic content with intelligent ranking algorithms
+- **User Profiles**: Customizable profiles with image uploads
+- **Search & Discovery**: Find users and trending hashtags
+- **Responsive Design**: Optimized for all screen sizes
+- **Modern UI/UX**: Beautiful animations and smooth interactions
 
 ## Get started
-
-1. Install dependencies
 
    ```bash
    npm install
