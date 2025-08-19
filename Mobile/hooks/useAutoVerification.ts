@@ -16,43 +16,39 @@ export const useAutoVerification = () => {
   const { posts: userPosts } = usePosts(currentUser?.username);
   const { updateVerification } = useProfileUpdate();
   const { showSuccess, showInfo } = useCustomAlert();
-  
-  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+
+  const [verificationResult, setVerificationResult] =
+    useState<VerificationResult | null>(null);
   const [progress, setProgress] = useState(0);
   const [isChecking, setIsChecking] = useState(false);
-
-  // Check verification eligibility whenever user data changes
-  useEffect(() => {
-    if (currentUser && userPosts) {
-      const result = checkVerificationEligibility(currentUser, userPosts.length);
-      const progressValue = getVerificationProgress(currentUser, userPosts.length);
-      
-      setVerificationResult(result);
-      setProgress(progressValue);
-
-      // Auto-verify if eligible and not already verified
-      if (result.isEligible && !currentUser.verified) {
-        handleAutoVerification();
-      }
-    }
-  }, [currentUser, userPosts]);
+  const [hasAttemptedAutoVerification, setHasAttemptedAutoVerification] =
+    useState(false);
 
   // Handle automatic verification
   const handleAutoVerification = useCallback(async () => {
-    if (!currentUser || currentUser.verified || !verificationResult?.isEligible) {
+    if (
+      !currentUser ||
+      currentUser.verified ||
+      !verificationResult?.isEligible
+    ) {
+      return;
+    }
+    const postCount = Array.isArray(userPosts) ? userPosts.length : 0;
+    const { isEligible } = checkVerificationEligibility(currentUser, postCount);
+    if (!isEligible) {
       return;
     }
 
     setIsChecking(true);
-    
+
     try {
       // Automatically verify the user
       const success = await updateVerification(true);
-      
+
       if (success) {
         // Refetch user data to get updated verification status
         await refetchUser();
-        
+
         // Show success message
         showSuccess(
           "🎉 Account Verified!",
@@ -68,17 +64,64 @@ export const useAutoVerification = () => {
     } finally {
       setIsChecking(false);
     }
-  }, [currentUser, verificationResult, updateVerification, refetchUser, showSuccess, showInfo]);
+  }, [
+    currentUser,
+    verificationResult,
+    updateVerification,
+    refetchUser,
+    showSuccess,
+    showInfo,
+    userPosts,
+    isChecking,
+  ]);
+
+  // Check verification eligibility whenever user data changes
+  useEffect(() => {
+    if (currentUser && userPosts) {
+      const result = checkVerificationEligibility(
+        currentUser,
+        userPosts.length
+      );
+      const progressValue = getVerificationProgress(
+        currentUser,
+        userPosts.length
+      );
+
+      setVerificationResult(result);
+      setProgress(progressValue);
+
+      // Auto-verify if eligible and not already verified
+      if (
+        result.isEligible &&
+        !currentUser.verified &&
+        !hasAttemptedAutoVerification
+      ) {
+        setHasAttemptedAutoVerification(true);
+        handleAutoVerification();
+      }
+    }
+  }, [
+    currentUser,
+    userPosts,
+    hasAttemptedAutoVerification,
+    handleAutoVerification,
+  ]);
 
   // Manual verification check
   const checkVerification = useCallback(() => {
     if (currentUser && userPosts) {
-      const result = checkVerificationEligibility(currentUser, userPosts.length);
-      const progressValue = getVerificationProgress(currentUser, userPosts.length);
-      
+      const result = checkVerificationEligibility(
+        currentUser,
+        userPosts.length
+      );
+      const progressValue = getVerificationProgress(
+        currentUser,
+        userPosts.length
+      );
+
       setVerificationResult(result);
       setProgress(progressValue);
-      
+
       return result;
     }
     return null;

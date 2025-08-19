@@ -1,5 +1,5 @@
 import { ConversationType, MessageType } from "@/data/conversations";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import {
   View,
   Text,
@@ -23,7 +23,6 @@ import Animated, {
   withSpring,
   withTiming,
   withDelay,
-  runOnJS,
   interpolate,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,7 +63,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   const [newMessage, setNewMessage] = useState("");
   const messagesRef = useRef<ScrollView>(null);
 
-  // Animation values matching CommentsModal
+  // Animation values
   const modalOpacity = useSharedValue(0);
   const modalScale = useSharedValue(0.9);
   const headerOpacity = useSharedValue(0);
@@ -141,12 +140,12 @@ const ChatModal: React.FC<ChatModalProps> = ({
     if (selectedConversation) {
       setSelectedConversation({
         ...selectedConversation,
-            lastMessage: text,
-            time: "now",
-            timestamp: now,
+        lastMessage: text,
+        time: "now",
+        timestamp: now,
         messages: [...selectedConversation.messages, outgoing],
       });
-          }
+    }
     setNewMessage("");
   }, [newMessage, selectedConversation]);
 
@@ -174,7 +173,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
       {
         translateY: interpolate(
           contentOpacity.value,
-      [0, 1],
+          [0, 1],
           [20 * baseScale, 0]
         ),
       },
@@ -182,7 +181,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
   }));
 
   const sendButtonAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: sendButtonScale.value }],
+    transform: [{ scale: sendButtonScale.value }],
   }));
 
   if (!selectedConversation) return null;
@@ -197,10 +196,11 @@ const ChatModal: React.FC<ChatModalProps> = ({
       style={{ flex: 1 }}
     >
       <SafeAreaView
-        edges={["top"]}
+        edges={["top", "bottom"]}
         style={{
           flex: 1,
           backgroundColor: `${BRAND_COLORS.PRIMARY_DARK}40`,
+          paddingTop: insets.top, // FIX: Ensures modal is below status bar
         }}
       >
         <BlurView
@@ -215,6 +215,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                   flex: 1,
                   width: width - responsiveSize(32),
                   maxHeight: height * 0.8,
+                  marginTop: insets.top, // FIX: Pushes the modal below the status bar
                   borderRadius: responsiveBorderRadius(28),
                   overflow: "hidden",
                   shadowColor: BRAND_COLORS.PRIMARY,
@@ -226,26 +227,26 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 modalAnimatedStyle,
               ]}
             >
-          <LinearGradient
+              <LinearGradient
                 colors={[BRAND_COLORS.SURFACE, `${BRAND_COLORS.BACKGROUND}95`]}
-            style={{ flex: 1 }}
-          >
+                style={{ flex: 1 }}
+              >
                 {/* Header */}
                 <Animated.View style={headerAnimatedStyle}>
                   <BlurView
                     intensity={10}
-                tint="light"
-                style={{
-                      paddingHorizontal: responsivePadding(24),
-                  paddingVertical: responsivePadding(20),
-                  borderBottomWidth: 1,
-                  borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-                }}
-              >
-                  <View
+                    tint="light"
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
+                      paddingHorizontal: responsivePadding(24),
+                      paddingVertical: responsivePadding(20),
+                      borderBottomWidth: 1,
+                      borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
                         justifyContent: "space-between",
                       }}
                     >
@@ -256,10 +257,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
                           paddingVertical: responsivePadding(8),
                           borderRadius: responsiveBorderRadius(20),
                           backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-                    }}
-                  >
-                    <Text
-                      style={{
+                        }}
+                      >
+                        <Text
+                          style={{
                             color: BRAND_COLORS.TEXT_SECONDARY,
                             fontSize: responsiveFontSize(16),
                             fontWeight: "600",
@@ -273,253 +274,253 @@ const ChatModal: React.FC<ChatModalProps> = ({
                         <Text
                           style={{
                             fontSize: responsiveFontSize(18),
-                        fontWeight: "800",
-                        color: BRAND_COLORS.TEXT_PRIMARY,
-                        letterSpacing: 0.3,
-                      }}
-                    >
-                      {selectedConversation.user.name}
-                    </Text>
-                    <Text
-                      style={{
+                            fontWeight: "800",
+                            color: BRAND_COLORS.TEXT_PRIMARY,
+                            letterSpacing: 0.3,
+                          }}
+                        >
+                          {selectedConversation.user.name}
+                        </Text>
+                        <Text
+                          style={{
                             fontSize: responsiveFontSize(12),
-                        color: BRAND_COLORS.TEXT_SECONDARY,
+                            color: BRAND_COLORS.TEXT_SECONDARY,
                             fontWeight: "500",
                             marginTop: responsiveMargin(2),
                           }}
                         >
                           Chat
-                    </Text>
-                  </View>
+                        </Text>
+                      </View>
 
                       <View style={{ width: responsiveSize(80) }} />
-                </View>
+                    </View>
                   </BlurView>
                 </Animated.View>
 
-                {/* Messages Content */}
+                {/* Messages */}
                 <KeyboardAvoidingView
                   behavior={Platform.OS === "ios" ? "padding" : "height"}
                   keyboardVerticalOffset={insets.bottom + responsiveSize(30)}
                   style={{ flex: 1 }}
                 >
-              <ScrollView
-                style={{
-                  flex: 1,
-                  paddingHorizontal: responsivePadding(20),
-                }}
-                ref={messagesRef}
-                showsVerticalScrollIndicator={false}
+                  <ScrollView
+                    style={{
+                      flex: 1,
+                      paddingHorizontal: responsivePadding(20),
+                    }}
+                    ref={messagesRef}
+                    showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode="interactive"
-              >
+                  >
                     <Animated.View style={contentAnimatedStyle}>
-                <View style={{ marginBottom: responsiveMargin(20) }}>
+                      <View style={{ marginBottom: responsiveMargin(20) }}>
                         <View
-                    style={{
-                      backgroundColor: `${BRAND_COLORS.SURFACE}90`,
-                      borderRadius: responsiveBorderRadius(24),
-                      padding: responsivePadding(20),
-                      marginBottom: responsiveMargin(24),
-                      borderWidth: 1,
-                      borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                      shadowColor: BRAND_COLORS.PRIMARY,
+                          style={{
+                            backgroundColor: `${BRAND_COLORS.SURFACE}90`,
+                            borderRadius: responsiveBorderRadius(24),
+                            padding: responsivePadding(20),
+                            marginBottom: responsiveMargin(24),
+                            borderWidth: 1,
+                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
+                            shadowColor: BRAND_COLORS.PRIMARY,
                             shadowOffset: {
                               width: 0,
                               height: responsiveSize(4),
                             },
-                      shadowOpacity: 0.08,
-                      shadowRadius: responsiveSize(12),
-                      elevation: 6,
-                    }}
-                  >
-                    <View
-                      style={{
-                        alignItems: "center",
-                        marginBottom: responsiveMargin(12),
-                      }}
-                    >
-                      <LinearGradient
-                        colors={[
-                          BRAND_COLORS.PRIMARY,
-                          BRAND_COLORS.PRIMARY_LIGHT,
-                        ]}
-                        style={{
-                          width: responsiveSize(40),
-                          height: responsiveSize(40),
-                          borderRadius: responsiveBorderRadius(20),
-                          justifyContent: "center",
-                          alignItems: "center",
-                          marginBottom: responsiveMargin(12),
-                        }}
-                      >
-                        <Feather
-                          name="star"
-                          size={responsiveIconSize(20)}
-                          color={BRAND_COLORS.SURFACE}
-                        />
-                      </LinearGradient>
-                    </View>
-                    <Text
-                      style={{
-                        textAlign: "center",
-                        color: BRAND_COLORS.TEXT_PRIMARY,
-                        fontSize: responsiveFontSize(15),
-                        fontWeight: "600",
-                        lineHeight: responsiveSize(22),
-                      }}
-                    >
-                      This is the beginning of your conversation with{" "}
-                      <Text
-                        style={{
-                          color: BRAND_COLORS.PRIMARY,
-                          fontWeight: "800",
-                        }}
-                      >
-                        {selectedConversation.user.name}
-                      </Text>
-                    </Text>
-                        </View>
-
-                  {selectedConversation.messages.map((message, index) => (
+                            shadowOpacity: 0.08,
+                            shadowRadius: responsiveSize(12),
+                            elevation: 6,
+                          }}
+                        >
                           <View
-                      key={message.id}
-                      style={{
-                        flexDirection: "row",
-                        marginBottom: responsiveMargin(16),
-                        justifyContent: message.fromUser
-                          ? "flex-end"
-                          : "flex-start",
-                      }}
-                    >
-                      {!message.fromUser && (
-                        <View
-                          style={{
-                            width: responsiveSize(36),
-                            height: responsiveSize(36),
-                            borderRadius: responsiveBorderRadius(18),
-                            marginRight: responsiveMargin(12),
-                            overflow: "hidden",
-                            borderWidth: 2,
-                            borderColor: `${BRAND_COLORS.PRIMARY}20`,
-                            shadowColor: BRAND_COLORS.PRIMARY,
-                            shadowOffset: {
-                              width: 0,
-                              height: responsiveSize(2),
-                            },
-                            shadowOpacity: 0.15,
-                            shadowRadius: responsiveSize(4),
-                            elevation: 3,
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                          }}
-                        >
-                          <Image
-                                  source={{
-                                    uri: selectedConversation.user.avatar,
-                                  }}
                             style={{
-                              width: responsiveSize(36),
-                              height: responsiveSize(36),
-                              borderRadius: responsiveBorderRadius(18),
+                              alignItems: "center",
+                              marginBottom: responsiveMargin(12),
                             }}
-                          />
-                        </View>
-                      )}
-
-                      <View
-                        style={{
-                          flex: 1,
-                          alignItems: message.fromUser
-                            ? "flex-end"
-                            : "flex-start",
-                          maxWidth: "75%",
-                        }}
-                      >
-                        <View
-                          style={{
-                            borderRadius: responsiveBorderRadius(24),
-                            paddingHorizontal: responsivePadding(20),
-                            paddingVertical: responsivePadding(14),
-                            marginBottom: responsiveMargin(4),
-                            shadowColor: message.fromUser
-                              ? BRAND_COLORS.PRIMARY
-                              : BRAND_COLORS.TEXT_SECONDARY,
-                            shadowOffset: {
-                              width: 0,
-                              height: responsiveSize(3),
-                            },
-                            shadowOpacity: message.fromUser ? 0.25 : 0.1,
-                            shadowRadius: responsiveSize(8),
-                            elevation: message.fromUser ? 6 : 3,
-                          }}
-                        >
-                          {message.fromUser ? (
+                          >
                             <LinearGradient
                               colors={[
                                 BRAND_COLORS.PRIMARY,
                                 BRAND_COLORS.PRIMARY_LIGHT,
                               ]}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
                               style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                borderRadius: responsiveBorderRadius(24),
+                                width: responsiveSize(40),
+                                height: responsiveSize(40),
+                                borderRadius: responsiveBorderRadius(20),
+                                justifyContent: "center",
+                                alignItems: "center",
+                                marginBottom: responsiveMargin(12),
                               }}
-                            />
-                          ) : (
-                            <View
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: `${BRAND_COLORS.SURFACE}95`,
-                                borderRadius: responsiveBorderRadius(24),
-                                borderWidth: 1,
-                                borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                              }}
-                            />
-                          )}
+                            >
+                              <Feather
+                                name="star"
+                                size={responsiveIconSize(20)}
+                                color={BRAND_COLORS.SURFACE}
+                              />
+                            </LinearGradient>
+                          </View>
                           <Text
                             style={{
-                              color: message.fromUser
-                                ? BRAND_COLORS.SURFACE
-                                : BRAND_COLORS.TEXT_PRIMARY,
+                              textAlign: "center",
+                              color: BRAND_COLORS.TEXT_PRIMARY,
                               fontSize: responsiveFontSize(15),
+                              fontWeight: "600",
                               lineHeight: responsiveSize(22),
+                            }}
+                          >
+                            This is the beginning of your conversation with{" "}
+                            <Text
+                              style={{
+                                color: BRAND_COLORS.PRIMARY,
+                                fontWeight: "800",
+                              }}
+                            >
+                              {selectedConversation.user.name}
+                            </Text>
+                          </Text>
+                        </View>
+
+                        {selectedConversation.messages.map((message) => (
+                          <View
+                            key={message.id}
+                            style={{
+                              flexDirection: "row",
+                              marginBottom: responsiveMargin(16),
+                              justifyContent: message.fromUser
+                                ? "flex-end"
+                                : "flex-start",
+                            }}
+                          >
+                            {!message.fromUser && (
+                              <View
+                                style={{
+                                  width: responsiveSize(36),
+                                  height: responsiveSize(36),
+                                  borderRadius: responsiveBorderRadius(18),
+                                  marginRight: responsiveMargin(12),
+                                  overflow: "hidden",
+                                  borderWidth: 2,
+                                  borderColor: `${BRAND_COLORS.PRIMARY}20`,
+                                  shadowColor: BRAND_COLORS.PRIMARY,
+                                  shadowOffset: {
+                                    width: 0,
+                                    height: responsiveSize(2),
+                                  },
+                                  shadowOpacity: 0.15,
+                                  shadowRadius: responsiveSize(4),
+                                  elevation: 3,
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <Image
+                                  source={{
+                                    uri: selectedConversation.user.avatar,
+                                  }}
+                                  style={{
+                                    width: responsiveSize(36),
+                                    height: responsiveSize(36),
+                                    borderRadius: responsiveBorderRadius(18),
+                                  }}
+                                />
+                              </View>
+                            )}
+
+                            <View
+                              style={{
+                                flex: 1,
+                                alignItems: message.fromUser
+                                  ? "flex-end"
+                                  : "flex-start",
+                                maxWidth: "75%",
+                              }}
+                            >
+                              <View
+                                style={{
+                                  borderRadius: responsiveBorderRadius(24),
+                                  paddingHorizontal: responsivePadding(20),
+                                  paddingVertical: responsivePadding(14),
+                                  marginBottom: responsiveMargin(4),
+                                  shadowColor: message.fromUser
+                                    ? BRAND_COLORS.PRIMARY
+                                    : BRAND_COLORS.TEXT_SECONDARY,
+                                  shadowOffset: {
+                                    width: 0,
+                                    height: responsiveSize(3),
+                                  },
+                                  shadowOpacity: message.fromUser ? 0.25 : 0.1,
+                                  shadowRadius: responsiveSize(8),
+                                  elevation: message.fromUser ? 6 : 3,
+                                }}
+                              >
+                                {message.fromUser ? (
+                                  <LinearGradient
+                                    colors={[
+                                      BRAND_COLORS.PRIMARY,
+                                      BRAND_COLORS.PRIMARY_LIGHT,
+                                    ]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      borderRadius: responsiveBorderRadius(24),
+                                    }}
+                                  />
+                                ) : (
+                                  <View
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      backgroundColor: `${BRAND_COLORS.SURFACE}95`,
+                                      borderRadius: responsiveBorderRadius(24),
+                                      borderWidth: 1,
+                                      borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
+                                    }}
+                                  />
+                                )}
+                                <Text
+                                  style={{
+                                    color: message.fromUser
+                                      ? BRAND_COLORS.SURFACE
+                                      : BRAND_COLORS.TEXT_PRIMARY,
+                                    fontSize: responsiveFontSize(15),
+                                    lineHeight: responsiveSize(22),
                                     fontWeight: message.fromUser
                                       ? "600"
                                       : "500",
-                              zIndex: 1,
-                            }}
-                          >
-                            {message.text}
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(12),
-                            color: BRAND_COLORS.TEXT_SECONDARY,
-                            marginHorizontal: responsiveMargin(8),
-                            fontWeight: "600",
-                          }}
-                        >
-                          {message.time}
-                        </Text>
-                      </View>
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  {message.text}
+                                </Text>
+                              </View>
+                              <Text
+                                style={{
+                                  fontSize: responsiveFontSize(12),
+                                  color: BRAND_COLORS.TEXT_SECONDARY,
+                                  marginHorizontal: responsiveMargin(8),
+                                  fontWeight: "600",
+                                }}
+                              >
+                                {message.time}
+                              </Text>
+                            </View>
                           </View>
-                  ))}
-                </View>
+                        ))}
+                      </View>
                     </Animated.View>
-              </ScrollView>
+                  </ScrollView>
 
-                  {/* Enhanced Input Section */}
+                  {/* Input */}
                   <Animated.View
                     style={[
                       {
@@ -531,60 +532,60 @@ const ChatModal: React.FC<ChatModalProps> = ({
                     ]}
                   >
                     <View
-                style={{
-                  flexDirection: "row",
+                      style={{
+                        flexDirection: "row",
                         alignContent: "center",
                         justifyContent: "center",
-                }}
-              >
-                <View
-                  style={{
-                    flex: 1,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flex: 1,
                           borderRadius: responsiveBorderRadius(16),
                           backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
                           borderWidth: 1,
                           borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                    shadowColor: BRAND_COLORS.PRIMARY,
+                          shadowColor: BRAND_COLORS.PRIMARY,
                           shadowOffset: { width: 0, height: responsiveSize(2) },
                           shadowOpacity: 0.05,
                           shadowRadius: responsiveSize(4),
                           elevation: 2,
-                      marginRight: responsiveMargin(12),
+                          marginRight: responsiveMargin(12),
                           marginBottom: responsiveMargin(12),
                         }}
                       >
                         <AnimatedTextInput
-                    style={{
+                          style={{
                             padding: responsivePadding(16),
-                      fontSize: responsiveFontSize(16),
-                      color: BRAND_COLORS.TEXT_PRIMARY,
-                      fontWeight: "500",
+                            fontSize: responsiveFontSize(16),
+                            color: BRAND_COLORS.TEXT_PRIMARY,
+                            fontWeight: "500",
                             minHeight: responsiveSize(48),
                             maxHeight: responsiveSize(100),
                             textAlignVertical: "center",
-                    }}
-                    placeholder="Type your message..."
-                    placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                    value={newMessage}
-                    onChangeText={setNewMessage}
-                    multiline
+                          }}
+                          placeholder="Type your message..."
+                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
+                          value={newMessage}
+                          onChangeText={setNewMessage}
+                          multiline
                           numberOfLines={10}
                           scrollEnabled={true}
                         />
-                </View>
+                      </View>
                       <Animated.View style={[sendButtonAnimatedStyle]}>
-                  <TouchableOpacity
-                    onPress={sendMessage}
-                    disabled={!newMessage.trim()}
-                    style={{
+                        <TouchableOpacity
+                          onPress={sendMessage}
+                          disabled={!newMessage.trim()}
+                          style={{
                             minWidth: responsiveSize(48),
                             minHeight: responsiveSize(48),
                             borderRadius: responsiveBorderRadius(16),
                             backgroundColor: newMessage.trim()
                               ? BRAND_COLORS.PRIMARY
                               : `${BRAND_COLORS.BORDER_LIGHT}60`,
-                          justifyContent: "center",
-                          alignItems: "center",
+                            justifyContent: "center",
+                            alignItems: "center",
                             shadowColor: BRAND_COLORS.PRIMARY,
                             shadowOffset: {
                               width: 0,
@@ -593,10 +594,10 @@ const ChatModal: React.FC<ChatModalProps> = ({
                             shadowOpacity: newMessage.trim() ? 0.3 : 0,
                             shadowRadius: responsiveSize(8),
                             elevation: newMessage.trim() ? 6 : 0,
-                        }}
-                      >
-                        <Feather
-                          name="send"
+                          }}
+                        >
+                          <Feather
+                            name="send"
                             size={responsiveIconSize(24)}
                             color={
                               newMessage.trim()
@@ -604,13 +605,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
                                 : BRAND_COLORS.TEXT_SECONDARY
                             }
                           />
-                  </TouchableOpacity>
+                        </TouchableOpacity>
                       </Animated.View>
                     </View>
-                </Animated.View>
-              </KeyboardAvoidingView>
-          </LinearGradient>
-        </Animated.View>
+                  </Animated.View>
+                </KeyboardAvoidingView>
+              </LinearGradient>
+            </Animated.View>
           </SafeAreaView>
         </BlurView>
       </SafeAreaView>

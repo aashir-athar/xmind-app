@@ -20,14 +20,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Feather } from "@expo/vector-icons";
 import { BRAND_COLORS } from "@/constants/colors";
-import { 
-  responsiveSize, 
-  responsivePadding, 
-  responsiveMargin, 
-  responsiveBorderRadius, 
-  responsiveFontSize, 
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
   responsiveIconSize,
-  baseScale 
+  baseScale,
 } from "@/utils/responsive";
 
 const { width, height } = Dimensions.get("window");
@@ -82,7 +82,11 @@ const ImageModal = ({
     opacity: headerOpacity.value,
     transform: [
       {
-        translateY: interpolate(headerOpacity.value, [0, 1], [-10 * baseScale, 0]),
+        translateY: interpolate(
+          headerOpacity.value,
+          [0, 1],
+          [-10 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -91,7 +95,11 @@ const ImageModal = ({
     opacity: imageOpacity.value,
     transform: [
       {
-        translateY: interpolate(imageOpacity.value, [0, 1], [20 * baseScale, 0]),
+        translateY: interpolate(
+          imageOpacity.value,
+          [0, 1],
+          [20 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -145,7 +153,10 @@ const ImageModal = ({
                 <BlurView
                   intensity={10}
                   tint="light"
-                  style={{ paddingHorizontal: responsivePadding(24), paddingVertical: responsivePadding(20) }}
+                  style={{
+                    paddingHorizontal: responsivePadding(24),
+                    paddingVertical: responsivePadding(20),
+                  }}
                 >
                   <View className="flex-row items-center justify-between">
                     <Animated.View style={closeButtonAnimatedStyle}>
@@ -196,7 +207,12 @@ const ImageModal = ({
               </Animated.View>
 
               {/* Image Content */}
-              <Animated.View style={[imageAnimatedStyle, { flex: 1, padding: responsivePadding(24) }]}>
+              <Animated.View
+                style={[
+                  imageAnimatedStyle,
+                  { flex: 1, padding: responsivePadding(24) },
+                ]}
+              >
                 <View
                   style={{
                     flex: 1,
@@ -212,10 +228,10 @@ const ImageModal = ({
                 >
                   <Image
                     source={{ uri: imageUrl }}
+                    resizeMode="contain"
                     style={{
                       width: "100%",
                       height: "100%",
-                      resizeMode: "contain",
                     }}
                   />
                 </View>

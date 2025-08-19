@@ -67,12 +67,8 @@ const PostCard = ({
   isLiked,
 }: PostCardProps) => {
   const router = useRouter();
-  const {
-    showDeleteConfirmation,
-    alertConfig,
-    isVisible,
-    hideAlert,
-  } = useCustomAlert();
+  const { showDeleteConfirmation, alertConfig, isVisible, hideAlert } =
+    useCustomAlert();
   const isOwnPost = currentUser ? post.user._id === currentUser._id : false;
   const [isImageModalVisible, setIsImageModalVisible] = useState(false);
 
@@ -108,7 +104,7 @@ const PostCard = ({
           withTiming(1.1, { duration: 100 }),
           withTiming(0, { duration: 200 })
         );
-        runOnJS(onDelete)(post._id);
+        onDelete(post._id);
       }
     );
   };
@@ -202,7 +198,10 @@ const PostCard = ({
                   fontWeight: "700",
                 }}
                 onPress={() => {
-                  const hashtag = word;
+                  // Keep only the leading hashtag token (letters, numbers, underscore)
+                  const match = word.match(/^#[A-Za-z0-9_]+/);
+                  const hashtag = match ? match[0] : "";
+                  if (!hashtag) return;
                   router.push({
                     pathname: "/hashtag-posts",
                     params: { hashtag },

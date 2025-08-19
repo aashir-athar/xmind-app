@@ -113,7 +113,7 @@ const VerificationProgress: React.FC<VerificationStatusProps> = ({
       <Ionicons
         name={isEligible ? "checkmark-circle-outline" : "time-outline"}
         size={responsiveIconSize(18)}
-        color={isEligible ? BRAND_COLORS.PRIMARY : BRAND_COLORS.ACCENT_YELLOW}
+        color={isEligible ? BRAND_COLORS.PRIMARY : BRAND_COLORS.WARNING}
       />
     );
   };
@@ -233,7 +233,7 @@ const VerificationProgress: React.FC<VerificationStatusProps> = ({
             borderRadius: responsiveBorderRadius(18),
             backgroundColor: isEligible
               ? `${BRAND_COLORS.PRIMARY}15`
-              : `${BRAND_COLORS.ACCENT_YELLOW}15`,
+              : `${BRAND_COLORS.WARNING}15`,
             justifyContent: "center",
             alignItems: "center",
             marginRight: responsiveMargin(12),

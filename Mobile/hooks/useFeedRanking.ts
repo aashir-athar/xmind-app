@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import { usePosts } from "./usePosts";
 import { useCurrentUser } from "./useCurrentUser";
 import { Post, User } from "@/types";
-import { rankFeedPosts, simpleRankPosts, FeedRankingAlgorithm } from "../utils/feedRanking";
+import {
+  rankFeedPosts,
+  simpleRankPosts,
+  FeedRankingAlgorithm,
+} from "../utils/feedRanking";
 
 interface UseFeedRankingOptions {
   useAdvancedAlgorithm?: boolean;
@@ -17,11 +21,7 @@ interface UseFeedRankingOptions {
 }
 
 export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
-  const { 
-    useAdvancedAlgorithm = true, 
-    maxPosts = 20,
-    customWeights 
-  } = options;
+  const { useAdvancedAlgorithm = true, maxPosts = 20, customWeights } = options;
 
   const { posts, isLoading, error, refetch } = usePosts();
   const { currentUser } = useCurrentUser();
@@ -49,13 +49,13 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
             adFrequency: 5,
           },
         });
-        
+
         // Limit to maxPosts
         return ranked.slice(0, maxPosts);
       } else {
         // Use simple ranking for better performance
-        const simpleRanked = simpleRankPosts(posts);
-        return simpleRanked.slice(0, maxPosts);
+        const simpleRanked = simpleRankPosts([...posts]);
+        return simpleRankPosts([...posts]).slice(0, maxPosts);
       }
     } catch (error) {
       console.error("Feed ranking error:", error);
@@ -78,7 +78,7 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
         followedAccounts: currentUser.following || [],
         interactionHistory: [], // Could be populated from user interactions
         preferences: {
-          contentTypes: ['text', 'image'] as const,
+          contentTypes: ["text", "image"] as const,
           topics: [],
           mutedAccounts: [],
         },
@@ -137,20 +137,25 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
 
     const averageEngagement = totalEngagement / rankedPosts.length;
 
-    const authorCounts = rankedPosts.reduce((acc, post) => {
-      acc[post.user._id] = (acc[post.user._id] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const authorCounts = rankedPosts.reduce(
+      (acc, post) => {
+        acc[post.user._id] = (acc[post.user._id] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     const topAuthors = Object.entries(authorCounts)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([userId, count]) => {
-        const user = rankedPosts.find(p => p.user._id === userId)?.user;
+        const user = rankedPosts.find((p) => p.user._id === userId)?.user;
         return { user, count };
       });
 
-    const timestamps = rankedPosts.map(post => new Date(post.createdAt).getTime());
+    const timestamps = rankedPosts.map((post) =>
+      new Date(post.createdAt).getTime()
+    );
     const timeRange = {
       oldest: timestamps.length > 0 ? new Date(Math.min(...timestamps)) : null,
       newest: timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null,
@@ -168,42 +173,42 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
   return {
     // Ranked posts
     posts: rankedPosts,
-    
+
     // Original posts (unranked)
     originalPosts: posts,
-    
+
     // Loading and error states
     isLoading,
     error,
     refetch,
-    
+
     // Feed statistics
     feedStats,
-    
+
     // Utility functions
     getRankingBreakdown,
-    
+
     // Algorithm options
-    algorithmType: useAdvancedAlgorithm ? 'advanced' : 'simple',
+    algorithmType: useAdvancedAlgorithm ? "advanced" : "simple",
   };
 };
 
 // Convenience hook for simple use cases
 export const useSimpleFeedRanking = (maxPosts: number = 20) => {
-  return useFeedRanking({ 
-    useAdvancedAlgorithm: false, 
-    maxPosts 
+  return useFeedRanking({
+    useAdvancedAlgorithm: false,
+    maxPosts,
   });
 };
 
 // Hook for advanced feed ranking with custom weights
 export const useAdvancedFeedRanking = (
   maxPosts: number = 20,
-  customWeights?: UseFeedRankingOptions['customWeights']
+  customWeights?: UseFeedRankingOptions["customWeights"]
 ) => {
-  return useFeedRanking({ 
-    useAdvancedAlgorithm: true, 
+  return useFeedRanking({
+    useAdvancedAlgorithm: true,
     maxPosts,
-    customWeights 
+    customWeights,
   });
 };

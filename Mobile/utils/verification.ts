@@ -46,10 +46,20 @@ export const checkVerificationEligibility = (
     isComplete: false,
   };
 
-  // Check if all criteria are met
-  criteria.isComplete = Object.values(criteria).every(
-    (criterion, index) => index === 5 || criterion // Skip isComplete itself
-  );
+  // Check if all criteria are met (explicitly list fields to avoid relying on property order)
+  const {
+    hasProfilePicture,
+    hasBio,
+    hasLocation,
+    hasEnoughPosts,
+    hasEnoughFollowers,
+  } = criteria;
+  criteria.isComplete =
+    hasProfilePicture &&
+    hasBio &&
+    hasLocation &&
+    hasEnoughPosts &&
+    hasEnoughFollowers;
 
   // Generate smart, actionable missing requirements
   const missingRequirements: string[] = [];

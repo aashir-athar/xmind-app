@@ -1,6 +1,13 @@
 import { ConversationType } from "@/data/conversations";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { View, Text, TouchableOpacity, Image, ImageErrorEventData, NativeSyntheticEvent } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ImageErrorEventData,
+  NativeSyntheticEvent,
+} from "react-native";
 import { BRAND_COLORS } from "@/constants/colors";
 import Animated, {
   useSharedValue,
@@ -10,6 +17,8 @@ import Animated, {
   withDelay,
   interpolate,
   runOnJS,
+  withSequence,
+  withRepeat,
 } from "react-native-reanimated";
 import {
   responsiveSize,
@@ -29,7 +38,8 @@ interface ChatCardProps {
   onLongPress: () => void;
 }
 
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 const ChatCard: React.FC<ChatCardProps> = ({
   conversation,
@@ -38,11 +48,6 @@ const ChatCard: React.FC<ChatCardProps> = ({
   onLongPress,
 }) => {
   const [avatarError, setAvatarError] = useState(false);
-  
-  // Safety check for conversation data
-  if (!conversation || !conversation.user) {
-    return null;
-  }
 
   // Animation values - simplified like PostCard
   const cardScale = useSharedValue(1);
@@ -57,14 +62,21 @@ const ChatCard: React.FC<ChatCardProps> = ({
     cardOpacity.value = withTiming(1, { duration: 400 });
     contentOpacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
     avatarScale.value = withDelay(delay + 100, withSpring(1, { damping: 15 }));
-    
-    // Simple pulse animation
-    pulseAnimation.value = withTiming(1.1, { duration: 1000 }, () => {
-      pulseAnimation.value = withTiming(1, { duration: 1000 });
-    });
+
+    // Continuous pulse animation
+    pulseAnimation.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1000 }),
+        withTiming(1, { duration: 1000 })
+      ),
+      -1, // infinite repeats
+      false // don't reverse
+    );
   }, [index]);
 
-  const handleAvatarError = (error: NativeSyntheticEvent<ImageErrorEventData>) => {
+  const handleAvatarError = (
+    error: NativeSyntheticEvent<ImageErrorEventData>
+  ) => {
     setAvatarError(true);
   };
 
@@ -85,18 +97,23 @@ const ChatCard: React.FC<ChatCardProps> = ({
     transform: [{ scale: pulseAnimation.value }],
   }));
 
+  // Safety check for conversation data
+  if (!conversation || !conversation.user) {
+    return null;
+  }
+
   return (
     <Animated.View style={cardAnimatedStyle}>
       <AnimatedTouchableOpacity
         style={{
-            flexDirection: "row",
-            alignItems: "center",
+          flexDirection: "row",
+          alignItems: "center",
           padding: responsivePadding(16),
-            marginHorizontal: responsiveMargin(4),
+          marginHorizontal: responsiveMargin(4),
           marginVertical: responsiveMargin(4),
-            borderRadius: responsiveBorderRadius(24),
+          borderRadius: responsiveBorderRadius(24),
           backgroundColor: BRAND_COLORS.SURFACE,
-            borderWidth: 1,
+          borderWidth: 1,
           borderColor: BRAND_COLORS.BORDER_LIGHT,
           shadowColor: BRAND_COLORS.PRIMARY,
           shadowOffset: { width: 0, height: responsiveSize(2) },
@@ -116,32 +133,32 @@ const ChatCard: React.FC<ChatCardProps> = ({
           }}
         >
           <Animated.View style={avatarAnimatedStyle}>
-          <View
-            style={{
-              width: responsiveSize(56),
-              height: responsiveSize(56),
-              borderRadius: responsiveBorderRadius(28),
-              overflow: "hidden",
-              borderWidth: 3,
-              borderColor: `${BRAND_COLORS.PRIMARY}20`,
-              shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: responsiveSize(4) },
-              shadowOpacity: 0.3,
-              shadowRadius: responsiveSize(12),
-              elevation: 8,
-                backgroundColor: BRAND_COLORS.SURFACE_MUTED,
-                alignItems: "center",
-                justifyContent: "center"
-            }}
-          >
-              {!avatarError ? (
-            <Image
-              source={{ uri: conversation.user.avatar }}
+            <View
               style={{
                 width: responsiveSize(56),
                 height: responsiveSize(56),
                 borderRadius: responsiveBorderRadius(28),
+                overflow: "hidden",
+                borderWidth: 3,
+                borderColor: `${BRAND_COLORS.PRIMARY}20`,
+                shadowColor: BRAND_COLORS.PRIMARY,
+                shadowOffset: { width: 0, height: responsiveSize(4) },
+                shadowOpacity: 0.3,
+                shadowRadius: responsiveSize(12),
+                elevation: 8,
+                backgroundColor: BRAND_COLORS.SURFACE_MUTED,
+                alignItems: "center",
+                justifyContent: "center",
               }}
+            >
+              {!avatarError ? (
+                <Image
+                  source={{ uri: conversation.user.avatar }}
+                  style={{
+                    width: responsiveSize(56),
+                    height: responsiveSize(56),
+                    borderRadius: responsiveBorderRadius(28),
+                  }}
                   onError={handleAvatarError}
                   defaultSource={require("@/assets/images/default-avatar.jpeg")}
                 />
@@ -164,11 +181,11 @@ const ChatCard: React.FC<ChatCardProps> = ({
                       letterSpacing: 0.5,
                     }}
                   >
-                    {conversation.user.name?.charAt(0)?.toUpperCase() || '?'}
+                    {conversation.user.name?.charAt(0)?.toUpperCase() || "?"}
                   </Text>
                 </View>
               )}
-          </View>
+            </View>
           </Animated.View>
 
           {/* Online indicator */}
@@ -216,7 +233,7 @@ const ChatCard: React.FC<ChatCardProps> = ({
                 }}
                 numberOfLines={1}
               >
-                {conversation.user.name || 'Unknown User'}
+                {conversation.user.name || "Unknown User"}
               </Text>
 
               {conversation.user.verified && (
@@ -253,7 +270,7 @@ const ChatCard: React.FC<ChatCardProps> = ({
                 }}
                 numberOfLines={1}
               >
-                @{conversation.user.username || 'unknown'}
+                @{conversation.user.username || "unknown"}
               </Text>
             </View>
 
@@ -265,7 +282,7 @@ const ChatCard: React.FC<ChatCardProps> = ({
                   fontWeight: "600",
                 }}
               >
-                {conversation.time || 'now'}
+                {conversation.time || "now"}
               </Text>
 
               <View
@@ -301,7 +318,7 @@ const ChatCard: React.FC<ChatCardProps> = ({
             }}
             numberOfLines={2}
           >
-            {conversation.lastMessage || 'No messages yet'}
+            {conversation.lastMessage || "No messages yet"}
           </Text>
         </Animated.View>
       </AnimatedTouchableOpacity>

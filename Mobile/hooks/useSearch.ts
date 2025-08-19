@@ -1,16 +1,14 @@
 import { useMemo } from "react";
 import { usePosts } from "./usePosts";
-import { useCurrentUser } from "./useCurrentUser";
 import { Post, User } from "../types";
 
 export const useSearch = () => {
   const { posts } = usePosts();
-  const { currentUser } = useCurrentUser();
 
   // Extract hashtags from all posts and count their occurrences
   const trendingHashtags = useMemo(() => {
     const hashtagCounts: { [key: string]: number } = {};
-    
+
     posts.forEach((post: Post) => {
       const hashtags = post.content.match(/#\w+/g) || [];
       hashtags.forEach((hashtag) => {
@@ -28,9 +26,9 @@ export const useSearch = () => {
   // Search users by username, firstName, or lastName
   const searchUsers = (searchQuery: string): User[] => {
     if (!searchQuery.trim()) return [];
-    
+
     const query = searchQuery.toLowerCase().trim();
-    
+
     // Get unique users from posts
     const uniqueUsers = new Map<string, User>();
     posts.forEach((post: Post) => {
@@ -53,7 +51,9 @@ export const useSearch = () => {
   const getPostsByHashtag = (hashtag: string): Post[] => {
     return posts.filter((post: Post) => {
       const hashtags = post.content.match(/#\w+/g) || [];
-      return hashtags.some(tag => tag.toLowerCase() === hashtag.toLowerCase());
+      return hashtags.some(
+        (tag) => tag.toLowerCase() === hashtag.toLowerCase()
+      );
     });
   };
 

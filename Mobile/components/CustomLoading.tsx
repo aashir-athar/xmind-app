@@ -171,6 +171,28 @@ const CustomLoading: React.FC<CustomLoadingProps> = ({
   const variantStyles = getVariantStyles();
   const { indicatorSize, fontSize, padding } = getSizeConfig();
 
+  // Create animated styles for all dots outside the render
+  const dotAnimatedStyles = [0, 1, 2].map((index) =>
+    useAnimatedStyle(() => ({
+      opacity: interpolate(
+        rotation.value,
+        [index * 120, index * 120 + 60, index * 120 + 120],
+        [0.3, 1, 0.3],
+        "clamp"
+      ),
+      transform: [
+        {
+          scale: interpolate(
+            rotation.value,
+            [index * 120, index * 120 + 60, index * 120 + 120],
+            [0.8, 1.2, 0.8],
+            "clamp"
+          ),
+        },
+      ],
+    }))
+  );
+
   return (
     <View
       style={[styles.container, variantStyles.container]}
@@ -237,31 +259,7 @@ const CustomLoading: React.FC<CustomLoadingProps> = ({
                 {[0, 1, 2].map((index) => (
                   <Animated.View
                     key={index}
-                    style={[
-                      styles.dot,
-                      useAnimatedStyle(() => ({
-                        opacity: interpolate(
-                          rotation.value,
-                          [index * 120, index * 120 + 60, index * 120 + 120],
-                          [0.3, 1, 0.3],
-                          "clamp"
-                        ),
-                        transform: [
-                          {
-                            scale: interpolate(
-                              rotation.value,
-                              [
-                                index * 120,
-                                index * 120 + 60,
-                                index * 120 + 120,
-                              ],
-                              [0.8, 1.2, 0.8],
-                              "clamp"
-                            ),
-                          },
-                        ],
-                      })),
-                    ]}
+                    style={[styles.dot, dotAnimatedStyles[index]]}
                   />
                 ))}
               </View>

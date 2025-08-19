@@ -604,7 +604,10 @@ function normalizeUsername(username: string): string {
 
 // Helper: Check if word is in list (substring match for robustness)
 function containsWord(normalized: string, words: string[]): boolean {
-  return words.some((word) => normalized.includes(word));
+  // Try word boundaries around tokens derived from underscores/letters -> digits
+  const tokens = normalized.split(/[_\W]+/).filter(Boolean);
+  const set = new Set(tokens);
+  return words.some((word) => set.has(word));
 }
 
 // Check Result Type
@@ -668,12 +671,16 @@ function checkReserved(
   username: string,
   config: ValidationConfig
 ): CheckResult {
-  const normalized = normalizeUsername(username);
-  if (containsWord(normalized, config.reservedWords)) {
-    return { valid: false, error: "Username contains a reserved word." };
+  const uname = username.toLowerCase();
+  if (config.reservedWords.map((w) => w.toLowerCase()).includes(uname)) {
+    return { valid: false, error: "Username is a reserved name." };
   }
-  // Platform-specific: For 'x', additional checks for generic terms
-  if (config.platformMode === "xMind" && /(.com|.net|.io)$/i.test(username)) {
+  // Note: domain-like patterns are already blocked by allowedCharsRegex.
+  // Keep this as a defense-in-depth check for future regex changes.
+  if (
+    config.platformMode === "xMind" &&
+    /(\.com|\.net|\.io)$/i.test(username)
+  ) {
     return {
       valid: false,
       error: "Username cannot contain domain extensions.",
@@ -837,38 +844,6 @@ async function validateUsername(
     errors,
   };
 }
-
-// Example Usage
-(async () => {
-  // Test cases
-  const tests = [
-    { username: "user1", expected: false }, // Taken
-    { username: "ab", expected: false }, // Too short
-    { username: "thisiswaytoolongusername", expected: false }, // Too long
-    { username: "user-name", expected: false }, // Hyphen not allowed
-    { username: "_user_", expected: false }, // Leading/trailing _
-    { username: "user__name", expected: false }, // Consecutive _
-    { username: "admin123", expected: false }, // Reserved
-    { username: "fckyou", expected: false }, // Abusive
-    { username: "sh1t", expected: false }, // Leetspeak abusive
-    { username: "elonmuskofficial", expected: false }, // Impersonation
-    { username: "<script>hack</script>", expected: false }, // Security
-    { username: "valid_user123", expected: true }, // Valid
-  ];
-
-  for (const test of tests) {
-    const result = await validateUsername(test.username);
-    console.log(
-      `Username "${test.username}": ${result.valid ? "Valid" : "Invalid"} - Errors: ${result.errors.join(", ")}`
-    );
-  }
-
-  // Example with X mode
-  const xResult = await validateUsername("xMindUser", {
-    platformMode: "xMind",
-  });
-  console.log("xMind mode example:", xResult);
-})();
 
 // Export
 export { validateUsername, ValidationConfig };

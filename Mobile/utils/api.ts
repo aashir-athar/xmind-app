@@ -107,6 +107,8 @@ export const userApi = {
     api.put("/users/profile", data),
   updateUsername: (api: AxiosInstance, username: string) =>
     api.put("/users/username", { username }),
+  checkUsernameAvailability: (api: AxiosInstance, username: string) =>
+    api.get(`/users/check-username/${username}`),
   getUserProfile: (api: AxiosInstance, username: string) =>
     api.get(`/users/profile/${username}`),
   followUser: (api: AxiosInstance, targetUserId: string) =>

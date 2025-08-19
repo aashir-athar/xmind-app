@@ -74,6 +74,29 @@ export const updateUsername = asyncHandler(async (req, res) => {
   res.status(200).json({ user });
 });
 
+export const checkUsernameAvailability = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  
+  if (!username) {
+    return res.status(400).json({ error: "Username is required" });
+  }
+
+  // Check if username exists in database
+  const existingUser = await User.findOne({ username });
+  
+  if (existingUser) {
+    return res.status(200).json({ 
+      available: false, 
+      message: "Username is already taken" 
+    });
+  } else {
+    return res.status(200).json({ 
+      available: true, 
+      message: "Username is available" 
+    });
+  }
+});
+
 export const syncUser = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
 

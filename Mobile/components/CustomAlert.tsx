@@ -65,7 +65,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
       
       // Icon animations
       iconScale.value = withDelay(200, withSpring(1, { damping: 20 }));
-      iconRotation.value = withDelay(200, withSpring(360, { duration: 600 }));
+      iconRotation.value = withDelay(200, withTiming(360, { duration: 600 }));
     } else {
       // Hide animations
       backdropOpacity.value = withTiming(0, { duration: 200 });

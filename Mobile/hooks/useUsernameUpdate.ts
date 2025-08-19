@@ -16,42 +16,84 @@ export const useUsernameUpdate = () => {
         "Username Updated!",
         `Your username has been successfully changed to @${response.data.user.username}`
       );
-      
+
       // Invalidate and refetch user data
       queryClient.invalidateQueries({ queryKey: ["currentUser"] });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
-      
+
       setIsUpdating(false);
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.error || "Failed to update username";
+      const errorMessage =
+        error.response?.data?.error || "Failed to update username";
       showError("Update Failed", errorMessage);
       setIsUpdating(false);
     },
   });
 
   const updateUsername = async (newUsername: string) => {
-    // Client-side validation
-    if (!newUsername || newUsername.trim().length === 0) {
+    const candidate = (newUsername ?? "").trim();
+
+    if (candidate.length === 0) {
       showError("Invalid Username", "Username cannot be empty");
       return false;
     }
-
-    if (newUsername.length < 3) {
-      showError("Invalid Username", "Username must be at least 3 characters long");
-      return false;
-    }
-
-    if (newUsername.length > 30) {
-      showError("Invalid Username", "Username cannot exceed 30 characters");
-      return false;
-    }
-
-    if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+    if (candidate.length < 4 || candidate.length > 15) {
       showError(
-        "Invalid Username", 
+        "Invalid Username",
+        "Username must be between 4 and 15 characters"
+      );
+      return false;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(candidate)) {
+      showError(
+        "Invalid Username",
         "Username can only contain letters, numbers, and underscores"
       );
+      return false;
+    }
+    if (candidate.startsWith("_") || candidate.endsWith("_")) {
+      showError(
+        "Invalid Username",
+        "Username cannot start or end with an underscore"
+      );
+      return false;
+    }
+    if (candidate.includes("__")) {
+      showError(
+        "Invalid Username",
+        "Username cannot have consecutive underscores"
+      );
+      return false;
+    }
+    const reservedWords = [
+      "admin",
+      "administrator",
+      "moderator",
+      "system",
+      "root",
+      "official",
+      "support",
+      "help",
+      "twitter",
+      "facebook",
+      "instagram",
+      "tiktok",
+      "youtube",
+      "twitch",
+      "discord",
+      "reddit",
+      "pinterest",
+      "linkedin",
+      "github",
+      "gitlab",
+      "bitbucket",
+      "heroku",
+      "vercel",
+      "netlify",
+    ];
+    if (reservedWords.includes(candidate.toLowerCase())) {
+      showError("Invalid Username", "Username contains a reserved word");
       return false;
     }
 

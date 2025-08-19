@@ -196,7 +196,7 @@ const ProfileScreen = () => {
         await handleAutoVerification();
       } else {
         // Show what's missing
-        const missingList = missingRequirements.join('\n• ');
+        const missingList = (missingRequirements ?? []).join('\n• ');
         showInfo(
           "Verification Requirements",
           `You need to complete these requirements:\n\n• ${missingList}\n\nKeep building your profile and you'll be automatically verified when ready!`
@@ -628,7 +628,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.PRIMARY,
                       }}
                     >
-                      {formatNumber(currentUser.following?.length) || 0}
+                      {formatNumber(currentUser.following?.length ?? 0)}
                     </Text>
                   </View>
                   <Text
@@ -670,7 +670,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.ACCENT_MINT,
                       }}
                     >
-                      {formatNumber(currentUser.followers?.length) || 0}
+                      {formatNumber(currentUser.followers?.length ?? 0)}
                     </Text>
                   </View>
                   <Text

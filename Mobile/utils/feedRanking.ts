@@ -67,6 +67,8 @@ interface FeedRankingConfig {
   };
 }
 
+type ReasonRef = { value: string };
+
 // Default configuration
 const DEFAULT_CONFIG: FeedRankingConfig = {
   weights: {
@@ -106,7 +108,17 @@ export class FeedRankingAlgorithm {
       blockedAccounts: userProfile.blockedAccounts || [],
     };
     this.currentUser = currentUser;
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...config,
+      weights: { ...DEFAULT_CONFIG.weights, ...(config?.weights ?? {}) },
+      limits: { ...DEFAULT_CONFIG.limits, ...(config?.limits ?? {}) },
+      timeDecay: { ...DEFAULT_CONFIG.timeDecay, ...(config?.timeDecay ?? {}) },
+      trendingThreshold: {
+        ...DEFAULT_CONFIG.trendingThreshold,
+        ...(config?.trendingThreshold ?? {}),
+      },
+    };
   }
 
   /**
@@ -166,17 +178,16 @@ export class FeedRankingAlgorithm {
   /**
    * Score each post based on multiple factors
    */
+
+
   private scorePosts(posts: Post[]): PostScore[] {
     return posts.map((post) => {
-      let reason = "";
-      const engagementLikelihood = this.calculateEngagementLikelihood(
-        post,
-        reason
-      );
-      const recencyScore = this.calculateRecencyScore(post, reason);
-      const connectionStrength = this.calculateConnectionStrength(post, reason);
-      const diversityBoost = this.calculateDiversityBoost(post, reason);
-      const qualityScore = this.calculateQualityScore(post, reason);
+      const reasonRef: ReasonRef = { value: "" };
+      const engagementLikelihood = this.calculateEngagementLikelihood(post, reasonRef);
+      const recencyScore = this.calculateRecencyScore(post, reasonRef);
+      const connectionStrength = this.calculateConnectionStrength(post, reasonRef);
+      const diversityBoost = this.calculateDiversityBoost(post, reasonRef);
+      const qualityScore = this.calculateQualityScore(post, reasonRef);
 
       const totalScore =
         this.config.weights.engagementLikelihood * engagementLikelihood +
@@ -195,7 +206,7 @@ export class FeedRankingAlgorithm {
           diversityBoost,
           qualityScore,
         },
-        reason,
+        reason: reasonRef.value,
       };
     });
   }
@@ -203,7 +214,7 @@ export class FeedRankingAlgorithm {
   /**
    * Calculate engagement likelihood score (0-1)
    */
-  private calculateEngagementLikelihood(post: Post, reason: string): number {
+  private calculateEngagementLikelihood(post: Post, reason: ReasonRef): number {
     let score = 0;
     const userInterestsSet = new Set(
       this.userProfile.interests.map((i) => i.toLowerCase())
@@ -219,7 +230,7 @@ export class FeedRankingAlgorithm {
     ).length;
     const matchRatio = interestMatch / (userInterestsSet.size || 1);
     score += Math.min(matchRatio * 0.4, 0.4);
-    reason += `Engagement: Matched ${interestMatch} interests (ratio: ${matchRatio.toFixed(2)}). `;
+    reason.value += `Engagement: Matched ${interestMatch} interests (ratio: ${matchRatio.toFixed(2)}). `;
 
     const authorInteractions = this.userProfile.interactionHistory.filter(
       (interaction) => interaction.userId === post.user._id
@@ -228,7 +239,7 @@ export class FeedRankingAlgorithm {
       authorInteractions.length /
       Math.max(this.userProfile.interactionHistory.length, 1);
     score += Math.min(engagementRate * 0.3, 0.3);
-    reason += `Historical engagement rate with author: ${engagementRate.toFixed(2)}. `;
+    reason.value += `Historical engagement rate with author: ${engagementRate.toFixed(2)}. `;
 
     const engagementCount = post.likes.length + post.comments.length;
     const postAgeHours =
@@ -237,7 +248,7 @@ export class FeedRankingAlgorithm {
     score += Math.min(velocity * 0.1, 0.2);
     const engagementRatio = engagementCount / Math.max(engagementCount + 1, 1);
     score += engagementRatio * 0.1;
-    reason += `Post engagement velocity: ${velocity.toFixed(2)}. `;
+    reason.value += `Post engagement velocity: ${velocity.toFixed(2)}. `;
 
     return Math.min(score, 1);
   }
@@ -245,7 +256,7 @@ export class FeedRankingAlgorithm {
   /**
    * Calculate recency score (0-1)
    */
-  private calculateRecencyScore(post: Post, reason: string): number {
+  private calculateRecencyScore(post: Post, reason: ReasonRef): number {
     const postAge = Date.now() - new Date(post.createdAt).getTime();
     const ageHours = postAge / (1000 * 60 * 60);
     let decayScore = 1 / (1 + ageHours / this.config.timeDecay.halfLifeHours);
@@ -258,9 +269,9 @@ export class FeedRankingAlgorithm {
       engagementCount > this.config.trendingThreshold.minEngagement
     ) {
       decayScore = Math.min(decayScore + 0.2, 1);
-      reason += `Trending boost applied (recent with ${engagementCount} engagements). `;
+      reason.value += `Trending boost applied (recent with ${engagementCount} engagements). `;
     } else {
-      reason += `Recency: Age ${ageHours.toFixed(1)} hours. `;
+      reason.value += `Recency: Age ${ageHours.toFixed(1)} hours. `;
     }
     return decayScore;
   }
@@ -268,15 +279,15 @@ export class FeedRankingAlgorithm {
   /**
    * Calculate connection strength score (0-1)
    */
-  private calculateConnectionStrength(post: Post, reason: string): number {
+  private calculateConnectionStrength(post: Post, reason: ReasonRef): number {
     let score = 0;
     if (this.userProfile.followedAccounts.includes(post.user._id)) {
       score += 0.5;
-      reason += `Follows author. `;
+      reason.value += `Follows author. `;
     }
     if (post.user.followers?.includes(this.currentUser._id)) {
       score += 0.2;
-      reason += `Mutual follow. `;
+      reason.value += `Mutual follow. `;
     }
     const userInteractions = this.userProfile.interactionHistory.filter(
       (interaction) => interaction.userId === post.user._id
@@ -285,13 +296,13 @@ export class FeedRankingAlgorithm {
       userInteractions.length /
       Math.max(this.userProfile.interactionHistory.length, 1);
     score += Math.min(interactionFrequency * 0.3, 0.3);
-    reason += `Interaction frequency: ${interactionFrequency.toFixed(2)}. `;
+    reason.value += `Interaction frequency: ${interactionFrequency.toFixed(2)}. `;
     if (
       this.userProfile.preferences.preferPersonalContent &&
       interactionFrequency > 0.5
     ) {
       score += 0.1;
-      reason += `Personal content boost. `;
+      reason.value += `Personal content boost. `;
     }
     return Math.min(score, 1);
   }
@@ -299,7 +310,7 @@ export class FeedRankingAlgorithm {
   /**
    * Calculate diversity boost score (0-1)
    */
-  private calculateDiversityBoost(post: Post, reason: string): number {
+  private calculateDiversityBoost(post: Post, reason: ReasonRef): number {
     let score = 0;
     const recentInteractions = this.userProfile.interactionHistory.filter(
       (interaction) => Date.now() - interaction.timestamp < 24 * 60 * 60 * 1000
@@ -307,23 +318,25 @@ export class FeedRankingAlgorithm {
     const recentAuthors = new Set(recentInteractions.map((i) => i.userId));
     if (!recentAuthors.has(post.user._id)) {
       score += 0.3;
-      reason += `Less-seen author. `;
+      reason.value += `Less-seen author. `;
     }
     const postType = this.getPostContentType(post);
     if (!this.userProfile.preferences.contentTypes.includes(postType)) {
       score += 0.2;
-      reason += `Diverse content type (${postType}). `;
+      reason.value += `Diverse content type (${postType}). `;
     }
     const postTopics =
       (post as any).topics ||
       post.content.toLowerCase().split(/\s+/).slice(0, 5);
     const recentTopics = new Set<string>(); // Placeholder for topic tracking
-    const newTopics = postTopics.filter((t: string) => !recentTopics.has(t)).length;
+    const newTopics = postTopics.filter(
+      (t: string) => !recentTopics.has(t)
+    ).length;
     score += Math.min(newTopics * 0.1, 0.3);
-    reason += `New topics: ${newTopics}. `;
+    reason.value += `New topics: ${newTopics}. `;
     if (Math.random() < 0.1) {
       score += 0.3;
-      reason += `Serendipity boost. `;
+      reason.value += `Serendipity boost. `;
     }
     return Math.min(score, 1);
   }
@@ -331,11 +344,11 @@ export class FeedRankingAlgorithm {
   /**
    * Calculate quality score (0-1)
    */
-  private calculateQualityScore(post: Post, reason: string): number {
+  private calculateQualityScore(post: Post, reason: ReasonRef): number {
     let score = 0.5;
     if (post.user.verified) {
       score += 0.2;
-      reason += `Verified author. `;
+      reason.value += `Verified author. `;
     }
     const contentLength = post.content.length;
     if (contentLength > 50 && contentLength < 500) {
@@ -345,7 +358,7 @@ export class FeedRankingAlgorithm {
     } else if (contentLength > 1000) {
       score -= 0.1;
     }
-    reason += `Content length: ${contentLength}. `;
+    reason.value += `Content length: ${contentLength}. `;
     const hashtags = post.content.match(/#\w+/g) || [];
     if (hashtags.length > 0 && hashtags.length <= 3) {
       score += 0.1;
@@ -369,7 +382,7 @@ export class FeedRankingAlgorithm {
     );
     if (isClickbait) {
       score -= 0.3;
-      reason += `Clickbait detected. `;
+      reason.value += `Clickbait detected. `;
     }
     return Math.max(0, Math.min(score, 1));
   }

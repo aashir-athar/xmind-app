@@ -8,7 +8,7 @@ import {
   TextInput,
   Dimensions,
 } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -24,6 +24,7 @@ import { BRAND_COLORS } from "@/constants/colors";
 import { useProfileUpdate } from "@/hooks/useProfileUpdate";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { validateUsername } from "@/utils/usernameValidation";
+import { useApiClient, userApi } from "@/utils/api";
 import { 
   responsiveSize, 
   responsivePadding, 
@@ -67,8 +68,13 @@ const EditProfileModal = ({
     isValid: boolean;
     errors: string[];
   }>({ isValid: true, errors: [] });
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const { updateUsername, currentUser } = useProfileUpdate();
   const { showError, showSuccess } = useCustomAlert();
+  const api = useApiClient();
+  
+  // Debounce timer for username validation
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Animation values
   const modalOpacity = useSharedValue(0);
@@ -95,10 +101,27 @@ const EditProfileModal = ({
       headerOpacity.value = withTiming(0, { duration: 100 });
       fieldsOpacity.value = withTiming(0, { duration: 100 });
       
-      // Clear username field when modal closes
+      // Clear username field and validation when modal closes
       setUsername("");
+      setUsernameValidation({ isValid: true, errors: [] });
     }
-  }, [isVisible, currentUser?.username]);
+  }, [isVisible]); // Removed currentUser?.username dependency
+
+  // Separate effect for username initialization to prevent infinite loops
+  useEffect(() => {
+    if (isVisible && currentUser?.username && username === "") {
+      setUsername(currentUser.username);
+    }
+  }, [isVisible, currentUser?.username]); // Removed username dependency
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
 
   const handleSave = () => {
     saveButtonScale.value = withSpring(0.95, { damping: 15 }, () => {
@@ -157,19 +180,59 @@ const EditProfileModal = ({
       return;
     }
 
-    // Validate on every character change
-    try {
-      const validation = await validateUsername(text.trim(), { platformMode: "xMind" });
-      console.log("Username validation result:", validation); // Debug log
-      setUsernameValidation({
-        isValid: validation.valid,
-        errors: validation.errors
-      });
-    } catch (error) {
-      console.error("Validation error:", error); // Debug log
-      // If validation fails, show error
-      setUsernameValidation({ isValid: false, errors: ["Validation error occurred"] });
+    // Clear previous timer
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
     }
+
+    // Set new timer for debounced validation
+    debounceTimer.current = setTimeout(async () => {
+      // First, validate format using usernameValidation.ts
+      try {
+        const validation = await validateUsername(text.trim(), { platformMode: "xMind" });
+        
+        if (!validation.valid) {
+          setUsernameValidation({
+            isValid: false,
+            errors: validation.errors
+          });
+          return; // Don't check availability if format is invalid
+        }
+
+        // If format is valid, check database availability
+        setIsCheckingAvailability(true);
+        try {
+          const response = await userApi.checkUsernameAvailability(api, text.trim());
+          
+          if (response.data.available) {
+            // Username is available and format is valid
+            setUsernameValidation({
+              isValid: true,
+              errors: []
+            });
+          } else {
+            // Username is taken
+            setUsernameValidation({
+              isValid: false,
+              errors: ["Username is already taken"]
+            });
+          }
+        } catch (error) {
+          console.error("Availability check error:", error);
+          // If availability check fails, still show format validation
+          setUsernameValidation({
+            isValid: validation.valid,
+            errors: validation.errors
+          });
+        } finally {
+          setIsCheckingAvailability(false);
+        }
+        
+      } catch (error) {
+        console.error("Validation error:", error);
+        setUsernameValidation({ isValid: false, errors: ["Validation error occurred"] });
+      }
+    }, 500); // 500ms debounce delay
   };
 
   const modalAnimatedStyle = useAnimatedStyle(() => ({
@@ -207,7 +270,6 @@ const EditProfileModal = ({
     <Modal
       visible={isVisible}
       animationType="none"
-      presentationStyle="pageSheet"
       transparent={true}
       style={{ flex: 1 }}
     >
@@ -475,7 +537,24 @@ const EditProfileModal = ({
                       {/* Validation Status */}
                       {username.trim() && (
                         <View style={{ marginTop: responsiveMargin(8) }}>
-                          {usernameValidation.isValid ? (
+                          {isCheckingAvailability ? (
+                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                              <ActivityIndicator
+                                size="small"
+                                color={BRAND_COLORS.PRIMARY}
+                                style={{ marginRight: responsiveMargin(8) }}
+                              />
+                              <Text
+                                style={{
+                                  color: BRAND_COLORS.TEXT_SECONDARY,
+                                  fontSize: responsiveFontSize(12),
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                Checking username availability...
+                              </Text>
+                            </View>
+                          ) : usernameValidation.isValid ? (
                             <Text
                               style={{
                                 color: BRAND_COLORS.SUCCESS,
