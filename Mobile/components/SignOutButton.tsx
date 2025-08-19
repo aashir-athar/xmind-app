@@ -7,8 +7,17 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
-import { BRAND_COLORS } from "@/constants/colors";
+import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
 import { useSignOut } from "@/hooks/useSignOut";
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
 
 const SignOutButton = () => {
   const { handleSignOut, isSigningOut } = useSignOut();
@@ -50,9 +59,9 @@ const SignOutButton = () => {
       <Animated.View style={logoAnimatedStyle}>
         <View
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+            width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+            height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+            borderRadius: responsiveBorderRadius(HEADER_CONFIG.BUTTON_BORDER_RADIUS),
             backgroundColor: BRAND_COLORS.ACCENT_MINT,
             justifyContent: "center",
             alignItems: "center",
@@ -63,7 +72,11 @@ const SignOutButton = () => {
             elevation: 8,
           }}
         >
-          <Feather name="log-out" size={20} color={BRAND_COLORS.SURFACE} />
+          <Feather
+            name="log-out"
+            size={responsiveIconSize(HEADER_CONFIG.ICON_SIZE)}
+            color={BRAND_COLORS.SURFACE}
+          />
         </View>
       </Animated.View>
     </TouchableOpacity>
@@ -72,7 +85,7 @@ const SignOutButton = () => {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
+    borderRadius: responsiveBorderRadius(16),
     overflow: "hidden",
     shadowColor: BRAND_COLORS.PRIMARY_DARK,
     shadowOffset: { width: 0, height: 4 },
@@ -80,9 +93,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   blurContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+    height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+    borderRadius: responsiveBorderRadius(HEADER_CONFIG.BUTTON_BORDER_RADIUS),
     backgroundColor: BRAND_COLORS.PRIMARY,
     justifyContent: "center",
     alignItems: "center",

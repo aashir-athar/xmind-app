@@ -5,6 +5,12 @@ export interface User {
   lastName: string;
   profilePicture?: string;
   verified?: boolean;
+  followers?: string[];
+  following?: string[];
+  bio?: string;
+  location?: string;
+  bannerImage?: string;
+  createdAt?: string;
 }
 
 export interface Comment {

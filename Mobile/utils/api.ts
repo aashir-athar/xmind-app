@@ -105,6 +105,21 @@ export const userApi = {
   getCurrentUser: (api: AxiosInstance) => api.get("/users/me"),
   updateProfile: (api: AxiosInstance, data: any) =>
     api.put("/users/profile", data),
+  updateUsername: (api: AxiosInstance, username: string) =>
+    api.put("/users/username", { username }),
+  checkUsernameAvailability: (api: AxiosInstance, username: string) =>
+    api.get(`/users/check-username/${username}`),
+  getUserProfile: (api: AxiosInstance, username: string) =>
+    api.get(`/users/profile/${username}`),
+  followUser: (api: AxiosInstance, targetUserId: string) =>
+    api.post(`/users/follow/${targetUserId}`),
+  toggleVerification: (api: AxiosInstance, targetUserId: string) =>
+    api.post(`/users/verify/${targetUserId}`),
+};
+
+export const uploadApi = {
+  uploadImage: (api: AxiosInstance, formData: FormData) =>
+    api.post("/upload/image", formData),
 };
 
 export const postApi = {
@@ -122,4 +137,6 @@ export const postApi = {
 export const commentApi = {
   createComment: (api: AxiosInstance, postId: string, content: string) =>
     api.post(`/comments/post/${postId}`, { content }),
+  deleteComment: (api: AxiosInstance, commentId: string) =>
+    api.delete(`/comments/${commentId}`),
 };

@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useApiClient } from "../utils/api";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
 
 export const useCreatePost = () => {
   const [content, setContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const api = useApiClient();
   const queryClient = useQueryClient();
+  const { showSuccess, showError, showInfo } = useCustomAlert();
 
   const createPostMutation = useMutation({
     mutationFn: async (postData: { content: string; imageUri?: string }) => {
@@ -43,10 +44,10 @@ export const useCreatePost = () => {
       setContent("");
       setSelectedImage(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      Alert.alert("Success", "Post created successfully!");
+      showSuccess("Success", "Post created successfully!");
     },
     onError: () => {
-      Alert.alert("Error", "Failed to create post. Please try again.");
+      showError("Error", "Failed to create post. Please try again.");
     },
   });
 
@@ -57,7 +58,7 @@ export const useCreatePost = () => {
 
     if (permissionResult.status !== "granted") {
       const source = useCamera ? "camera" : "photo library";
-      Alert.alert(
+      showInfo(
         "Permission needed",
         `Please grant permission to access your ${source}`
       );
@@ -82,7 +83,7 @@ export const useCreatePost = () => {
 
   const createPost = () => {
     if (!content.trim() && !selectedImage) {
-      Alert.alert(
+      showInfo(
         "Empty Post",
         "Please write something or add an image before posting!"
       );

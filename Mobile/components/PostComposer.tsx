@@ -23,6 +23,15 @@ import { useCreatePost } from "@/hooks/useCreatePost";
 import { useUser } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { BRAND_COLORS } from "@/constants/colors";
+import { 
+  responsiveSize, 
+  responsivePadding, 
+  responsiveMargin, 
+  responsiveBorderRadius, 
+  responsiveFontSize, 
+  responsiveIconSize,
+  baseScale 
+} from "@/utils/responsive";
 
 const { width } = Dimensions.get("window");
 
@@ -43,8 +52,8 @@ const PostComposer = () => {
 
   // Animation values
   const containerScale = useSharedValue(1);
-  const inputHeight = useSharedValue(60);
-  const borderRadius = useSharedValue(20);
+  const inputHeight = useSharedValue(60 * baseScale);
+  const borderRadius = useSharedValue(20 * baseScale);
   const shadowOpacity = useSharedValue(0.1);
   const buttonScale = useSharedValue(1);
   const progressWidth = useSharedValue(0);
@@ -59,14 +68,14 @@ const PostComposer = () => {
 
   useEffect(() => {
     if (isFocused) {
-      inputHeight.value = withSpring(120);
-      borderRadius.value = withSpring(24);
+      inputHeight.value = withSpring(120 * baseScale);
+      borderRadius.value = withSpring(24 * baseScale);
       shadowOpacity.value = withTiming(0.15);
       avatarScale.value = withSpring(1.05);
       toolsOpacity.value = withTiming(1);
     } else {
-      inputHeight.value = withSpring(60);
-      borderRadius.value = withSpring(20);
+      inputHeight.value = withSpring(60 * baseScale);
+      borderRadius.value = withSpring(20 * baseScale);
       shadowOpacity.value = withTiming(0.08);
       avatarScale.value = withSpring(1);
     }
@@ -74,7 +83,7 @@ const PostComposer = () => {
 
   useEffect(() => {
     const progress = content.length / 300;
-    progressWidth.value = withTiming(progress * (width - 32));
+    progressWidth.value = withTiming(progress * (width - 32 * baseScale));
   }, [content]);
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
@@ -138,11 +147,11 @@ const PostComposer = () => {
     <Animated.View
       style={[
         {
-          marginHorizontal: 16,
-          marginVertical: 12,
+          marginHorizontal: responsiveMargin(16),
+          marginVertical: responsiveMargin(12),
           shadowColor: BRAND_COLORS.PRIMARY,
-          shadowOffset: { width: 0, height: 8 },
-          shadowRadius: 16,
+          shadowOffset: { width: 0, height: responsiveSize(8) },
+          shadowRadius: responsiveSize(16),
           elevation: 12,
         },
         containerAnimatedStyle,
@@ -151,20 +160,20 @@ const PostComposer = () => {
       <BlurView
         intensity={10}
         tint="light"
-        style={{ borderRadius: 24, overflow: "hidden" }}
+        style={{ borderRadius: responsiveBorderRadius(24), overflow: "hidden" }}
       >
         <LinearGradient
           colors={[`${BRAND_COLORS.SURFACE}95`, `${BRAND_COLORS.SURFACE}85`]}
-          style={{ padding: 20 }}
+          style={{ padding: responsivePadding(20) }}
         >
           <View className="flex-row">
             <Animated.View style={avatarAnimatedStyle}>
               <View
                 style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 100,
-                  marginRight: 16,
+                  width: responsiveSize(52),
+                  height: responsiveSize(52),
+                  borderRadius: responsiveBorderRadius(100),
+                  marginRight: responsiveMargin(16),
                   overflow: "hidden",
                   borderWidth: 2,
                   borderColor: `${BRAND_COLORS.PRIMARY}20`,
@@ -174,7 +183,7 @@ const PostComposer = () => {
               >
                 <Image
                   source={{ uri: user?.imageUrl }}
-                  style={{ width: 52, height: 52 }}
+                  style={{ width: responsiveSize(52), height: responsiveSize(52) }}
                   resizeMode="cover"
                 />
               </View>
@@ -189,16 +198,16 @@ const PostComposer = () => {
                     borderColor: isFocused
                       ? BRAND_COLORS.PRIMARY_LIGHT
                       : `${BRAND_COLORS.BORDER_LIGHT}60`,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
+                    paddingHorizontal: responsivePadding(16),
+                    paddingVertical: responsivePadding(12),
                   },
                   inputContainerAnimatedStyle,
                 ]}
               >
                 <TextInput
                   style={{
-                    fontSize: 16,
-                    lineHeight: 22,
+                    fontSize: responsiveFontSize(16),
+                    lineHeight: responsiveSize(22),
                     color: BRAND_COLORS.TEXT_PRIMARY,
                     flex: 1,
                     textAlignVertical: "top",
@@ -218,16 +227,16 @@ const PostComposer = () => {
               {content.length > 0 && (
                 <View
                   style={{
-                    height: 3,
+                    height: responsiveSize(3),
                     backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                    borderRadius: 2,
-                    marginTop: 12,
+                    borderRadius: responsiveBorderRadius(2),
+                    marginTop: responsiveMargin(12),
                     overflow: "hidden",
                   }}
                 >
                   <Animated.View
                     style={[
-                      { height: "100%", borderRadius: 2 },
+                      { height: "100%", borderRadius: responsiveBorderRadius(2) },
                       progressAnimatedStyle,
                     ]}
                   />
@@ -239,37 +248,37 @@ const PostComposer = () => {
           {selectedImage && (
             <Animated.View
               style={{
-                marginTop: 16,
-                marginLeft: 68,
-                borderRadius: 16,
+                marginTop: responsiveMargin(16),
+                marginLeft: responsiveMargin(68),
+                borderRadius: responsiveBorderRadius(16),
                 overflow: "hidden",
                 shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: 4 },
+                shadowOffset: { width: 0, height: responsiveSize(4) },
                 shadowOpacity: 0.1,
-                shadowRadius: 8,
+                shadowRadius: responsiveSize(8),
                 elevation: 4,
               }}
             >
               <Image
                 source={{ uri: selectedImage }}
-                style={{ width: "100%", height: 200 }}
+                style={{ width: "100%", height: responsiveSize(200) }}
                 resizeMode="cover"
               />
               <TouchableOpacity
                 style={{
                   position: "absolute",
-                  top: 12,
-                  right: 12,
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
+                  top: responsiveSize(12),
+                  right: responsiveSize(12),
+                  width: responsiveSize(32),
+                  height: responsiveSize(32),
+                  borderRadius: responsiveBorderRadius(16),
                   backgroundColor: `${BRAND_COLORS.SURFACE}90`,
                   justifyContent: "center",
                   alignItems: "center",
                 }}
                 onPress={removeImage}
               >
-                <Feather name="x" size={16} color={BRAND_COLORS.TEXT_PRIMARY} />
+                <Feather name="x" size={responsiveIconSize(16)} color={BRAND_COLORS.TEXT_PRIMARY} />
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -280,7 +289,7 @@ const PostComposer = () => {
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
-              marginTop: 20,
+              marginTop: responsiveMargin(20),
             }}
           >
             <Animated.View
@@ -291,41 +300,41 @@ const PostComposer = () => {
             >
               <TouchableOpacity
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                  width: responsiveSize(44),
+                  height: responsiveSize(44),
+                  borderRadius: responsiveBorderRadius(22),
                   backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: responsiveMargin(12),
                 }}
                 onPress={pickImageFromGallery}
               >
-                <Feather name="image" size={20} color={BRAND_COLORS.PRIMARY} />
+                <Feather name="image" size={responsiveIconSize(20)} color={BRAND_COLORS.PRIMARY} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
+                  width: responsiveSize(44),
+                  height: responsiveSize(44),
+                  borderRadius: responsiveBorderRadius(22),
                   backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
                   justifyContent: "center",
                   alignItems: "center",
-                  marginRight: 12,
+                  marginRight: responsiveMargin(12),
                 }}
                 onPress={takePhoto}
               >
-                <Feather name="camera" size={20} color={BRAND_COLORS.PRIMARY} />
+                <Feather name="camera" size={responsiveIconSize(20)} color={BRAND_COLORS.PRIMARY} />
               </TouchableOpacity>
 
               {/* Character Counter */}
               {content.length > 250 && (
                 <View
                   style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 12,
+                    paddingHorizontal: responsivePadding(12),
+                    paddingVertical: responsivePadding(6),
+                    borderRadius: responsiveBorderRadius(12),
                     backgroundColor:
                       content.length >= 290
                         ? `${BRAND_COLORS.DANGER}15`
@@ -334,7 +343,7 @@ const PostComposer = () => {
                 >
                   <Text
                     style={{
-                      fontSize: 12,
+                      fontSize: responsiveFontSize(12),
                       fontWeight: "600",
                       color:
                         content.length >= 290
@@ -351,13 +360,13 @@ const PostComposer = () => {
             <Animated.View style={buttonAnimatedStyle}>
               <TouchableOpacity
                 style={{
-                  paddingHorizontal: 28,
-                  paddingVertical: 12,
-                  borderRadius: 24,
+                  paddingHorizontal: responsivePadding(28),
+                  paddingVertical: responsivePadding(12),
+                  borderRadius: responsiveBorderRadius(24),
                   shadowColor: BRAND_COLORS.PRIMARY,
-                  shadowOffset: { width: 0, height: 4 },
+                  shadowOffset: { width: 0, height: responsiveSize(4) },
                   shadowOpacity: 0.2,
-                  shadowRadius: 8,
+                  shadowRadius: responsiveSize(8),
                   elevation: 6,
                 }}
                 onPress={handleButtonPress}
@@ -371,7 +380,7 @@ const PostComposer = () => {
                 ) : (
                   <Text
                     style={{
-                      fontSize: 15,
+                      fontSize: responsiveFontSize(15),
                       fontWeight: "700",
                       color:
                         content.trim() || selectedImage

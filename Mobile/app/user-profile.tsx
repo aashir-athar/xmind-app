@@ -1,14 +1,14 @@
 import {
   View,
   Text,
+  ActivityIndicator,
   ScrollView,
   Image,
   TouchableOpacity,
   Dimensions,
   RefreshControl,
-  Alert,
 } from "react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,24 +21,19 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import {
-  SafeAreaView,
   useSafeAreaInsets,
+  SafeAreaView,
 } from "react-native-safe-area-context";
-import SignOutButton from "@/components/SignOutButton";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons, AntDesign } from "@expo/vector-icons";
 import PostsList from "@/components/PostsList";
 import { format } from "date-fns";
 import { usePosts } from "@/hooks/usePosts";
-import { useProfile } from "@/hooks/useProfile";
-import { useProfileUpdate } from "@/hooks/useProfileUpdate";
-import { useAutoVerification } from "@/hooks/useAutoVerification";
-import { useCustomAlert } from "@/hooks/useCustomAlert";
-import EditProfileModal from "@/components/EditProfileModal";
-import CustomAlert from "@/components/CustomAlert";
-import ProfileImageEditButton from "@/components/ProfileImageEditButton";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { User } from "@/types";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { 
   responsiveSize, 
   responsivePadding, 
@@ -49,54 +44,38 @@ import {
   baseScale,
 } from "@/utils/responsive";
 import CustomLoading from "@/components/CustomLoading";
-import VerificationProgress from "@/components/VerificationProgress";
-import { formatNumber } from "@/utils/formatter";
 
 const { width, height } = Dimensions.get("window");
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
-const ProfileScreen = () => {
-  const { currentUser, isLoading } = useCurrentUser();
+const UserProfileScreen = () => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { userId, username } = useLocalSearchParams<{
+    userId: string;
+    username: string;
+  }>();
+  const { currentUser, refetch: refetchCurrentUser } = useCurrentUser();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const {
+    user,
+    isLoading,
+    error,
+    refetch: refetchUserProfile,
+    toggleFollow,
+    isFollowLoading,
+  } = useUserProfile(username);
+
+  // Calculate if current user is following this user
+  const isFollowing =
+    currentUser?.following?.includes(user?._id || "") || false;
 
   const {
     posts: userPosts,
     refetch: refetchPosts,
     isLoading: isRefetching,
-  } = usePosts(currentUser?.username);
-
-  const {
-    isEditModalVisible,
-    openEditModal,
-    closeEditModal,
-    formData,
-    saveProfile,
-    updateFormField,
-    isUpdating,
-    refetch: refetchProfile,
-  } = useProfile();
-
-  const {
-    showImageSourceDialog,
-    isUpdating: isUpdatingImages,
-    updateType,
-  } = useProfileUpdate();
-
-  const { showInfo, showConfirmation, showSuccess, showError, alertConfig, isVisible, hideAlert } = useCustomAlert();
-
-  // Auto-verification hook
-  const {
-    verificationResult,
-    progress,
-    isChecking,
-    isEligible,
-    isVerified,
-    statusMessage,
-    missingRequirements,
-    checkVerification,
-    handleAutoVerification,
-  } = useAutoVerification();
+  } = usePosts(username);
 
   // Animation values
   const scrollY = useSharedValue(0);
@@ -105,11 +84,11 @@ const ProfileScreen = () => {
   const avatarScale = useSharedValue(0);
   const profileInfoOpacity = useSharedValue(0);
   const statsOpacity = useSharedValue(0);
-  const editButtonScale = useSharedValue(0);
+  const followButtonScale = useSharedValue(0);
   const bannerOverlayOpacity = useSharedValue(0);
 
   useEffect(() => {
-    if (!isLoading && currentUser) {
+    if (!isLoading && user) {
       // Staggered entrance animations
       headerOpacity.value = withTiming(1, { duration: 400 });
       bannerScale.value = withSpring(1, { damping: 15 });
@@ -123,12 +102,27 @@ const ProfileScreen = () => {
         withTiming(1, { duration: 500 })
       );
       statsOpacity.value = withDelay(800, withTiming(1, { duration: 400 }));
-      editButtonScale.value = withDelay(1000, withSpring(1, { damping: 15 }));
+      followButtonScale.value = withDelay(1000, withSpring(1, { damping: 15 }));
     }
-  }, [isLoading, currentUser]);
+  }, [isLoading, user]);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+
+      // Dynamic header effects based on scroll
+      const progress = Math.min(event.contentOffset.y / 100, 1);
+      headerOpacity.value = interpolate(progress, [0, 1], [1, 0.8]);
+    },
+  });
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
-    // Header stays fixed, no scroll effects
+    opacity: headerOpacity.value,
+    transform: [
+      {
+        translateY: interpolate(scrollY.value, [0, 100], [0, -10 * baseScale]),
+      },
+    ],
   }));
 
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
@@ -179,39 +173,31 @@ const ProfileScreen = () => {
     ],
   }));
 
-  const editButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: editButtonScale.value }],
+  const followButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: followButtonScale.value }],
   }));
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refetchProfile(), refetchPosts()]);
+    await Promise.all([
+      refetchUserProfile(),
+      refetchPosts(),
+      refetchCurrentUser(),
+    ]);
     setIsRefreshing(false);
   };
 
-  const handleVerificationRequest = useCallback(async () => {
-    try {
-      if (isEligible) {
-        // User meets all criteria - trigger automatic verification
-        await handleAutoVerification();
-      } else {
-        // Show what's missing
-        const missingList = (missingRequirements ?? []).join('\n• ');
-        showInfo(
-          "Verification Requirements",
-          `You need to complete these requirements:\n\n• ${missingList}\n\nKeep building your profile and you'll be automatically verified when ready!`
-        );
-      }
-    } catch (error) {
-      console.error("Verification request failed:", error);
-      showError(
-        "Request Failed",
-        "Something went wrong. Please try again later."
-      );
+  const handleFollowToggle = () => {
+    if (user && currentUser) {
+      toggleFollow(user._id);
     }
-  }, [isEligible, missingRequirements, handleAutoVerification, showInfo, showError]);
+  };
 
-  if (isLoading || !currentUser._id) {
+  const handleBackPress = () => {
+    router.back();
+  };
+
+  if (isLoading || !user) {
     return (
       <View
         style={{
@@ -222,35 +208,13 @@ const ProfileScreen = () => {
         }}
       >
         <CustomLoading
-          message="Loading notifications..."
+          message="Loading profile..."
           size="large"
           variant="screen"
           colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
           showDots={true}
           accessibilityLabel="Custom loading spinner"
         />
-      </View>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: BRAND_COLORS.BACKGROUND,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text
-          style={{
-            color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: responsiveFontSize(16),
-          }}
-        >
-          Mind not found.
-        </Text>
       </View>
     );
   }
@@ -280,7 +244,26 @@ const ProfileScreen = () => {
             }}
           >
             <View className="flex-row items-center justify-between">
-              <View>
+              <TouchableOpacity
+                onPress={handleBackPress}
+                style={{
+                  width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+                  height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+                  borderRadius: responsiveBorderRadius(
+                    HEADER_CONFIG.BUTTON_BORDER_RADIUS
+                  ),
+                  backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <AntDesign
+                  name="arrowleft"
+                  size={responsiveIconSize(HEADER_CONFIG.ICON_SIZE)}
+                  color={BRAND_COLORS.PRIMARY}
+                />
+              </TouchableOpacity>
+              <View className="items-center justify-center">
                 <Text
                   style={{
                     fontSize: responsiveFontSize(HEADER_CONFIG.TITLE_SIZE),
@@ -289,7 +272,7 @@ const ProfileScreen = () => {
                     letterSpacing: 0.5,
                   }}
                 >
-                  {currentUser.firstName} {currentUser.lastName}
+                  {user?.firstName} {user?.lastName}
                 </Text>
                 <Text
                   style={{
@@ -308,7 +291,9 @@ const ProfileScreen = () => {
                       : `${userPosts.length} Thoughts`}
                 </Text>
               </View>
-              <SignOutButton />
+              <View
+                style={{ width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE) }}
+              />
             </View>
           </BlurView>
         </Animated.View>
@@ -322,8 +307,8 @@ const ProfileScreen = () => {
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing} // Add this prop
-              onRefresh={handleRefresh} // Use the new async handler
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
               tintColor={BRAND_COLORS.PRIMARY_LIGHT}
               progressBackgroundColor={BRAND_COLORS.SURFACE}
               colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
@@ -336,9 +321,9 @@ const ProfileScreen = () => {
           >
             <Image
               source={
-                currentUser.bannerImage
-                  ? { uri: currentUser.bannerImage }
-                  : require("../../assets/images/default-banner.jpeg")
+                user?.bannerImage
+                  ? { uri: user.bannerImage }
+                  : require("../assets/images/default-banner.jpeg")
               }
               style={{ width: "100%", height: responsiveSize(200) }}
               resizeMode="cover"
@@ -361,15 +346,6 @@ const ProfileScreen = () => {
                 }}
               />
             </Animated.View>
-
-            {/* Banner Edit Button */}
-            <ProfileImageEditButton
-              onPress={() => showImageSourceDialog("bannerImage")}
-              isLoading={isUpdatingImages && updateType === "bannerImage"}
-              size="medium"
-              position="top-right"
-              variant="banner"
-            />
           </Animated.View>
 
           {/* Enhanced Profile Section */}
@@ -412,14 +388,13 @@ const ProfileScreen = () => {
                     elevation: 10,
                     alignItems: "center",
                     justifyContent: "center",
-                    position: "relative",
                   }}
                 >
                   <Image
                     source={
-                      currentUser.profilePicture
-                        ? { uri: currentUser.profilePicture }
-                        : require("../../assets/images/default-avatar.jpeg")
+                      user?.profilePicture
+                        ? { uri: user.profilePicture }
+                        : require("../assets/images/default-avatar.jpeg")
                     }
                     style={{ 
                       width: responsiveSize(120), 
@@ -428,45 +403,46 @@ const ProfileScreen = () => {
                     resizeMode="cover"
                   />
                 </View>
-
-                {/* Profile Picture Edit Button - Positioned Above */}
-                <ProfileImageEditButton
-                  onPress={() => showImageSourceDialog("profilePicture")}
-                  isLoading={
-                    isUpdatingImages && updateType === "profilePicture"
-                  }
-                  size="small"
-                  position="bottom-right"
-                  variant="profile"
-                />
               </Animated.View>
 
-              <Animated.View style={editButtonAnimatedStyle}>
+              <Animated.View style={followButtonAnimatedStyle}>
                 <TouchableOpacity
-                  onPress={openEditModal}
+                  onPress={handleFollowToggle}
+                  disabled={isFollowLoading}
                   style={{
                     paddingHorizontal: responsivePadding(24),
                     paddingVertical: responsivePadding(12),
                     borderRadius: responsiveBorderRadius(24),
-                    backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
+                    backgroundColor: isFollowing
+                      ? `${BRAND_COLORS.SECONDARY}15`
+                      : BRAND_COLORS.PRIMARY,
                     borderWidth: 1,
-                    borderColor: `${BRAND_COLORS.PRIMARY}30`,
+                    borderColor: isFollowing
+                      ? BRAND_COLORS.SECONDARY
+                      : BRAND_COLORS.PRIMARY,
                     shadowColor: BRAND_COLORS.PRIMARY,
                     shadowOffset: { width: 0, height: responsiveSize(4) },
                     shadowOpacity: 0.1,
                     shadowRadius: responsiveSize(8),
                     elevation: 4,
+                    opacity: isFollowLoading ? 0.7 : 1,
                   }}
                 >
                   <Text
                     style={{
                       fontSize: responsiveFontSize(15),
                       fontWeight: "700",
-                      color: BRAND_COLORS.PRIMARY,
+                      color: isFollowing
+                        ? BRAND_COLORS.SECONDARY
+                        : BRAND_COLORS.SURFACE,
                       letterSpacing: 0.3,
                     }}
                   >
-                    Edit Profile
+                    {isFollowLoading
+                      ? "..."
+                      : isFollowing
+                        ? "Following"
+                        : "Follow"}
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
@@ -485,9 +461,9 @@ const ProfileScreen = () => {
                       letterSpacing: 0.3,
                     }}
                   >
-                    {currentUser.firstName} {currentUser.lastName}
+                    {user?.firstName} {user?.lastName}
                   </Text>
-                  {currentUser.user?.verified && (
+                  {user?.verified && (
                     <View
                       style={{
                         width: responsiveSize(24),
@@ -519,7 +495,7 @@ const ProfileScreen = () => {
                     fontWeight: "500",
                   }}
                 >
-                  @{currentUser.username}
+                  @{user.username}
                 </Text>
 
                 <Text
@@ -530,8 +506,7 @@ const ProfileScreen = () => {
                     marginBottom: responsiveMargin(16),
                   }}
                 >
-                  {currentUser?.bio ||
-                    "This mind hasn't shared thoughts yet..."}
+                  {user?.bio || "This mind hasn't shared thoughts yet..."}
                 </Text>
 
                 <View className="space-y-3">
@@ -560,7 +535,7 @@ const ProfileScreen = () => {
                         fontWeight: "500",
                       }}
                     >
-                      {currentUser?.location || "Location unknown"}
+                      {user?.location || "Location unknown"}
                     </Text>
                   </View>
 
@@ -590,7 +565,9 @@ const ProfileScreen = () => {
                       }}
                     >
                       Joined{" "}
-                      {format(new Date(currentUser.createdAt), "MMMM yyyy")}
+                      {user?.createdAt
+                        ? format(new Date(user.createdAt), "MMMM yyyy")
+                        : "recently"}
                     </Text>
                   </View>
                 </View>
@@ -628,7 +605,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.PRIMARY,
                       }}
                     >
-                      {formatNumber(currentUser.following?.length ?? 0)}
+                      {user?.following?.length || 0}
                     </Text>
                   </View>
                   <Text
@@ -670,7 +647,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.ACCENT_MINT,
                       }}
                     >
-                      {formatNumber(currentUser.followers?.length ?? 0)}
+                      {user?.followers?.length || 0}
                     </Text>
                   </View>
                   <Text
@@ -712,7 +689,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.ACCENT_YELLOW,
                       }}
                     >
-                      {formatNumber(userPosts.length)}
+                      {userPosts.length}
                     </Text>
                   </View>
                   <Text
@@ -727,17 +704,6 @@ const ProfileScreen = () => {
                 </View>
               </View>
             </Animated.View>
-
-            {/* Verification Status */}
-            <VerificationProgress
-              isVerified={currentUser?.verified}
-              progress={progress}
-              statusMessage={statusMessage}
-              isEligible={isEligible}
-              onVerificationRequest={handleVerificationRequest}
-              isChecking={isChecking}
-              missingRequirements={missingRequirements}
-            />
           </View>
 
           {/* Posts Section with Enhanced Styling */}
@@ -755,33 +721,12 @@ const ProfileScreen = () => {
               elevation: 8,
             }}
           >
-            <PostsList username={currentUser?.username} />
+            <PostsList username={user?.username} />
           </View>
         </AnimatedScrollView>
-
-        <EditProfileModal
-          isVisible={isEditModalVisible}
-          onClose={closeEditModal}
-          formData={formData}
-          saveProfile={saveProfile}
-          updateFormField={updateFormField}
-          isUpdating={isUpdating}
-        />
-
-        {/* Custom Alert */}
-        {alertConfig && (
-          <CustomAlert
-            visible={isVisible}
-            title={alertConfig.title}
-            message={alertConfig.message}
-            buttons={alertConfig.buttons}
-            type={alertConfig.type}
-            onDismiss={hideAlert}
-          />
-        )}
       </SafeAreaView>
     </View>
   );
 };
 
-export default ProfileScreen;
+export default UserProfileScreen;

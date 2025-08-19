@@ -14,6 +14,8 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="user-profile" />
+          <Stack.Screen name="hashtag-posts" />
         </Stack>
         <StatusBar style="inverted" />
       </QueryClientProvider>

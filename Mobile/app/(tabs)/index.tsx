@@ -1,4 +1,11 @@
-import { View, Text, Image, ScrollView, RefreshControl } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+} from "react-native";
 import React, { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -14,17 +21,61 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import SignOutButton from "@/components/SignOutButton";
 import { useUserSync } from "@/hooks/useUserSync";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import PostComposer from "@/components/PostComposer";
 import PostsList from "@/components/PostsList";
-import { usePosts } from "@/hooks/usePosts";
-import { BRAND_COLORS } from "@/constants/colors";
+import { useFeedRanking } from "@/hooks/useFeedRanking";
+import CustomLoading from "@/components/CustomLoading";
+import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import CustomAlert from "@/components/CustomAlert";
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 const HomeScreen = () => {
+  const {
+    showSuccess,
+    showError,
+    showInfo,
+    alertConfig,
+    isVisible,
+    hideAlert,
+  } = useCustomAlert();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { refetch: refetchPosts } = usePosts();
+  const {
+    posts: rankedPosts,
+    isLoading,
+    error,
+    refetch: refetchPosts,
+    feedStats,
+  } = useFeedRanking({
+    useAdvancedAlgorithm: true,
+    maxPosts: 25,
+    customWeights: {
+      engagementLikelihood: 0.4,
+      recency: 0.3,
+      connectionStrength: 0.15,
+      diversity: 0.1,
+      quality: 0.05,
+    },
+  });
+
+  // Debug logging
+  useEffect(() => {
+    if (rankedPosts && rankedPosts.length > 0) {
+      console.log(`Feed ranking: ${rankedPosts.length} posts loaded`);
+      console.log("Feed stats:", feedStats);
+    }
+  }, [rankedPosts, feedStats]);
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -44,23 +95,17 @@ const HomeScreen = () => {
     setIsRefreshing(true);
     headerScale.value = withSpring(0.95);
 
-    await refetchPosts();
-    setIsRefreshing(false);
-    headerScale.value = withSpring(1);
+    try {
+      await refetchPosts();
+    } catch (error) {
+      console.error("Failed to refresh feed:", error);
+    } finally {
+      setIsRefreshing(false);
+      headerScale.value = withSpring(1);
+    }
   };
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-
-      // Dynamic header effects based on scroll
-      const progress = Math.min(event.contentOffset.y / 100, 1);
-      headerOpacity.value = interpolate(progress, [0, 1], [1, 0.8]);
-    },
-  });
-
   const headerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
     transform: [{ scale: headerScale.value }],
   }));
 
@@ -73,6 +118,97 @@ const HomeScreen = () => {
   }));
 
   useUserSync();
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: BRAND_COLORS.BACKGROUND,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <CustomLoading
+          message="Loading your feed..."
+          size="large"
+          variant="screen"
+          intensity={8}
+          colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
+          showDots={true}
+          accessibilityLabel="Custom loading spinner"
+        />
+      </View>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: BRAND_COLORS.BACKGROUND,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <View
+          style={{
+            width: responsiveSize(80),
+            height: responsiveSize(80),
+            borderRadius: responsiveBorderRadius(40),
+            backgroundColor: `${BRAND_COLORS.DANGER}15`,
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: responsiveMargin(16),
+          }}
+        >
+          <Feather
+            name="alert-circle"
+            size={responsiveIconSize(40)}
+            color={BRAND_COLORS.DANGER}
+          />
+        </View>
+        <Text
+          style={{
+            color: BRAND_COLORS.TEXT_SECONDARY,
+            marginBottom: responsiveMargin(16),
+            fontSize: responsiveFontSize(16),
+            textAlign: "center",
+          }}
+        >
+          Failed to load feed
+        </Text>
+        <TouchableOpacity
+          style={{
+            backgroundColor: BRAND_COLORS.PRIMARY,
+            paddingHorizontal: responsivePadding(24),
+            paddingVertical: responsivePadding(12),
+            borderRadius: responsiveBorderRadius(20),
+            shadowColor: BRAND_COLORS.PRIMARY,
+            shadowOffset: { width: 0, height: responsiveSize(4) },
+            shadowOpacity: 0.3,
+            shadowRadius: responsiveSize(8),
+            elevation: 6,
+          }}
+          onPress={() => refetchPosts()}
+        >
+          <Text
+            style={{
+              color: BRAND_COLORS.SURFACE,
+              fontSize: responsiveFontSize(16),
+              fontWeight: "700",
+              letterSpacing: 0.3,
+            }}
+          >
+            Retry
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -94,34 +230,47 @@ const HomeScreen = () => {
         />
       </Animated.View>
 
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={["top"]}>
         {/* Enhanced Header with Blur Effect */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView
-            intensity={20}
+            intensity={HEADER_CONFIG.BLUR_INTENSITY}
             tint="light"
-            style={{ paddingHorizontal: 16, paddingVertical: 12 }}
+            style={{
+              paddingHorizontal: responsivePadding(
+                HEADER_CONFIG.PADDING_HORIZONTAL
+              ),
+              paddingVertical: responsivePadding(
+                HEADER_CONFIG.PADDING_VERTICAL
+              ),
+              paddingTop: responsivePadding(HEADER_CONFIG.PADDING_VERTICAL + 8), // Extra padding for status bar
+            }}
           >
             <View className="flex-row justify-between items-center">
               <Animated.View style={logoAnimatedStyle}>
                 <View
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
+                    width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+                    height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+                    borderRadius: responsiveBorderRadius(
+                      HEADER_CONFIG.BUTTON_BORDER_RADIUS
+                    ),
                     backgroundColor: BRAND_COLORS.PRIMARY,
                     justifyContent: "center",
                     alignItems: "center",
                     shadowColor: BRAND_COLORS.PRIMARY,
-                    shadowOffset: { width: 0, height: 4 },
+                    shadowOffset: { width: 0, height: responsiveSize(4) },
                     shadowOpacity: 0.3,
-                    shadowRadius: 8,
+                    shadowRadius: responsiveSize(8),
                     elevation: 8,
                   }}
                 >
                   <Image
                     source={require("@/assets/images/xMind-Logo1.png")}
-                    style={{ width: 20, height: 20 }}
+                    style={{
+                      width: responsiveSize(HEADER_CONFIG.ICON_SIZE),
+                      height: responsiveSize(HEADER_CONFIG.ICON_SIZE),
+                    }}
                     resizeMode="contain"
                   />
                 </View>
@@ -129,18 +278,17 @@ const HomeScreen = () => {
 
               <View
                 style={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
+                  paddingHorizontal: responsivePadding(20),
+                  paddingVertical: responsivePadding(8),
+                  borderRadius: responsiveBorderRadius(20),
                   borderWidth: 1,
                   borderColor: `${BRAND_COLORS.PRIMARY}20`,
                 }}
               >
                 <Text
                   style={{
-                    fontSize: 18,
-                    fontWeight: "700",
+                    fontSize: responsiveFontSize(HEADER_CONFIG.TITLE_SIZE),
+                    fontWeight: "800",
                     color: BRAND_COLORS.TEXT_PRIMARY,
                     letterSpacing: 0.5,
                   }}
@@ -156,11 +304,9 @@ const HomeScreen = () => {
 
         {/* Enhanced ScrollView with Smooth Animations */}
         <AnimatedScrollView
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: responsiveSize(100) }}
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
@@ -175,22 +321,86 @@ const HomeScreen = () => {
           }
         >
           <PostComposer />
-          <PostsList />
+          {rankedPosts && rankedPosts.length > 0 ? (
+            <PostsList posts={rankedPosts} />
+          ) : (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingVertical: responsivePadding(40),
+              }}
+            >
+              <View
+                style={{
+                  width: responsiveSize(80),
+                  height: responsiveSize(80),
+                  borderRadius: responsiveBorderRadius(40),
+                  backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: responsiveMargin(16),
+                }}
+              >
+                <Feather
+                  name="feather"
+                  size={responsiveIconSize(40)}
+                  color={BRAND_COLORS.PRIMARY}
+                />
+              </View>
+              <Text
+                style={{
+                  fontSize: responsiveFontSize(18),
+                  fontWeight: "700",
+                  color: BRAND_COLORS.TEXT_PRIMARY,
+                  marginBottom: responsiveMargin(8),
+                  textAlign: "center",
+                }}
+              >
+                No posts yet
+              </Text>
+              <Text
+                style={{
+                  fontSize: responsiveFontSize(14),
+                  color: BRAND_COLORS.TEXT_SECONDARY,
+                  textAlign: "center",
+                  paddingHorizontal: responsivePadding(32),
+                  lineHeight: responsiveSize(20),
+                }}
+              >
+                Be the first to share your thoughts! Create a post to get
+                started.
+              </Text>
+            </View>
+          )}
         </AnimatedScrollView>
 
         {/* Floating Action Indicator */}
         <Animated.View
           style={{
             position: "absolute",
-            bottom: 100,
-            right: 20,
-            width: 4,
-            height: 40,
-            borderRadius: 2,
+            bottom: responsiveSize(100),
+            right: responsiveSize(20),
+            width: responsiveSize(4),
+            height: responsiveSize(40),
+            borderRadius: responsiveBorderRadius(2),
             backgroundColor: BRAND_COLORS.PRIMARY,
             opacity: 0.6,
           }}
         />
+
+        {/* Custom Alert */}
+        {alertConfig && (
+          <CustomAlert
+            visible={isVisible}
+            title={alertConfig.title}
+            message={alertConfig.message}
+            buttons={alertConfig.buttons}
+            type={alertConfig.type}
+            onDismiss={hideAlert}
+          />
+        )}
       </SafeAreaView>
     </View>
   );

@@ -18,6 +18,16 @@ import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import CommentsModal from "./CommentsModal";
 import { BRAND_COLORS } from "@/constants/colors";
 import { Feather } from "@expo/vector-icons";
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
+  responsiveIconSize,
+  baseScale,
+} from "@/utils/responsive";
+import CustomLoading from "./CustomLoading";
 
 // New component to handle individual post animations
 const AnimatedPostCard = ({
@@ -38,7 +48,7 @@ const AnimatedPostCard = ({
   isLiked: boolean;
 }) => {
   // Animation values for this specific post
-  const translateY = useSharedValue(50);
+  const translateY = useSharedValue(50 * baseScale);
   const opacity = useSharedValue(0);
 
   // Trigger animation on mount
@@ -67,10 +77,16 @@ const AnimatedPostCard = ({
   );
 };
 
-const PostsList = ({ username }: { username?: string }) => {
+const PostsList = ({
+  username,
+  posts: customPosts,
+}: {
+  username?: string;
+  posts?: Post[];
+}) => {
   const { currentUser } = useCurrentUser();
   const {
-    posts,
+    posts: fetchedPosts,
     isLoading,
     error,
     refetch,
@@ -78,6 +94,9 @@ const PostsList = ({ username }: { username?: string }) => {
     deletePost,
     checkIsLiked,
   } = usePosts(username);
+
+  // Use custom posts if provided, otherwise use fetched posts
+  const posts = customPosts || fetchedPosts;
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   // Animation values for loading, content, and error states
@@ -87,7 +106,12 @@ const PostsList = ({ username }: { username?: string }) => {
   const retryButtonScale = useSharedValue(1);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (customPosts) {
+      // If using custom posts, show content immediately
+      loadingOpacity.value = withTiming(0, { duration: 300 });
+      contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
+    } else if (!isLoading) {
+      // If fetching posts, handle loading states
       loadingOpacity.value = withTiming(0, { duration: 300 });
       if (error) {
         errorOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
@@ -95,7 +119,14 @@ const PostsList = ({ username }: { username?: string }) => {
         contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
       }
     }
-  }, [isLoading, error, loadingOpacity, contentOpacity, errorOpacity]);
+  }, [
+    isLoading,
+    error,
+    loadingOpacity,
+    contentOpacity,
+    errorOpacity,
+    customPosts,
+  ]);
 
   const selectedPost = selectedPostId
     ? posts.find((p: Post) => p._id === selectedPostId)
@@ -121,7 +152,11 @@ const PostsList = ({ username }: { username?: string }) => {
     opacity: contentOpacity.value,
     transform: [
       {
-        translateY: interpolate(contentOpacity.value, [0, 1], [20, 0]),
+        translateY: interpolate(
+          contentOpacity.value,
+          [0, 1],
+          [20 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -130,7 +165,11 @@ const PostsList = ({ username }: { username?: string }) => {
     opacity: errorOpacity.value,
     transform: [
       {
-        translateY: interpolate(errorOpacity.value, [0, 1], [20, 0]),
+        translateY: interpolate(
+          errorOpacity.value,
+          [0, 1],
+          [20 * baseScale, 0]
+        ),
       },
     ],
   }));
@@ -139,66 +178,35 @@ const PostsList = ({ username }: { username?: string }) => {
     transform: [{ scale: retryButtonScale.value }],
   }));
 
-  if (isLoading) {
+  if (isLoading && !customPosts) {
     return (
-      <Animated.View
-        style={[
-          {
-            padding: 40,
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          loadingAnimatedStyle,
-        ]}
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: BRAND_COLORS.BACKGROUND,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
       >
-        <View
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: 40,
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: 20,
-            shadowColor: BRAND_COLORS.PRIMARY,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.15,
-            shadowRadius: 16,
-            elevation: 8,
-          }}
-        >
-          <LinearGradient
-            colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
-            style={{
-              width: "100%",
-              height: "100%",
-              borderRadius: 40,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <ActivityIndicator size="large" color={BRAND_COLORS.SURFACE} />
-          </LinearGradient>
-        </View>
-        <Text
-          style={{
-            color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: 16,
-            fontWeight: "500",
-            letterSpacing: 0.3,
-          }}
-        >
-          Loading minds...
-        </Text>
-      </Animated.View>
+        <CustomLoading
+          message="Loading minds..."
+          size="large"
+          variant="modal"
+          intensity={8}
+          colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
+          showDots={true}
+          accessibilityLabel="Custom loading spinner"
+        />
+      </View>
     );
   }
 
-  if (error) {
+  if (error && !customPosts) {
     return (
       <Animated.View
         style={[
           {
-            padding: 40,
+            padding: responsivePadding(40),
             alignItems: "center",
             justifyContent: "center",
           },
@@ -207,23 +215,27 @@ const PostsList = ({ username }: { username?: string }) => {
       >
         <View
           style={{
-            width: 60,
-            height: 60,
-            borderRadius: 30,
+            width: responsiveSize(60),
+            height: responsiveSize(60),
+            borderRadius: responsiveBorderRadius(30),
             backgroundColor: `${BRAND_COLORS.DANGER}15`,
             justifyContent: "center",
             alignItems: "center",
-            marginBottom: 20,
+            marginBottom: responsiveMargin(20),
           }}
         >
-          <Feather name="wifi-off" size={24} color={BRAND_COLORS.DANGER} />
+          <Feather
+            name="wifi-off"
+            size={responsiveIconSize(24)}
+            color={BRAND_COLORS.DANGER}
+          />
         </View>
 
         <Text
           style={{
             color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: 16,
-            marginBottom: 20,
+            fontSize: responsiveFontSize(16),
+            marginBottom: responsiveMargin(20),
             textAlign: "center",
           }}
         >
@@ -233,13 +245,13 @@ const PostsList = ({ username }: { username?: string }) => {
         <Animated.View style={retryButtonAnimatedStyle}>
           <TouchableOpacity
             style={{
-              paddingHorizontal: 28,
-              paddingVertical: 14,
-              borderRadius: 24,
+              paddingHorizontal: responsivePadding(28),
+              paddingVertical: responsivePadding(14),
+              borderRadius: responsiveBorderRadius(24),
               shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: 4 },
+              shadowOffset: { width: 0, height: responsiveSize(4) },
               shadowOpacity: 0.2,
-              shadowRadius: 8,
+              shadowRadius: responsiveSize(8),
               elevation: 6,
             }}
             onPress={handleRetry}
@@ -247,9 +259,9 @@ const PostsList = ({ username }: { username?: string }) => {
             <LinearGradient
               colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
               style={{
-                paddingHorizontal: 20,
-                paddingVertical: 12,
-                borderRadius: 20,
+                paddingHorizontal: responsivePadding(20),
+                paddingVertical: responsivePadding(12),
+                borderRadius: responsiveBorderRadius(20),
                 justifyContent: "center",
                 alignItems: "center",
               }}
@@ -257,7 +269,7 @@ const PostsList = ({ username }: { username?: string }) => {
               <Text
                 style={{
                   color: BRAND_COLORS.SURFACE,
-                  fontSize: 15,
+                  fontSize: responsiveFontSize(15),
                   fontWeight: "700",
                   letterSpacing: 0.5,
                 }}
@@ -276,7 +288,7 @@ const PostsList = ({ username }: { username?: string }) => {
       <Animated.View
         style={[
           {
-            padding: 40,
+            padding: responsivePadding(40),
             alignItems: "center",
             justifyContent: "center",
           },
@@ -285,25 +297,29 @@ const PostsList = ({ username }: { username?: string }) => {
       >
         <View
           style={{
-            width: 80,
-            height: 80,
-            borderRadius: 40,
+            width: responsiveSize(80),
+            height: responsiveSize(80),
+            borderRadius: responsiveBorderRadius(40),
             backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
             justifyContent: "center",
             alignItems: "center",
-            marginBottom: 20,
+            marginBottom: responsiveMargin(20),
             borderWidth: 2,
             borderColor: `${BRAND_COLORS.PRIMARY}20`,
           }}
         >
-          <Feather name="feather" size={32} color={BRAND_COLORS.PRIMARY} />
+          <Feather
+            name="feather"
+            size={responsiveIconSize(32)}
+            color={BRAND_COLORS.PRIMARY}
+          />
         </View>
         <Text
           style={{
             color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: 16,
+            fontSize: responsiveFontSize(16),
             textAlign: "center",
-            lineHeight: 24,
+            lineHeight: responsiveSize(24),
           }}
         >
           No thoughts shared yet{"\n"}Start expressing your mind!
