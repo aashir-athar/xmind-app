@@ -1,7 +1,7 @@
 # 🧠 xMind - Revolutionary Social Media Platform
 
 <div align="center">
-  <img src="Mobile/assets/images/xMind-Logo.png" alt="xMind Logo" width="200" height="200">
+  <img src="Mobile/assets/images/xMind-Logo1.png" alt="xMind Logo" width="200" height="200">
   
   [![React Native](https://img.shields.io/badge/React%20Native-0.72+-blue.svg)](https://reactnative.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
