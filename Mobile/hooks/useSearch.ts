@@ -1,9 +1,11 @@
 import { useMemo } from "react";
 import { usePosts } from "./usePosts";
 import { Post, User } from "../types";
+import { useCurrentUser } from "./useCurrentUser";
 
 export const useSearch = () => {
   const { posts } = usePosts();
+  const { currentUser } = useCurrentUser();
 
   // Extract hashtags from all posts and count their occurrences
   const trendingHashtags = useMemo(() => {
@@ -21,6 +23,23 @@ export const useSearch = () => {
       .map(([hashtag, count]) => ({ hashtag, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 20); // Top 20 trending hashtags
+  }, [posts]);
+
+  // Extract all unique usernames from posts
+  const allUsernames = useMemo(() => {
+    const uniqueUsernames = new Set<string>();
+    
+    posts.forEach((post: Post) => {
+      if (post.user?.username) {
+        uniqueUsernames.add(post.user.username.toLowerCase());
+        if (post.user._id === currentUser?._id) {
+          // I want to exclude the current user from the list of usernames
+          uniqueUsernames.delete(currentUser.username.toLowerCase());
+        }
+      }
+    });
+    
+    return Array.from(uniqueUsernames);
   }, [posts]);
 
   // Search users by username, firstName, or lastName
@@ -62,5 +81,6 @@ export const useSearch = () => {
     searchUsers,
     getPostsByHashtag,
     posts,
+    allUsernames, // New: All usernames from posts
   };
 };

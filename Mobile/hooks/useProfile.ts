@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useApiClient } from "../utils/api";
 import { useCurrentUser } from "./useCurrentUser";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
+import { useExistingUsernames } from "./useExistingUsernames";
 import {
   checkVerificationEligibility,
   getVerificationProgress,
@@ -12,6 +13,10 @@ import {
   VerificationResult,
 } from "@/utils/verification";
 import { usePosts } from "./usePosts";
+import {
+  validateUsername,
+  ValidationConfig,
+} from "../utils/usernameValidation";
 
 export interface ProfileFormData {
   firstName: string;
@@ -28,11 +33,12 @@ export const useProfile = () => {
   const { showSuccess, showError, showInfo } = useCustomAlert();
   const queryClient = useQueryClient();
   const { currentUser, refetch: refetchCurrentUser } = useCurrentUser();
-    const { posts: userPosts } = usePosts(currentUser?.username);
+  const { posts: userPosts } = usePosts(currentUser?.username);
+  const { existingUsernames } = useExistingUsernames();
 
   // Modal state
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  
+
   // Form data state
   const [formData, setFormData] = useState<ProfileFormData>({
     firstName: "",
@@ -45,11 +51,20 @@ export const useProfile = () => {
   });
 
   // Image states
-  const [selectedProfileImage, setSelectedProfileImage] = useState<string | null>(null);
-  const [selectedBannerImage, setSelectedBannerImage] = useState<string | null>(null);
+  const [selectedProfileImage, setSelectedProfileImage] = useState<
+    string | null
+  >(null);
+  const [selectedBannerImage, setSelectedBannerImage] = useState<string | null>(
+    null
+  );
+  const [usernameValidate, setusernameValidate] = useState<boolean>(false);
+  const [usernameValidateErrors, setusernameValidateErrors] = useState<string[]>(
+    []
+  );
 
   // Verification state
-  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [verificationResult, setVerificationResult] =
+    useState<VerificationResult | null>(null);
 
   // Profile update mutation (handles text fields + images)
   const updateProfileMutation = useMutation({
@@ -57,10 +72,14 @@ export const useProfile = () => {
       const formDataToSend = new FormData();
 
       // Add text fields if they have values
-      if (profileData.firstName?.trim()) formDataToSend.append("firstName", profileData.firstName.trim());
-      if (profileData.lastName?.trim()) formDataToSend.append("lastName", profileData.lastName.trim());
-      if (profileData.bio?.trim()) formDataToSend.append("bio", profileData.bio.trim());
-      if (profileData.location?.trim()) formDataToSend.append("location", profileData.location.trim());
+      if (profileData.firstName?.trim())
+        formDataToSend.append("firstName", profileData.firstName.trim());
+      if (profileData.lastName?.trim())
+        formDataToSend.append("lastName", profileData.lastName.trim());
+      if (profileData.bio?.trim())
+        formDataToSend.append("bio", profileData.bio.trim());
+      if (profileData.location?.trim())
+        formDataToSend.append("location", profileData.location.trim());
 
       // Handle profile picture upload (same logic as useCreatePost)
       if (selectedProfileImage) {
@@ -108,16 +127,16 @@ export const useProfile = () => {
     },
     onSuccess: async () => {
       console.log("Profile update successful, refreshing data...");
-      
+
       // Clear selected images
       setSelectedProfileImage(null);
       setSelectedBannerImage(null);
-      
+
       // Invalidate and refetch user data
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await queryClient.refetchQueries({ queryKey: ["authUser"] });
       await refetchCurrentUser();
-      
+
       // Close modal and show success
       setIsEditModalVisible(false);
       showSuccess("Success", "Profile updated successfully!");
@@ -192,13 +211,19 @@ export const useProfile = () => {
     return true;
   };
 
-  const handleImagePicker = async (type: "profilePicture" | "bannerImage", useCamera: boolean = false) => {
+  const handleImagePicker = async (
+    type: "profilePicture" | "bannerImage",
+    useCamera: boolean = false
+  ) => {
     const hasPermission = await requestPermissions(useCamera);
     if (!hasPermission) return;
 
     const pickerOptions = {
       allowsEditing: true,
-      aspect: type === "profilePicture" ? [1, 1] as [number, number] : [3, 1] as [number, number],
+      aspect:
+        type === "profilePicture"
+          ? ([1, 1] as [number, number])
+          : ([3, 1] as [number, number]),
       quality: 0.8,
     };
 
@@ -219,55 +244,19 @@ export const useProfile = () => {
   };
 
   // Username validation
-  const validateUsername = (username: string): boolean => {
+  const usernameValidation = async (username: string): Promise<boolean> => {
     const candidate = (username ?? "").trim();
 
-    if (candidate.length === 0) {
-      showError("Invalid Username", "Username cannot be empty");
+    const result = await validateUsername(candidate, undefined, existingUsernames);
+    if (result.valid) {
+      setusernameValidate(true);
+      setusernameValidateErrors([]);
+      return true;
+    } else {
+      setusernameValidate(false);
+      setusernameValidateErrors(result.errors);
       return false;
     }
-    if (candidate.length < 4 || candidate.length > 15) {
-      showError(
-        "Invalid Username",
-        "Username must be between 4 and 15 characters"
-      );
-      return false;
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(candidate)) {
-      showError(
-        "Invalid Username",
-        "Username can only contain letters, numbers, and underscores"
-      );
-      return false;
-    }
-    if (candidate.startsWith("_") || candidate.endsWith("_")) {
-      showError(
-        "Invalid Username",
-        "Username cannot start or end with an underscore"
-      );
-      return false;
-    }
-    if (candidate.includes("__")) {
-      showError(
-        "Invalid Username",
-        "Username cannot have consecutive underscores"
-      );
-      return false;
-    }
-    
-    const reservedWords = [
-      "admin", "administrator", "moderator", "system", "root", "official",
-      "support", "help", "twitter", "facebook", "instagram", "tiktok",
-      "youtube", "twitch", "discord", "reddit", "pinterest", "linkedin",
-      "github", "gitlab", "bitbucket", "heroku", "vercel", "netlify",
-    ];
-    
-    if (reservedWords.includes(candidate.toLowerCase())) {
-      showError("Invalid Username", "Username contains a reserved word");
-      return false;
-    }
-
-    return true;
   };
 
   // Verification functions
@@ -290,21 +279,21 @@ export const useProfile = () => {
 
   const getVerificationProgressValue = () => {
     if (currentUser) {
-      return getVerificationProgress(currentUser, userPosts.length);
+      return getVerificationProgress(currentUser, userPosts?.length || 0);
     }
     return 0;
   };
 
   const getVerificationStatusMessageValue = () => {
     if (currentUser) {
-      return getVerificationStatusMessage(currentUser, userPosts.length);
+      return getVerificationStatusMessage(currentUser, userPosts?.length || 0);
     }
     return "";
   };
 
   const getVerificationRequirementsValue = () => {
     if (currentUser) {
-      return getVerificationRequirements(currentUser, userPosts.length);
+      return getVerificationRequirements(currentUser, userPosts?.length || 0);
     }
     return [];
   };
@@ -321,7 +310,7 @@ export const useProfile = () => {
         profilePicture: currentUser.profilePicture || "",
         bannerImage: currentUser.bannerImage || "",
       });
-      
+
       // Clear any previously selected images
       setSelectedProfileImage(null);
       setSelectedBannerImage(null);
@@ -345,9 +334,13 @@ export const useProfile = () => {
   const saveProfile = async () => {
     // Check if username needs to be updated separately
     const usernameChanged = formData.username !== currentUser?.username;
-    
+
     // Check if we have any profile data to update
-    const hasTextData = formData.firstName || formData.lastName || formData.bio || formData.location;
+    const hasTextData =
+      formData.firstName ||
+      formData.lastName ||
+      formData.bio ||
+      formData.location;
     const hasImages = selectedProfileImage || selectedBannerImage;
 
     if (!hasTextData && !hasImages && !usernameChanged) {
@@ -358,7 +351,7 @@ export const useProfile = () => {
     try {
       // Update username first if changed
       if (usernameChanged) {
-        if (!validateUsername(formData.username)) {
+        if (!usernameValidation(formData.username)) {
           return;
         }
         await updateUsernameMutation.mutateAsync(formData.username);
@@ -407,22 +400,23 @@ export const useProfile = () => {
     isEditModalVisible,
     openEditModal,
     closeEditModal,
-    
+
     // Form data
     formData,
     updateFormField,
-    
+
     // Save function
     saveProfile,
-    isUpdating: updateProfileMutation.isPending || updateUsernameMutation.isPending,
-    
+    isUpdating:
+      updateProfileMutation.isPending || updateUsernameMutation.isPending,
+
     // Image functions
     selectedProfileImage,
     selectedBannerImage,
     pickImageFromGallery,
     takePhoto,
     removeImage,
-    
+
     // Verification functions
     verificationResult,
     checkVerification,
@@ -431,10 +425,12 @@ export const useProfile = () => {
     getVerificationStatusMessageValue,
     getVerificationRequirementsValue,
     isCheckingVerification: autoVerificationMutation.isPending,
-    
+
     // Username functions
-    validateUsername,
-    
+    usernameValidation,
+    usernameValidate,
+    usernameValidateErrors,
+    existingUsernames, // New: Available usernames for validation
     // Utility
     refetch,
   };

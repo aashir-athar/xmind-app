@@ -227,7 +227,7 @@ const UserProfileScreen = () => {
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       />
 
-      <SafeAreaView className="flex-1" edges={["top"]}>
+      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         {/* Enhanced Header */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView

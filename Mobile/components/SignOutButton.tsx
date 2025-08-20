@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
 import { useSignOut } from "@/hooks/useSignOut";
+import CustomAlert from "./CustomAlert";
 import {
   responsiveSize,
   responsivePadding,
@@ -20,7 +21,7 @@ import {
 } from "@/utils/responsive";
 
 const SignOutButton = () => {
-  const { handleSignOut, isSigningOut } = useSignOut();
+  const { handleSignOut, isSigningOut, alertConfig, isVisible, hideAlert } = useSignOut();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -49,37 +50,51 @@ const SignOutButton = () => {
   }));
 
   return (
-    <TouchableOpacity
-      onPress={handleSignOut}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={isSigningOut}
-      activeOpacity={1}
-    >
-      <Animated.View style={logoAnimatedStyle}>
-        <View
-          style={{
-            width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
-            height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
-            borderRadius: responsiveBorderRadius(HEADER_CONFIG.BUTTON_BORDER_RADIUS),
-            backgroundColor: BRAND_COLORS.ACCENT_MINT,
-            justifyContent: "center",
-            alignItems: "center",
-            shadowColor: BRAND_COLORS.PRIMARY,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            elevation: 8,
-          }}
-        >
-          <Feather
-            name="log-out"
-            size={responsiveIconSize(HEADER_CONFIG.ICON_SIZE)}
-            color={BRAND_COLORS.SURFACE}
-          />
-        </View>
-      </Animated.View>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity
+        onPress={handleSignOut}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={isSigningOut}
+        activeOpacity={1}
+      >
+        <Animated.View style={logoAnimatedStyle}>
+          <View
+            style={{
+              width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+              height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
+              borderRadius: responsiveBorderRadius(HEADER_CONFIG.BUTTON_BORDER_RADIUS),
+              backgroundColor: BRAND_COLORS.ACCENT_MINT,
+              justifyContent: "center",
+              alignItems: "center",
+              shadowColor: BRAND_COLORS.PRIMARY,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              elevation: 8,
+            }}
+          >
+            <Feather
+              name="log-out"
+              size={responsiveIconSize(HEADER_CONFIG.ICON_SIZE)}
+              color={BRAND_COLORS.SURFACE}
+            />
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/* Custom Alert */}
+      {alertConfig && (
+        <CustomAlert
+          visible={isVisible}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          buttons={alertConfig.buttons}
+          type={alertConfig.type}
+          onDismiss={hideAlert}
+        />
+      )}
+    </>
   );
 };
 

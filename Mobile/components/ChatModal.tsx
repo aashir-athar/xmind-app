@@ -208,7 +208,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
           tint="dark"
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+          <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
             <Animated.View
               style={[
                 {
@@ -301,7 +301,7 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 {/* Messages */}
                 <KeyboardAvoidingView
                   behavior={Platform.OS === "ios" ? "padding" : "height"}
-                  keyboardVerticalOffset={insets.bottom + responsiveSize(30)}
+                  keyboardVerticalOffset={insets.bottom + responsiveSize(100)}
                   style={{ flex: 1 }}
                 >
               <ScrollView

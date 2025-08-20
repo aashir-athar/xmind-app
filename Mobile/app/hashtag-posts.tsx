@@ -97,7 +97,7 @@ const HashtagPostsScreen = () => {
         />
       </Animated.View>
 
-      <SafeAreaView className="flex-1" edges={["top"]}>
+      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         {/* Enhanced Header */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView

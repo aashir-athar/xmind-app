@@ -650,17 +650,19 @@ function checkCharacters(
 }
 
 // Check 3: Uniqueness (Async; simulated DB) [general best practice]
-async function checkUniqueness(username: string): Promise<CheckResult> {
-  // Mock existing usernames (lowercase)
-  const existingUsernames: Set<string> = new Set([
-    "user1",
-    "john_doe",
-    "example",
-    "admin",
-  ]);
-  if (existingUsernames.has(username.toLowerCase())) {
+async function checkUniqueness(
+  username: string, 
+  existingUsernames: string[] = []
+): Promise<CheckResult> {
+  // Use provided existing usernames or fallback to mock data
+  const usernamesToCheck = existingUsernames.length > 0 
+    ? existingUsernames 
+    : ["user1", "john_doe", "example", "admin"]; // Fallback mock data
+  
+  if (usernamesToCheck.includes(username.toLowerCase())) {
     return { valid: false, error: "Username is already taken." };
   }
+  
   // Real impl: await db.users.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
   // Consider case-insensitive index in DB
   return { valid: true };
@@ -815,7 +817,8 @@ function checkSecurity(username: string): CheckResult {
 // Main Validation Function (Async for uniqueness and cross-platform)
 async function validateUsername(
   username: string,
-  customConfig?: Partial<ValidationConfig>
+  customConfig?: Partial<ValidationConfig>,
+  existingUsernames?: string[]
 ): Promise<{ valid: boolean; errors: string[] }> {
   const config = { ...defaultConfig, ...customConfig };
   const syncChecks: CheckResult[] = [
@@ -830,7 +833,7 @@ async function validateUsername(
   ];
 
   const asyncChecks = await Promise.all([
-    checkUniqueness(username),
+    checkUniqueness(username, existingUsernames),
     checkCrossPlatform(username),
   ]);
 

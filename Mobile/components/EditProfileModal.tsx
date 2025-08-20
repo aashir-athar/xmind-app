@@ -22,7 +22,6 @@ import Animated, {
   withTiming,
   withDelay,
   interpolate,
-  runOnJS,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -53,6 +52,9 @@ interface EditProfileModalProps {
   pickImageFromGallery: (type: "profilePicture" | "bannerImage") => void;
   takePhoto: (type: "profilePicture" | "bannerImage") => void;
   removeImage: (type: "profilePicture" | "bannerImage") => void;
+  usernameValidation: (username: string) => Promise<boolean>;
+  usernameValidate: boolean;
+  usernameValidateErrors: string[];
 }
 
 const EditProfileModal = ({
@@ -67,6 +69,9 @@ const EditProfileModal = ({
   pickImageFromGallery,
   takePhoto,
   removeImage,
+  usernameValidate,
+  usernameValidateErrors,
+  usernameValidation,
 }: EditProfileModalProps) => {
   const insets = useSafeAreaInsets();
 
@@ -90,8 +95,13 @@ const EditProfileModal = ({
     }
   }, [isVisible]);
 
+  useEffect(() => {
+    if (formData?.username) {
+      usernameValidation(formData.username);
+    }
+  }, [formData?.username]);
+
   const handleClose = () => {
-    // Same close logic as CommentsModal
     onClose();
   };
 
@@ -229,7 +239,7 @@ const EditProfileModal = ({
               colors={[BRAND_COLORS.SURFACE, `${BRAND_COLORS.BACKGROUND}95`]}
               style={{ flex: 1 }}
             >
-              {/* Enhanced Header */}
+              {/* Enhanced Header - matching CommentsModal pattern */}
               <Animated.View style={headerAnimatedStyle}>
                 <BlurView
                   intensity={10}
@@ -237,6 +247,8 @@ const EditProfileModal = ({
                   style={{
                     paddingHorizontal: responsivePadding(24),
                     paddingVertical: responsivePadding(20),
+                    borderBottomWidth: 1,
+                    borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
                   }}
                 >
                   <View
@@ -326,7 +338,7 @@ const EditProfileModal = ({
                 </BlurView>
               </Animated.View>
 
-              {/* Enhanced Content */}
+              {/* Enhanced Content - matching CommentsModal pattern */}
               <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 keyboardVerticalOffset={insets.bottom + responsiveSize(60)}
@@ -627,7 +639,7 @@ const EditProfileModal = ({
                         />
                       </View>
 
-                      {/* Username */}
+                      {/* Username with validation */}
                       <View>
                         <Text
                           style={{
@@ -642,7 +654,11 @@ const EditProfileModal = ({
                         <TextInput
                           style={{
                             borderWidth: 1,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
+                            borderColor: usernameValidate 
+                              ? BRAND_COLORS.SUCCESS 
+                              : (usernameValidateErrors?.length || 0) > 0 
+                                ? BRAND_COLORS.DANGER 
+                                : `${BRAND_COLORS.BORDER_LIGHT}60`,
                             borderRadius: responsiveBorderRadius(12),
                             padding: responsivePadding(16),
                             fontSize: responsiveFontSize(16),
@@ -651,12 +667,69 @@ const EditProfileModal = ({
                           }}
                           placeholder="Enter your username"
                           placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData.username}
+                          value={formData?.username || ""}
                           onChangeText={(text) =>
                             updateFormField("username", text.toLowerCase())
                           }
                           autoCapitalize="none"
                         />
+                        {/* Username validation display */}
+                        {(usernameValidateErrors?.length || 0) > 0 && (
+                          <View style={{ marginTop: responsiveMargin(8) }}>
+                            {usernameValidateErrors?.map((error, index) => (
+                              <View
+                                key={index}
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  marginBottom: responsiveMargin(4),
+                                }}
+                              >
+                                <Feather
+                                  name="alert-circle"
+                                  size={responsiveIconSize(14)}
+                                  color={BRAND_COLORS.DANGER}
+                                  style={{ marginRight: responsiveMargin(6) }}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: responsiveFontSize(12),
+                                    color: BRAND_COLORS.DANGER,
+                                    fontWeight: "500",
+                                    flex: 1,
+                                  }}
+                                >
+                                  {error}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        {usernameValidate && (formData?.username?.length || 0) > 0 && (
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginTop: responsiveMargin(8),
+                            }}
+                          >
+                            <Feather
+                              name="check-circle"
+                              size={responsiveIconSize(14)}
+                              color={BRAND_COLORS.SUCCESS}
+                              style={{ marginRight: responsiveMargin(6) }}
+                            />
+                            <Text
+                              style={{
+                                fontSize: responsiveFontSize(12),
+                                color: BRAND_COLORS.SUCCESS,
+                                fontWeight: "500",
+                              }}
+                            >
+                              Username is available
+                            </Text>
+                          </View>
+                        )}
                       </View>
 
                       {/* Bio */}
@@ -699,7 +772,7 @@ const EditProfileModal = ({
                             marginTop: responsiveMargin(4),
                           }}
                         >
-                          {formData.bio.length}/160
+                          {(formData?.bio?.length || 0)}/160
                         </Text>
                       </View>
 
