@@ -247,7 +247,7 @@ export const useProfile = () => {
   const usernameValidation = async (username: string): Promise<boolean> => {
     const candidate = (username ?? "").trim();
 
-    const result = await validateUsername(candidate, undefined, existingUsernames);
+    const result = await validateUsername(currentUser?.username, candidate, undefined, existingUsernames);
     if (result.valid) {
       setusernameValidate(true);
       setusernameValidateErrors([]);

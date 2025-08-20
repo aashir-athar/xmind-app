@@ -32,10 +32,6 @@ export const useSearch = () => {
     posts.forEach((post: Post) => {
       if (post.user?.username) {
         uniqueUsernames.add(post.user.username.toLowerCase());
-        if (post.user._id === currentUser?._id) {
-          // I want to exclude the current user from the list of usernames
-          uniqueUsernames.delete(currentUser.username.toLowerCase());
-        }
       }
     });
     
