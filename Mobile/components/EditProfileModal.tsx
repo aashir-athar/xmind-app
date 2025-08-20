@@ -7,6 +7,9 @@ import {
   ScrollView,
   TextInput,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
 } from "react-native";
 import React, { useEffect, useState, useRef } from "react";
 import Animated, {
@@ -22,9 +25,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { BRAND_COLORS } from "@/constants/colors";
 import { useProfileUpdate } from "@/hooks/useProfileUpdate";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { validateUsername } from "@/utils/usernameValidation";
 import { useApiClient, userApi } from "@/utils/api";
+import { Feather } from "@expo/vector-icons";
 import { 
   responsiveSize, 
   responsivePadding, 
@@ -51,8 +56,6 @@ interface EditProfileModalProps {
   isUpdating: boolean;
 }
 
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
-
 const EditProfileModal = ({
   formData,
   isUpdating,
@@ -69,7 +72,23 @@ const EditProfileModal = ({
     errors: string[];
   }>({ isValid: true, errors: [] });
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
-  const { updateUsername, currentUser } = useProfileUpdate();
+  
+  // Get current user data
+  const { currentUser } = useCurrentUser();
+  
+  // Profile update hook with image functionality
+  const { 
+    updateUsername, 
+    uploadImagesAndUpdateProfile,
+    pickImageFromGallery,
+    takePhoto,
+    removeImage,
+    selectedProfileImage,
+    selectedBannerImage,
+    isUpdating: isUpdatingImages,
+    updateType
+  } = useProfileUpdate();
+  
   const { showError, showSuccess } = useCustomAlert();
   const api = useApiClient();
   
@@ -123,18 +142,35 @@ const EditProfileModal = ({
     };
   }, []);
 
-  const handleSave = () => {
-    saveButtonScale.value = withSpring(0.95, { damping: 15 }, () => {
+  const handleSave = async () => {
+    saveButtonScale.value = withSpring(0.95, { damping: 15 }, async () => {
       saveButtonScale.value = withSpring(1);
-      runOnJS(saveProfile)();
-      runOnJS(onClose)();
+      
+      // Check if we have images to upload
+      if (selectedProfileImage || selectedBannerImage) {
+        // Upload images and update profile using TanStack Query
+        await uploadImagesAndUpdateProfile({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          bio: formData.bio,
+          location: formData.location,
+        });
+        
+        // The mutation will handle success/error and close modal
+        onClose();
+        
+      } else {
+        // Just save profile without images using the existing saveProfile
+        saveProfile();
+        onClose();
+      }
     });
   };
 
   const handleCancel = () => {
     cancelButtonScale.value = withSpring(0.95, { damping: 15 }, () => {
       cancelButtonScale.value = withSpring(1);
-      runOnJS(onClose)();
+      onClose();
     });
   };
 
@@ -144,14 +180,17 @@ const EditProfileModal = ({
       return;
     }
 
+    // Convert username to lowercase
+    const lowercaseUsername = username.trim().toLowerCase();
+
     // Check if username is the same as current
-    if (username.trim() === currentUser?.username) {
+    if (lowercaseUsername === currentUser?.username) {
       showError("Error", "This is already your current username");
       return;
     }
 
     // Validate username before updating
-    const validation = await validateUsername(username.trim(), { platformMode: "xMind" });
+    const validation = await validateUsername(lowercaseUsername, { platformMode: "xMind" });
     if (!validation.valid) {
       showError("Invalid Username", validation.errors.join(", "));
       return;
@@ -159,7 +198,7 @@ const EditProfileModal = ({
 
     setIsUsernameUpdating(true);
     try {
-      const success = await updateUsername(username.trim());
+      const success = await updateUsername(lowercaseUsername);
       if (success) {
         showSuccess("Success", "Username updated successfully!");
         // Don't clear the input, keep the new username
@@ -187,9 +226,12 @@ const EditProfileModal = ({
 
     // Set new timer for debounced validation
     debounceTimer.current = setTimeout(async () => {
+      // Convert to lowercase for validation and availability check
+      const lowercaseText = text.trim().toLowerCase();
+      
       // First, validate format using usernameValidation.ts
       try {
-        const validation = await validateUsername(text.trim(), { platformMode: "xMind" });
+        const validation = await validateUsername(lowercaseText, { platformMode: "xMind" });
         
         if (!validation.valid) {
           setUsernameValidation({
@@ -202,7 +244,7 @@ const EditProfileModal = ({
         // If format is valid, check database availability
         setIsCheckingAvailability(true);
         try {
-          const response = await userApi.checkUsernameAvailability(api, text.trim());
+          const response = await userApi.checkUsernameAvailability(api, lowercaseText);
           
           if (response.data.available) {
             // Username is available and format is valid
@@ -270,6 +312,7 @@ const EditProfileModal = ({
     <Modal
       visible={isVisible}
       animationType="none"
+      presentationStyle="pageSheet"
       transparent={true}
       style={{ flex: 1 }}
     >
@@ -312,7 +355,7 @@ const EditProfileModal = ({
                   tint="light"
                   style={{ paddingHorizontal: responsivePadding(24), paddingVertical: responsivePadding(20) }}
                 >
-                  <View className="flex-row items-center justify-between">
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                     <Animated.View style={cancelButtonAnimatedStyle}>
                       <TouchableOpacity
                         onPress={handleCancel}
@@ -360,13 +403,13 @@ const EditProfileModal = ({
                     <Animated.View style={saveButtonAnimatedStyle}>
                       <TouchableOpacity
                         onPress={handleSave}
-                        disabled={isUpdating}
+                        disabled={isUpdating || isUpdatingImages}
                         style={{
                           paddingHorizontal: responsivePadding(20),
                           paddingVertical: responsivePadding(12),
                           borderRadius: responsiveBorderRadius(20),
                           backgroundColor: BRAND_COLORS.PRIMARY,
-                          opacity: isUpdating ? 0.7 : 1,
+                          opacity: (isUpdating || isUpdatingImages) ? 0.7 : 1,
                           shadowColor: BRAND_COLORS.PRIMARY,
                           shadowOffset: { width: 0, height: responsiveSize(4) },
                           shadowOpacity: 0.3,
@@ -374,7 +417,7 @@ const EditProfileModal = ({
                           elevation: 6,
                         }}
                       >
-                        {isUpdating ? (
+                        {(isUpdating || isUpdatingImages) ? (
                           <ActivityIndicator
                             size="small"
                             color={BRAND_COLORS.SURFACE}
@@ -398,12 +441,235 @@ const EditProfileModal = ({
               </Animated.View>
 
               {/* Enhanced Form Fields */}
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={responsiveSize(60)}
+                style={{ flex: 1 }}
+              >
               <ScrollView
                 style={{ flex: 1 }}
                 showsVerticalScrollIndicator={false}
               >
                 <Animated.View style={[{ padding: responsivePadding(24) }, fieldsAnimatedStyle]}>
                   <View style={{ gap: responsiveSize(24) }}>
+                      {/* Profile Picture Section */}
+                      <View>
+                        <Text
+                          style={{
+                            color: BRAND_COLORS.TEXT_SECONDARY,
+                            fontSize: responsiveFontSize(14),
+                            fontWeight: "600",
+                            marginBottom: responsiveMargin(12),
+                            letterSpacing: 0.3,
+                          }}
+                        >
+                          PROFILE PICTURE
+                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: responsiveMargin(16),
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: responsiveSize(80),
+                              height: responsiveSize(80),
+                              borderRadius: responsiveBorderRadius(40),
+                              overflow: "hidden",
+                              borderWidth: 3,
+                              borderColor: BRAND_COLORS.SURFACE,
+                              shadowColor: BRAND_COLORS.PRIMARY,
+                              shadowOffset: { width: 0, height: responsiveSize(4) },
+                              shadowOpacity: 0.2,
+                              shadowRadius: responsiveSize(8),
+                              elevation: 6,
+                            }}
+                          >
+                            <Image
+                              source={
+                                selectedProfileImage
+                                  ? { uri: selectedProfileImage }
+                                  : currentUser?.profilePicture
+                                  ? { uri: currentUser.profilePicture }
+                                  : require("../assets/images/default-avatar.jpeg")
+                              }
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                              }}
+                              resizeMode="cover"
+                            />
+                          </View>
+                          <View style={{ flexDirection: "row", gap: responsiveMargin(8) }}>
+                            <TouchableOpacity
+                              onPress={() => pickImageFromGallery("profilePicture")}
+                              style={{
+                                paddingHorizontal: responsivePadding(16),
+                                paddingVertical: responsivePadding(12),
+                                borderRadius: responsiveBorderRadius(20),
+                                backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
+                                borderWidth: 1,
+                                borderColor: `${BRAND_COLORS.PRIMARY}30`,
+                              }}
+                            >
+                              <Feather name="image" size={responsiveIconSize(16)} color={BRAND_COLORS.PRIMARY} />
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              onPress={() => takePhoto("profilePicture")}
+                              style={{
+                                paddingHorizontal: responsivePadding(16),
+                                paddingVertical: responsivePadding(12),
+                                borderRadius: responsiveBorderRadius(20),
+                                backgroundColor: BRAND_COLORS.PRIMARY,
+                                shadowColor: BRAND_COLORS.PRIMARY,
+                                shadowOffset: { width: 0, height: responsiveSize(4) },
+                                shadowOpacity: 0.3,
+                                shadowRadius: responsiveSize(8),
+                                elevation: 6,
+                              }}
+                            >
+                              <Feather name="camera" size={responsiveIconSize(16)} color={BRAND_COLORS.SURFACE} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        {selectedProfileImage && (
+                          <TouchableOpacity
+                            onPress={() => removeImage("profilePicture")}
+                            style={{
+                              alignSelf: "flex-start",
+                              marginTop: responsiveMargin(8),
+                              paddingHorizontal: responsivePadding(12),
+                              paddingVertical: responsivePadding(6),
+                              borderRadius: responsiveBorderRadius(12),
+                              backgroundColor: `${BRAND_COLORS.DANGER}15`,
+                              borderWidth: 1,
+                              borderColor: `${BRAND_COLORS.DANGER}30`,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: BRAND_COLORS.DANGER,
+                                fontSize: responsiveFontSize(12),
+                                fontWeight: "600",
+                              }}
+                            >
+                              Remove
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Banner Image Section */}
+                      <View>
+                        <Text
+                          style={{
+                            color: BRAND_COLORS.TEXT_SECONDARY,
+                            fontSize: responsiveFontSize(14),
+                            fontWeight: "600",
+                            marginBottom: responsiveMargin(12),
+                            letterSpacing: 0.3,
+                          }}
+                        >
+                          BANNER IMAGE
+                        </Text>
+                        <View
+                          style={{
+                            borderRadius: responsiveBorderRadius(16),
+                            overflow: "hidden",
+                            borderWidth: 2,
+                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}40`,
+                            shadowColor: BRAND_COLORS.PRIMARY,
+                            shadowOffset: { width: 0, height: responsiveSize(4) },
+                            shadowOpacity: 0.1,
+                            shadowRadius: responsiveSize(8),
+                            elevation: 4,
+                          }}
+                        >
+                          <Image
+                            source={
+                              selectedBannerImage
+                                ? { uri: selectedBannerImage }
+                                : currentUser?.bannerImage
+                                ? { uri: currentUser.bannerImage }
+                                : require("../assets/images/default-banner.jpeg")
+                            }
+                            style={{
+                              width: "100%",
+                              height: responsiveSize(120),
+                            }}
+                            resizeMode="cover"
+                          />
+                          <View
+                            style={{
+                              position: "absolute",
+                              bottom: responsiveMargin(12),
+                              right: responsiveMargin(12),
+                              flexDirection: "row",
+                              gap: responsiveMargin(8),
+                            }}
+                          >
+                            <TouchableOpacity
+                              onPress={() => pickImageFromGallery("bannerImage")}
+                              style={{
+                                paddingHorizontal: responsivePadding(16),
+                                paddingVertical: responsivePadding(12),
+                                borderRadius: responsiveBorderRadius(20),
+                                backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
+                                borderWidth: 1,
+                                borderColor: `${BRAND_COLORS.PRIMARY}30`,
+                              }}
+                            >
+                              <Feather name="image" size={responsiveIconSize(16)} color={BRAND_COLORS.PRIMARY} />
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                              onPress={() => takePhoto("bannerImage")}
+                              style={{
+                                paddingHorizontal: responsivePadding(16),
+                                paddingVertical: responsivePadding(12),
+                                borderRadius: responsiveBorderRadius(20),
+                                backgroundColor: BRAND_COLORS.PRIMARY,
+                                shadowColor: BRAND_COLORS.PRIMARY,
+                                shadowOffset: { width: 0, height: responsiveSize(4) },
+                                shadowOpacity: 0.3,
+                                shadowRadius: responsiveSize(8),
+                                elevation: 6,
+                              }}
+                            >
+                              <Feather name="camera" size={responsiveIconSize(16)} color={BRAND_COLORS.SURFACE} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        {selectedBannerImage && (
+                          <TouchableOpacity
+                            onPress={() => removeImage("bannerImage")}
+                            style={{
+                              alignSelf: "flex-start",
+                              marginTop: responsiveMargin(8),
+                              paddingHorizontal: responsivePadding(12),
+                              paddingVertical: responsivePadding(6),
+                              borderRadius: responsiveBorderRadius(12),
+                              backgroundColor: `${BRAND_COLORS.DANGER}15`,
+                              borderWidth: 1,
+                              borderColor: `${BRAND_COLORS.DANGER}30`,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: BRAND_COLORS.DANGER,
+                                fontSize: responsiveFontSize(12),
+                                fontWeight: "600",
+                              }}
+                            >
+                              Remove
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
                     {/* First Name Field */}
                     <View>
                       <Text
@@ -490,151 +756,150 @@ const EditProfileModal = ({
                       </View>
                     </View>
 
-                    {/* Username Field */}
-                    <View>
-                      <Text
-                        style={{
-                          color: BRAND_COLORS.TEXT_SECONDARY,
-                          fontSize: responsiveFontSize(14),
-                          fontWeight: "600",
-                          marginBottom: responsiveMargin(8),
-                          letterSpacing: 0.3,
-                        }}
-                      >
-                        USERNAME
-                      </Text>
-                      <View
-                        style={{
-                          borderRadius: responsiveBorderRadius(16),
-                          backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          borderWidth: 1,
-                          borderColor: username.trim() ? 
-                            (usernameValidation.isValid ? BRAND_COLORS.SUCCESS : BRAND_COLORS.DANGER) : 
-                            `${BRAND_COLORS.BORDER_LIGHT}60`,
-                          shadowColor: BRAND_COLORS.PRIMARY,
-                          shadowOffset: { width: 0, height: responsiveSize(2) },
-                          shadowOpacity: 0.05,
-                          shadowRadius: responsiveSize(4),
-                          elevation: 2,
-                        }}
-                      >
-                        <TextInput
-                          style={{
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            fontWeight: "500",
-                          }}
-                          value={username}
-                          onChangeText={handleUsernameInputChange}
-                          placeholder="Choose your username"
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                        />
-                      </View>
-                      
-                      {/* Validation Status */}
-                      {username.trim() && (
-                        <View style={{ marginTop: responsiveMargin(8) }}>
-                          {isCheckingAvailability ? (
-                            <View style={{ flexDirection: "row", alignItems: "center" }}>
-                              <ActivityIndicator
-                                size="small"
-                                color={BRAND_COLORS.PRIMARY}
-                                style={{ marginRight: responsiveMargin(8) }}
-                              />
-                              <Text
-                                style={{
-                                  color: BRAND_COLORS.TEXT_SECONDARY,
-                                  fontSize: responsiveFontSize(12),
-                                  fontStyle: "italic",
-                                }}
-                              >
-                                Checking username availability...
-                              </Text>
-                            </View>
-                          ) : usernameValidation.isValid ? (
-                            <Text
-                              style={{
-                                color: BRAND_COLORS.SUCCESS,
-                                fontSize: responsiveFontSize(12),
-                                fontStyle: "italic",
-                              }}
-                            >
-                              ✓ Username is available and valid
-                            </Text>
-                          ) : (
-                            usernameValidation.errors.map((error, index) => (
-                              <Text
-                                key={index}
-                                style={{
-                                  color: BRAND_COLORS.DANGER,
-                                  fontSize: responsiveFontSize(12),
-                                  marginBottom: responsiveMargin(2),
-                                  fontStyle: "italic",
-                                }}
-                              >
-                                • {error}
-                              </Text>
-                            ))
-                          )}
-                        </View>
-                      )}
-                      
-                      <View style={{ flexDirection: "row", alignItems: "center", marginTop: responsiveMargin(8) }}>
-                        <TouchableOpacity
-                          onPress={handleUsernameChange}
-                          disabled={isUsernameUpdating || !username.trim() || !usernameValidation.isValid}
-                          style={{
-                            paddingHorizontal: responsivePadding(16),
-                            paddingVertical: responsivePadding(8),
-                            borderRadius: responsiveBorderRadius(12),
-                            backgroundColor: (username.trim() && usernameValidation.isValid) ? BRAND_COLORS.PRIMARY : `${BRAND_COLORS.PRIMARY}40`,
-                            opacity: (isUsernameUpdating || !username.trim() || !usernameValidation.isValid) ? 0.6 : 1,
-                            shadowColor: BRAND_COLORS.PRIMARY,
-                            shadowOffset: { width: 0, height: responsiveSize(2) },
-                            shadowOpacity: 0.2,
-                            shadowRadius: responsiveSize(4),
-                            elevation: 3,
-                          }}
-                        >
-                          {isUsernameUpdating ? (
-                            <ActivityIndicator
-                              size="small"
-                              color={BRAND_COLORS.SURFACE}
-                            />
-                          ) : (
-                            <Text
-                              style={{
-                                color: BRAND_COLORS.SURFACE,
-                                fontSize: responsiveFontSize(14),
-                                fontWeight: "600",
-                                letterSpacing: 0.3,
-                              }}
-                            >
-                              Update Username
-                            </Text>
-                          )}
-                        </TouchableOpacity>
+                      {/* Username Field */}
+                      <View>
                         <Text
                           style={{
                             color: BRAND_COLORS.TEXT_SECONDARY,
-                            fontSize: responsiveFontSize(12),
-                            marginLeft: responsiveMargin(12),
-                            fontStyle: "italic",
-                            flex: 1,
+                            fontSize: responsiveFontSize(14),
+                            fontWeight: "600",
+                            marginBottom: responsiveMargin(8),
+                            letterSpacing: 0.3,
                           }}
                         >
-                          Only letters, numbers, and underscores. 4-15 characters.
-                          {currentUser?.username && (
-                            <Text style={{ color: BRAND_COLORS.PRIMARY }}>
-                              {" "}Current: @{currentUser.username}
-                            </Text>
-                          )}
+                          USERNAME
                         </Text>
+                        <View
+                          style={{
+                            borderRadius: responsiveBorderRadius(16),
+                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
+                            borderWidth: 1,
+                            borderColor: username.trim() ? 
+                              (usernameValidation.isValid ? BRAND_COLORS.SUCCESS : BRAND_COLORS.DANGER) : 
+                              `${BRAND_COLORS.BORDER_LIGHT}60`,
+                            shadowColor: BRAND_COLORS.PRIMARY,
+                            shadowOffset: { width: 0, height: responsiveSize(2) },
+                            shadowOpacity: 0.05,
+                            shadowRadius: responsiveSize(4),
+                            elevation: 2,
+                          }}
+                        >
+                          <TextInput
+                            style={{
+                              padding: responsivePadding(16),
+                              fontSize: responsiveFontSize(16),
+                              color: BRAND_COLORS.TEXT_PRIMARY,
+                              fontWeight: "500",
+                            }}
+                            value={username}
+                            onChangeText={handleUsernameInputChange}
+                            placeholder="Choose your username"
+                            placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                          />
+                        </View>
+                        
+                        {/* Validation Status */}
+                        {username.trim() && (
+                          <View style={{ marginTop: responsiveMargin(8) }}>
+                            {isCheckingAvailability ? (
+                              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                                <ActivityIndicator
+                                  size="small"
+                                  color={BRAND_COLORS.PRIMARY}
+                                  style={{ marginRight: responsiveMargin(8) }}
+                                />
+                                <Text
+                                  style={{
+                                    color: BRAND_COLORS.TEXT_SECONDARY,
+                                    fontSize: responsiveFontSize(12),
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  Checking username availability...
+                                </Text>
+                              </View>
+                            ) : usernameValidation.isValid ? (
+                              <Text
+                                style={{
+                                  color: BRAND_COLORS.SUCCESS,
+                                  fontSize: responsiveFontSize(12),
+                                  fontStyle: "italic",
+                                }}
+                              >
+                                ✓ Username is available and valid
+                              </Text>
+                            ) : (
+                              usernameValidation.errors.map((error, index) => (
+                                <Text
+                                  key={index}
+                                  style={{
+                                    color: BRAND_COLORS.DANGER,
+                                    fontSize: responsiveFontSize(12),
+                                    marginBottom: responsiveMargin(2),
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  • {error}
+                                </Text>
+                              ))
+                            )}
+                          </View>
+                        )}
+                        
+                        <View style={{ flexDirection: "row", alignItems: "center", marginTop: responsiveMargin(8) }}>
+                          <TouchableOpacity
+                            onPress={handleUsernameChange}
+                            disabled={isUsernameUpdating || !username.trim() || !usernameValidation.isValid}
+                            style={{
+                              paddingHorizontal: responsivePadding(16),
+                              paddingVertical: responsivePadding(8),
+                              borderRadius: responsiveBorderRadius(12),
+                              backgroundColor: (username.trim() && usernameValidation.isValid) ? BRAND_COLORS.PRIMARY : `${BRAND_COLORS.PRIMARY}40`,
+                              opacity: (isUsernameUpdating || !username.trim() || !usernameValidation.isValid) ? 0.6 : 1,
+                              shadowColor: BRAND_COLORS.PRIMARY,
+                              shadowOffset: { width: 0, height: responsiveSize(2) },
+                              shadowOpacity: 0.2,
+                              shadowRadius: responsiveSize(4),
+                              elevation: 3,
+                            }}
+                          >
+                            {isUsernameUpdating ? (
+                              <ActivityIndicator
+                                size="small"
+                                color={BRAND_COLORS.SURFACE}
+                              />
+                            ) : (
+                              <Text
+                                style={{
+                                  color: BRAND_COLORS.SURFACE,
+                                  fontSize: responsiveFontSize(14),
+                                  fontWeight: "600",
+                                }}
+                              >
+                                Update Username
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                          <Text
+                            style={{
+                              color: BRAND_COLORS.TEXT_SECONDARY,
+                              fontSize: responsiveFontSize(12),
+                              marginLeft: responsiveMargin(12),
+                              fontStyle: "italic",
+                              flex: 1,
+                            }}
+                          >
+                            Only letters, numbers, and underscores. 4-15 characters. Usernames are stored in lowercase.
+                            {currentUser?.username && (
+                              <Text style={{ color: BRAND_COLORS.PRIMARY }}>
+                                {" "}Current: @{currentUser.username}
+                              </Text>
+                            )}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
 
                     {/* Bio Field */}
                     <View>
@@ -726,6 +991,7 @@ const EditProfileModal = ({
                   </View>
                 </Animated.View>
               </ScrollView>
+              </KeyboardAvoidingView>
             </LinearGradient>
           </Animated.View>
         </BlurView>

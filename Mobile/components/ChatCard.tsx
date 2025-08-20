@@ -106,14 +106,14 @@ const ChatCard: React.FC<ChatCardProps> = ({
     <Animated.View style={cardAnimatedStyle}>
       <AnimatedTouchableOpacity
         style={{
-          flexDirection: "row",
-          alignItems: "center",
+            flexDirection: "row",
+            alignItems: "center",
           padding: responsivePadding(16),
-          marginHorizontal: responsiveMargin(4),
+            marginHorizontal: responsiveMargin(4),
           marginVertical: responsiveMargin(4),
-          borderRadius: responsiveBorderRadius(24),
+            borderRadius: responsiveBorderRadius(24),
           backgroundColor: BRAND_COLORS.SURFACE,
-          borderWidth: 1,
+            borderWidth: 1,
           borderColor: BRAND_COLORS.BORDER_LIGHT,
           shadowColor: BRAND_COLORS.PRIMARY,
           shadowOffset: { width: 0, height: responsiveSize(2) },
@@ -133,32 +133,32 @@ const ChatCard: React.FC<ChatCardProps> = ({
           }}
         >
           <Animated.View style={avatarAnimatedStyle}>
-            <View
+          <View
+            style={{
+              width: responsiveSize(56),
+              height: responsiveSize(56),
+              borderRadius: responsiveBorderRadius(28),
+              overflow: "hidden",
+              borderWidth: 3,
+              borderColor: `${BRAND_COLORS.PRIMARY}20`,
+              shadowColor: BRAND_COLORS.PRIMARY,
+              shadowOffset: { width: 0, height: responsiveSize(4) },
+              shadowOpacity: 0.3,
+              shadowRadius: responsiveSize(12),
+              elevation: 8,
+                backgroundColor: BRAND_COLORS.SURFACE_MUTED,
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+          >
+              {!avatarError ? (
+            <Image
+              source={{ uri: conversation.user.avatar }}
               style={{
                 width: responsiveSize(56),
                 height: responsiveSize(56),
                 borderRadius: responsiveBorderRadius(28),
-                overflow: "hidden",
-                borderWidth: 3,
-                borderColor: `${BRAND_COLORS.PRIMARY}20`,
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(4) },
-                shadowOpacity: 0.3,
-                shadowRadius: responsiveSize(12),
-                elevation: 8,
-                backgroundColor: BRAND_COLORS.SURFACE_MUTED,
-                alignItems: "center",
-                justifyContent: "center",
               }}
-            >
-              {!avatarError ? (
-                <Image
-                  source={{ uri: conversation.user.avatar }}
-                  style={{
-                    width: responsiveSize(56),
-                    height: responsiveSize(56),
-                    borderRadius: responsiveBorderRadius(28),
-                  }}
                   onError={handleAvatarError}
                   defaultSource={require("@/assets/images/default-avatar.jpeg")}
                 />
@@ -185,7 +185,7 @@ const ChatCard: React.FC<ChatCardProps> = ({
                   </Text>
                 </View>
               )}
-            </View>
+          </View>
           </Animated.View>
 
           {/* Online indicator */}

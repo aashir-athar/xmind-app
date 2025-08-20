@@ -10,6 +10,7 @@ import {
   toggleVerification,
 } from "../controllers/user.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
+import upload from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
@@ -19,8 +20,12 @@ router.get("/profile/:username", getUserProfile);
 // protected routes
 router.post("/sync", protectRoute, syncUser);
 router.get("/me", protectRoute, getCurrentUser);
-router.put("/profile", protectRoute, updateProfile);
-router.put("/username", protectRoute, updateUsername);
+router.post("/profile", protectRoute, updateProfile);
+router.post("/profile", protectRoute, upload.fields([
+  { name: 'profilePicture', maxCount: 1 },
+  { name: 'bannerImage', maxCount: 1 }
+]), updateProfile);
+router.post("/username", protectRoute, updateUsername);
 router.get("/check-username/:username", protectRoute, checkUsernameAvailability);
 router.post("/follow/:targetUserId", protectRoute, followUser);
 router.post("/verify/:targetUserId", protectRoute, toggleVerification);

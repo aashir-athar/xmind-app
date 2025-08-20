@@ -104,7 +104,7 @@ export const userApi = {
   syncUser: (api: AxiosInstance) => api.post("/users/sync"),
   getCurrentUser: (api: AxiosInstance) => api.get("/users/me"),
   updateProfile: (api: AxiosInstance, data: any) =>
-    api.put("/users/profile", data),
+    api.post("/users/profile", data),
   updateUsername: (api: AxiosInstance, username: string) =>
     api.put("/users/username", { username }),
   checkUsernameAvailability: (api: AxiosInstance, username: string) =>
@@ -117,10 +117,7 @@ export const userApi = {
     api.post(`/users/verify/${targetUserId}`),
 };
 
-export const uploadApi = {
-  uploadImage: (api: AxiosInstance, formData: FormData) =>
-    api.post("/upload/image", formData),
-};
+
 
 export const postApi = {
   createPost: (api: AxiosInstance, data: { content: string; image?: string }) =>
