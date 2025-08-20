@@ -35,7 +35,7 @@ export interface VerificationResult {
  */
 export const checkVerificationEligibility = (
   user: User,
-  postCount: number = 0
+  postCount: number
 ): VerificationResult => {
   const criteria: VerificationCriteria = {
     hasProfilePicture: Boolean(user.profilePicture?.trim()),
@@ -134,7 +134,7 @@ export const checkVerificationEligibility = (
  */
 export const getVerificationProgress = (
   user: User,
-  postCount: number = 0
+  postCount: number
 ): number => {
   const result = checkVerificationEligibility(user, postCount);
   let progress = 0;
@@ -166,7 +166,7 @@ export const getVerificationProgress = (
  */
 export const getVerificationStatusMessage = (
   user: User,
-  postCount: number = 0
+  postCount: number
 ): string => {
   if (user.verified) {
     return "Your account is verified and authentic";
@@ -200,7 +200,7 @@ export const getVerificationStatusMessage = (
  */
 export const getVerificationRequirements = (
   user: User,
-  postCount: number = 0
+  postCount: number
 ): string[] => {
   return checkVerificationEligibility(user, postCount).missingRequirements;
 };

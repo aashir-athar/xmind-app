@@ -10,7 +10,6 @@ export interface ProfileUpdateData {
   lastName?: string;
   bio?: string;
   location?: string;
-  username?: string;
 }
 
 export const useProfileUpdate = () => {
@@ -24,7 +23,7 @@ export const useProfileUpdate = () => {
   const { showSuccess, showError, showInfo } = useCustomAlert();
   const { refetch: refetchUser } = useCurrentUser();
 
-  // Main profile update mutation (handles both text fields and images)
+  // Profile update mutation (exactly like useProfile.ts)
   const updateProfileMutation = useMutation({
     mutationFn: async (profileData: ProfileUpdateData) => {
       const formData = new FormData();
@@ -80,17 +79,19 @@ export const useProfileUpdate = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      console.log("Profile update successful, refreshing data...");
+      
       // Clear selected images
       setSelectedProfileImage(null);
       setSelectedBannerImage(null);
       
-      // Invalidate and refetch user data
-      queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      // Invalidate and refetch the current user data (exactly like useProfile.ts)
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      await queryClient.refetchQueries({ queryKey: ["authUser"] });
       
       // Also refetch user data directly
-      refetchUser();
+      await refetchUser();
       
       showSuccess("Success", "Profile updated successfully!");
     },
@@ -109,11 +110,11 @@ export const useProfileUpdate = () => {
       const lowercaseUsername = username.toLowerCase();
       return api.put("/users/username", { username: lowercaseUsername });
     },
-    onSuccess: () => {
-      // Invalidate and refetch user data
-      queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
-      refetchUser();
+    onSuccess: async () => {
+      // Invalidate and refetch user data (exactly like useProfile.ts)
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      await queryClient.refetchQueries({ queryKey: ["authUser"] });
+      await refetchUser();
       showSuccess("Success", "Username updated successfully!");
     },
     onError: (error: any) => {
@@ -188,8 +189,8 @@ export const useProfileUpdate = () => {
     }
   };
 
-  // Update profile with all fields (text + images)
-  const updateProfile = async (profileData: ProfileUpdateData) => {
+  // Update profile with all fields (text + images) - exactly like useProfile.ts
+  const updateProfile = (profileData: ProfileUpdateData) => {
     // Check if we have any data to update
     const hasTextData = Object.values(profileData).some(value => value !== undefined);
     const hasImages = selectedProfileImage || selectedBannerImage;
@@ -199,15 +200,8 @@ export const useProfileUpdate = () => {
       return;
     }
 
-    setIsUpdating(true);
-    setUpdateType(selectedProfileImage ? "profilePicture" : selectedBannerImage ? "bannerImage" : null);
-
-    try {
-      await updateProfileMutation.mutateAsync(profileData);
-    } finally {
-      setIsUpdating(false);
-      setUpdateType(null);
-    }
+    // Use the mutation (exactly like useProfile.ts)
+    updateProfileMutation.mutate(profileData);
   };
 
   // Update username separately
@@ -226,7 +220,7 @@ export const useProfileUpdate = () => {
   };
 
   // Upload images and update profile (legacy function for backward compatibility)
-  const uploadImagesAndUpdateProfile = async (profileData: ProfileUpdateData) => {
+  const uploadImagesAndUpdateProfile = (profileData: ProfileUpdateData) => {
     return updateProfile(profileData);
   };
 
@@ -234,7 +228,7 @@ export const useProfileUpdate = () => {
     // State
     selectedProfileImage,
     selectedBannerImage,
-    isUpdating,
+    isUpdating: updateProfileMutation.isPending,
     updateType,
 
     // Functions
