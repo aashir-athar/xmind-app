@@ -1,270 +1,252 @@
 import { useState } from "react";
-import { Platform } from "react-native";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { useCurrentUser } from "./useCurrentUser";
-import { useApiClient, uploadApi } from "@/utils/api";
-import { BRAND_COLORS } from "@/constants/colors";
+import { useApiClient } from "@/utils/api";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
-import { validateUsername } from "@/utils/usernameValidation";
+import { useCurrentUser } from "./useCurrentUser";
 
-interface ProfileUpdateData {
-  profilePicture?: string;
-  bannerImage?: string;
+export interface ProfileUpdateData {
   firstName?: string;
   lastName?: string;
-  username?: string;
   bio?: string;
   location?: string;
-  verified?: boolean;
+  username?: string;
 }
 
 export const useProfileUpdate = () => {
-  const { currentUser, refetch: refetchUser } = useCurrentUser();
-  const api = useApiClient();
-  const { showInfo, showError, showSuccess, showChoiceDialog } =
-    useCustomAlert();
+  const [selectedProfileImage, setSelectedProfileImage] = useState<string | null>(null);
+  const [selectedBannerImage, setSelectedBannerImage] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [updateType, setUpdateType] = useState<
-    "profilePicture" | "bannerImage" | "bio" | "location" | "verified" | null
-  >(null);
+  const [updateType, setUpdateType] = useState<"profilePicture" | "bannerImage" | null>(null);
 
-  // Request permissions for camera and photo library
-  const requestPermissions = async () => {
-    if (Platform.OS !== "web") {
-      const { status: cameraStatus } =
-        await ImagePicker.requestCameraPermissionsAsync();
-      const { status: libraryStatus } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const api = useApiClient();
+  const queryClient = useQueryClient();
+  const { showSuccess, showError, showInfo } = useCustomAlert();
+  const { refetch: refetchUser } = useCurrentUser();
 
-      if (cameraStatus !== "granted" || libraryStatus !== "granted") {
-        showInfo(
-          "Permission Required",
-          "Camera and photo library access is required to update your profile images."
-        );
-        return false;
+  // Main profile update mutation (handles both text fields and images)
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profileData: ProfileUpdateData) => {
+      const formData = new FormData();
+
+      // Add text fields
+      Object.keys(profileData).forEach(key => {
+        if (profileData[key as keyof ProfileUpdateData] !== undefined) {
+          formData.append(key, profileData[key as keyof ProfileUpdateData] as string);
+        }
+      });
+
+      // Handle profile picture upload
+      if (selectedProfileImage) {
+        const uriParts = selectedProfileImage.split(".");
+        const fileType = uriParts[uriParts.length - 1].toLowerCase();
+
+        const mimeTypeMap: Record<string, string> = {
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+        };
+        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
+        const normalizedExt = mimeType.split("/")[1];
+
+        formData.append("profilePicture", {
+          uri: selectedProfileImage,
+          name: `profile-image.${normalizedExt}`,
+          type: mimeType,
+        } as any);
       }
+
+      // Handle banner image upload
+      if (selectedBannerImage) {
+        const uriParts = selectedBannerImage.split(".");
+        const fileType = uriParts[uriParts.length - 1].toLowerCase();
+
+        const mimeTypeMap: Record<string, string> = {
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+        };
+        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
+        const normalizedExt = mimeType.split("/")[1];
+
+        formData.append("bannerImage", {
+          uri: selectedBannerImage,
+          name: `banner-image.${normalizedExt}`,
+          type: mimeType,
+        } as any);
+      }
+
+      return api.post("/users/profile", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    },
+    onSuccess: () => {
+      // Clear selected images
+      setSelectedProfileImage(null);
+      setSelectedBannerImage(null);
+      
+      // Invalidate and refetch user data
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      
+      // Also refetch user data directly
+      refetchUser();
+      
+      showSuccess("Success", "Profile updated successfully!");
+    },
+    onError: (error: any) => {
+      console.error("Profile update error:", error);
+      showError(
+        "Error",
+        error.response?.data?.error || "Failed to update profile"
+      );
+    },
+  });
+
+  // Username update mutation (separate endpoint)
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (username: string) => {
+      const lowercaseUsername = username.toLowerCase();
+      return api.put("/users/username", { username: lowercaseUsername });
+    },
+    onSuccess: () => {
+      // Invalidate and refetch user data
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      refetchUser();
+      showSuccess("Success", "Username updated successfully!");
+    },
+    onError: (error: any) => {
+      console.error("Username update error:", error);
+      showError(
+        "Error",
+        error.response?.data?.error || "Failed to update username"
+      );
+    },
+  });
+
+  // Request permissions for camera/gallery
+  const requestPermissions = async (useCamera: boolean) => {
+    const permissionResult = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.status !== "granted") {
+      const source = useCamera ? "camera" : "photo library";
+      showInfo(
+        "Permission needed",
+        `Please grant permission to access your ${source}`
+      );
+      return false;
     }
     return true;
   };
 
-  // Upload image to Cloudinary
-  const uploadImageToCloudinary = async (imageUri: string): Promise<string> => {
-    try {
-      // Convert image URI to blob
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+  // Handle image picker for both profile and banner images
+  const handleImagePicker = async (type: "profilePicture" | "bannerImage", useCamera: boolean = false) => {
+    const hasPermission = await requestPermissions(useCamera);
+    if (!hasPermission) return;
 
-      // Create FormData
-      const formData = new FormData();
-      formData.append("image", blob, "profile-image.jpg");
+    const pickerOptions = {
+      allowsEditing: true,
+      aspect: type === "profilePicture" ? [1, 1] as [number, number] : [3, 1] as [number, number],
+      quality: 0.8,
+    };
 
-      // Upload to backend
-      const uploadResponse = await uploadApi.uploadImage(api, formData);
+    const result = useCamera
+      ? await ImagePicker.launchCameraAsync(pickerOptions)
+      : await ImagePicker.launchImageLibraryAsync({
+          ...pickerOptions,
+          mediaTypes: ["images"],
+        });
 
-      if (uploadResponse.data.success) {
-        return uploadResponse.data.data.url;
+    if (!result.canceled) {
+      if (type === "profilePicture") {
+        setSelectedProfileImage(result.assets[0].uri);
       } else {
-        throw new Error(uploadResponse.data.message || "Upload failed");
+        setSelectedBannerImage(result.assets[0].uri);
       }
-    } catch (error) {
-      // Log only non-sensitive error information
-      if (error instanceof Error) {
-        console.error("Image upload failed:", error.message);
-      }
-      throw new Error("Failed to upload image. Please try again.");
     }
   };
 
-  // Show image source selection dialog
-  const showImageSourceDialog = (type: "profilePicture" | "bannerImage") => {
-    showChoiceDialog(
-      `Update ${type === "profilePicture" ? "Profile Picture" : "Banner Image"}`,
-      "Choose image source:",
-      [
-        { text: "Camera", onPress: () => pickImage(type, "camera") },
-        { text: "Photo Library", onPress: () => pickImage(type, "library") },
-      ]
-    );
+  // Pick image from gallery
+  const pickImageFromGallery = (type: "profilePicture" | "bannerImage") => {
+    handleImagePicker(type, false);
   };
 
-  // Pick image from camera or library
-  const pickImage = async (
-    type: "profilePicture" | "bannerImage",
-    source: "camera" | "library"
-  ) => {
-    if (!(await requestPermissions())) return;
+  // Take photo with camera
+  const takePhoto = (type: "profilePicture" | "bannerImage") => {
+    handleImagePicker(type, true);
+  };
 
-    try {
-      const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-        aspect: type === "profilePicture" ? [1, 1] : [16, 9], // Square for profile, 16:9 for banner
-      };
-
-      let result;
-      if (source === "camera") {
-        result = await ImagePicker.launchCameraAsync(options);
-      } else {
-        result = await ImagePicker.launchImageLibraryAsync(options);
-      }
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-
-        // Upload image to Cloudinary first
-        const cloudinaryUrl = await uploadImageToCloudinary(imageUri);
-
-        // Then update profile with Cloudinary URL
-        if (type === "profilePicture") {
-          await updateProfilePicture(cloudinaryUrl);
-        } else {
-          await updateBannerImage(cloudinaryUrl);
-        }
-      }
-    } catch (error) {
-      console.error("Image picking error:", error);
-      showError(
-        "Error",
-        error instanceof Error
-          ? error.message
-          : "Failed to pick image. Please try again."
-      );
+  // Remove selected image
+  const removeImage = (type: "profilePicture" | "bannerImage") => {
+    if (type === "profilePicture") {
+      setSelectedProfileImage(null);
+    } else {
+      setSelectedBannerImage(null);
     }
   };
 
-  const updateProfile = async (updateData: ProfileUpdateData) => {
-    if (!currentUser?._id) {
-      showError("Error", "User not found");
-      return false;
+  // Update profile with all fields (text + images)
+  const updateProfile = async (profileData: ProfileUpdateData) => {
+    // Check if we have any data to update
+    const hasTextData = Object.values(profileData).some(value => value !== undefined);
+    const hasImages = selectedProfileImage || selectedBannerImage;
+
+    if (!hasTextData && !hasImages) {
+      showInfo("No Changes", "Please make some changes before saving");
+      return;
     }
 
     setIsUpdating(true);
+    setUpdateType(selectedProfileImage ? "profilePicture" : selectedBannerImage ? "bannerImage" : null);
 
     try {
-      // Determine what type of update this is
-      // Priority-based type determination for clearer user feedback
-      if (updateData.profilePicture) {
-        setUpdateType("profilePicture");
-      } else if (updateData.bannerImage) {
-        setUpdateType("bannerImage");
-      } else if (updateData.verified !== undefined) {
-        setUpdateType("verified");
-      } else if (updateData.bio !== undefined) {
-        setUpdateType("bio");
-      } else if (updateData.location !== undefined) {
-        setUpdateType("location");
-      }
-
-      const response = await api.put("/users/profile", updateData);
-
-      if (response.data.user) {
-        // Refetch user data to get updated information
-        await refetchUser();
-
-        // Show success message based on update type
-        let successMessage = "Profile updated successfully";
-        if (updateType === "profilePicture")
-          successMessage = "Profile picture updated successfully";
-        else if (updateType === "bannerImage")
-          successMessage = "Banner image updated successfully";
-        else if (updateType === "bio")
-          successMessage = "Bio updated successfully";
-        else if (updateType === "location")
-          successMessage = "Location updated successfully";
-        else if (updateType === "verified")
-          successMessage = "Verification status updated successfully";
-
-        showSuccess("Success", successMessage);
-        return true;
-      } else {
-        throw new Error("Failed to update profile");
-      }
-    } catch (error) {
-      console.error("Profile update error:", error);
-
-      let errorMessage = "Failed to update profile";
-      if (updateType === "profilePicture")
-        errorMessage = "Failed to update profile picture";
-      else if (updateType === "bannerImage")
-        errorMessage = "Failed to update banner image";
-      else if (updateType === "bio") errorMessage = "Failed to update bio";
-      else if (updateType === "location")
-        errorMessage = "Failed to update location";
-      else if (updateType === "verified")
-        errorMessage = "Failed to update verification status";
-
-      showError("Error", errorMessage);
-      return false;
+      await updateProfileMutation.mutateAsync(profileData);
     } finally {
       setIsUpdating(false);
       setUpdateType(null);
     }
   };
 
-  const updateProfilePicture = async (imageUrl: string) => {
-    return await updateProfile({ profilePicture: imageUrl });
-  };
-
-  const updateBannerImage = async (imageUrl: string) => {
-    return await updateProfile({ bannerImage: imageUrl });
-  };
-
-  const updateBio = async (bio: string) => {
-    return await updateProfile({ bio });
-  };
-
-  const updateLocation = async (location: string) => {
-    return await updateProfile({ location });
-  };
-
+  // Update username separately
   const updateUsername = async (username: string) => {
-    // Validate username before updating
-    const validation = await validateUsername(username, {
-      platformMode: "xMind",
-    });
-
-    if (!validation.valid) {
-      showError("Invalid Username", validation.errors.join(", "));
+    if (!username.trim()) {
+      showError("Error", "Username cannot be empty");
       return false;
     }
 
-    // Use the dedicated username endpoint instead of general profile update
     try {
-      const response = await api.put("/users/username", { username });
-
-      if (response.data.user) {
-        // Refetch user data to get updated information
-        await refetchUser();
-        return true;
-      } else {
-        throw new Error("Failed to update username");
-      }
-    } catch (error: any) {
-      console.error("Username update error:", error);
-      showError(
-        "Error",
-        error.response?.data?.error || "Failed to update username"
-      );
+      await updateUsernameMutation.mutateAsync(username);
+      return true;
+    } catch (error) {
       return false;
     }
   };
 
-  const updateVerification = async (verified: boolean) => {
-    return await updateProfile({ verified });
+  // Upload images and update profile (legacy function for backward compatibility)
+  const uploadImagesAndUpdateProfile = async (profileData: ProfileUpdateData) => {
+    return updateProfile(profileData);
   };
 
   return {
-    updateProfile,
-    updateProfilePicture,
-    updateBannerImage,
-    updateBio,
-    updateLocation,
-    updateUsername,
-    updateVerification,
-    showImageSourceDialog,
+    // State
+    selectedProfileImage,
+    selectedBannerImage,
     isUpdating,
     updateType,
-    currentUser,
+
+    // Functions
+    updateProfile,
+    updateUsername,
+    uploadImagesAndUpdateProfile,
+    pickImageFromGallery,
+    takePhoto,
+    removeImage,
+
+    // Mutations (for external use if needed)
+    updateProfileMutation,
+    updateUsernameMutation,
   };
 };

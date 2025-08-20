@@ -24,6 +24,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true, // Ensure username is always lowercase
     },
     profilePicture: {
       type: String,
@@ -61,6 +62,22 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save middleware to ensure username is always lowercase
+userSchema.pre('save', function(next) {
+  if (this.username) {
+    this.username = this.username.toLowerCase();
+  }
+  next();
+});
+
+// Pre-update middleware to ensure username is always lowercase
+userSchema.pre('findOneAndUpdate', function(next) {
+  if (this._update.username) {
+    this._update.username = this._update.username.toLowerCase();
+  }
+  next();
+});
 
 const User = mongoose.model("User", userSchema);
 

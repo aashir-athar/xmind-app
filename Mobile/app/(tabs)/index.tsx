@@ -29,12 +29,12 @@ import CustomLoading from "@/components/CustomLoading";
 import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import CustomAlert from "@/components/CustomAlert";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveMargin,
-  responsiveBorderRadius,
-  responsiveFontSize,
+import { 
+  responsiveSize, 
+  responsivePadding, 
+  responsiveMargin, 
+  responsiveBorderRadius, 
+  responsiveFontSize, 
   responsiveIconSize,
   baseScale,
 } from "@/utils/responsive";
@@ -96,12 +96,12 @@ const HomeScreen = () => {
     headerScale.value = withSpring(0.95);
 
     try {
-      await refetchPosts();
+    await refetchPosts();
     } catch (error) {
       console.error("Failed to refresh feed:", error);
     } finally {
-      setIsRefreshing(false);
-      headerScale.value = withSpring(1);
+    setIsRefreshing(false);
+    headerScale.value = withSpring(1);
     }
   };
 
@@ -236,7 +236,7 @@ const HomeScreen = () => {
           <BlurView
             intensity={HEADER_CONFIG.BLUR_INTENSITY}
             tint="light"
-            style={{
+            style={{ 
               paddingHorizontal: responsivePadding(
                 HEADER_CONFIG.PADDING_HORIZONTAL
               ),
@@ -267,7 +267,7 @@ const HomeScreen = () => {
                 >
                   <Image
                     source={require("@/assets/images/xMind-Logo1.png")}
-                    style={{
+                    style={{ 
                       width: responsiveSize(HEADER_CONFIG.ICON_SIZE),
                       height: responsiveSize(HEADER_CONFIG.ICON_SIZE),
                     }}

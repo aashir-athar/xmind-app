@@ -17,7 +17,6 @@ import Animated, {
   interpolate,
   withDelay,
   withSequence,
-  useAnimatedScrollHandler,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -32,12 +31,12 @@ import PostsList from "@/components/PostsList";
 import { format } from "date-fns";
 import { usePosts } from "@/hooks/usePosts";
 import { useProfile } from "@/hooks/useProfile";
-import { useProfileUpdate } from "@/hooks/useProfileUpdate";
+
 import { useAutoVerification } from "@/hooks/useAutoVerification";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import EditProfileModal from "@/components/EditProfileModal";
 import CustomAlert from "@/components/CustomAlert";
-import ProfileImageEditButton from "@/components/ProfileImageEditButton";
+
 import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
 import { 
   responsiveSize, 
@@ -77,13 +76,17 @@ const ProfileScreen = () => {
     refetch: refetchProfile,
   } = useProfile();
 
-  const {
-    showImageSourceDialog,
-    isUpdating: isUpdatingImages,
-    updateType,
-  } = useProfileUpdate();
 
-  const { showInfo, showConfirmation, showSuccess, showError, alertConfig, isVisible, hideAlert } = useCustomAlert();
+
+  const {
+    showInfo,
+    showConfirmation,
+    showSuccess,
+    showError,
+    alertConfig,
+    isVisible,
+    hideAlert,
+  } = useCustomAlert();
 
   // Auto-verification hook
   const {
@@ -99,7 +102,6 @@ const ProfileScreen = () => {
   } = useAutoVerification();
 
   // Animation values
-  const scrollY = useSharedValue(0);
   const headerOpacity = useSharedValue(0);
   const bannerScale = useSharedValue(0.8);
   const avatarScale = useSharedValue(0);
@@ -109,8 +111,8 @@ const ProfileScreen = () => {
   const bannerOverlayOpacity = useSharedValue(0);
 
   useEffect(() => {
-    if (!isLoading && currentUser) {
-      // Staggered entrance animations
+    // Memoized animation setup function
+    const setupAnimations = () => {
       headerOpacity.value = withTiming(1, { duration: 400 });
       bannerScale.value = withSpring(1, { damping: 15 });
       bannerOverlayOpacity.value = withDelay(
@@ -124,20 +126,55 @@ const ProfileScreen = () => {
       );
       statsOpacity.value = withDelay(800, withTiming(1, { duration: 400 }));
       editButtonScale.value = withDelay(1000, withSpring(1, { damping: 15 }));
+    };
+
+    // Memoized reset function
+    const resetAnimations = () => {
+      headerOpacity.value = 0;
+      bannerScale.value = 0.8;
+      bannerOverlayOpacity.value = 0;
+      avatarScale.value = 0;
+      profileInfoOpacity.value = 0;
+      statsOpacity.value = 0;
+      editButtonScale.value = 0;
+    };
+
+    if (!isLoading && currentUser?._id) {
+      setupAnimations();
     }
-  }, [isLoading, currentUser]);
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      resetAnimations();
+    };
+  }, [currentUser?._id]);
+
+  // Additional effect to refresh profile data when currentUser changes
+  useEffect(() => {
+    if (currentUser?._id && !isLoading) {
+      // Refresh profile data to ensure we have the latest information
+      refetchProfile();
+    }
+  }, [currentUser?._id, isLoading]);
+
+  // Debug effect to log currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      console.log("Profile screen - currentUser updated:", {
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        bio: currentUser.bio,
+        location: currentUser.location,
+      });
+    }
+  }, [currentUser?.firstName, currentUser?.lastName, currentUser?.bio, currentUser?.location]);
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     // Header stays fixed, no scroll effects
   }));
 
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: bannerScale.value },
-      {
-        translateY: interpolate(scrollY.value, [0, 200], [0, -50 * baseScale]),
-      },
-    ],
+    transform: [{ scale: bannerScale.value }],
   }));
 
   const bannerOverlayAnimatedStyle = useAnimatedStyle(() => ({
@@ -145,12 +182,7 @@ const ProfileScreen = () => {
   }));
 
   const avatarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: avatarScale.value },
-      {
-        translateY: interpolate(scrollY.value, [0, 100], [0, -20 * baseScale]),
-      },
-    ],
+    transform: [{ scale: avatarScale.value }],
   }));
 
   const profileInfoAnimatedStyle = useAnimatedStyle(() => ({
@@ -196,7 +228,7 @@ const ProfileScreen = () => {
         await handleAutoVerification();
       } else {
         // Show what's missing
-        const missingList = (missingRequirements ?? []).join('\n• ');
+        const missingList = (missingRequirements ?? []).join("\n• ");
         showInfo(
           "Verification Requirements",
           `You need to complete these requirements:\n\n• ${missingList}\n\nKeep building your profile and you'll be automatically verified when ready!`
@@ -209,7 +241,13 @@ const ProfileScreen = () => {
         "Something went wrong. Please try again later."
       );
     }
-  }, [isEligible, missingRequirements, handleAutoVerification, showInfo, showError]);
+  }, [
+    isEligible,
+    missingRequirements,
+    handleAutoVerification,
+    showInfo,
+    showError,
+  ]);
 
   if (isLoading || !currentUser._id) {
     return (
@@ -362,14 +400,7 @@ const ProfileScreen = () => {
               />
             </Animated.View>
 
-            {/* Banner Edit Button */}
-            <ProfileImageEditButton
-              onPress={() => showImageSourceDialog("bannerImage")}
-              isLoading={isUpdatingImages && updateType === "bannerImage"}
-              size="medium"
-              position="top-right"
-              variant="banner"
-            />
+            {/* Banner Edit Button - Moved to EditProfileModal */}
           </Animated.View>
 
           {/* Enhanced Profile Section */}
@@ -429,16 +460,7 @@ const ProfileScreen = () => {
                   />
                 </View>
 
-                {/* Profile Picture Edit Button - Positioned Above */}
-                <ProfileImageEditButton
-                  onPress={() => showImageSourceDialog("profilePicture")}
-                  isLoading={
-                    isUpdatingImages && updateType === "profilePicture"
-                  }
-                  size="small"
-                  position="bottom-right"
-                  variant="profile"
-                />
+                {/* Profile Picture Edit Button - Moved to EditProfileModal */}
               </Animated.View>
 
               <Animated.View style={editButtonAnimatedStyle}>
@@ -761,9 +783,21 @@ const ProfileScreen = () => {
 
         <EditProfileModal
           isVisible={isEditModalVisible}
-          onClose={closeEditModal}
+          onClose={() => {
+            closeEditModal();
+            // Refresh the current user data when modal closes
+            if (currentUser) {
+              refetchProfile();
+            }
+          }}
           formData={formData}
-          saveProfile={saveProfile}
+          saveProfile={async () => {
+            await saveProfile();
+            // Additional refresh after save to ensure UI updates
+            setTimeout(() => {
+              refetchProfile();
+            }, 100);
+          }}
           updateFormField={updateFormField}
           isUpdating={isUpdating}
         />

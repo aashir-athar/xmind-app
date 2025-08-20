@@ -58,7 +58,7 @@ const VerificationProgress: React.FC<VerificationStatusProps> = ({
       1200,
       withTiming(progress, { duration: 800 })
     );
-  }, [isVerified, isEligible, progress]);
+  }, [isVerified, progress]); // Add progress dependency
 
   const containerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: containerScale.value }],

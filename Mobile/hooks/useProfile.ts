@@ -15,17 +15,37 @@ export const useProfile = () => {
     lastName: "",
     bio: "",
     location: "",
+    profilePicture: "",
+    bannerImage: "",
   });
   const { currentUser } = useCurrentUser();
 
   const updateProfileMutation = useMutation({
     mutationFn: (profileData: any) => userApi.updateProfile(api, profileData),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+    onSuccess: async () => {
+      console.log("Profile update successful, refreshing data...");
+      
+      // Invalidate and refetch the current user data
+      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      await queryClient.refetchQueries({ queryKey: ["authUser"] });
+      
+      // Also update the local form data to reflect changes immediately
+      if (currentUser) {
+        setFormData({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          bio: formData.bio,
+          location: formData.location,
+          profilePicture: formData.profilePicture,
+          bannerImage: formData.bannerImage,
+        });
+      }
+      
       setIsEditModalVisible(false);
       showSuccess("Success", "Profile updated successfully!");
     },
     onError: (error: any) => {
+      console.error("Profile update error:", error);
       showError(
         "Error",
         error.response?.data?.error || "Failed to update profile"
@@ -40,6 +60,8 @@ export const useProfile = () => {
         lastName: currentUser.lastName || "",
         bio: currentUser.bio || "",
         location: currentUser.location || "",
+        profilePicture: currentUser.profilePicture || "",
+        bannerImage: currentUser.bannerImage || "",
       });
     }
     setIsEditModalVisible(true);
@@ -57,6 +79,6 @@ export const useProfile = () => {
     saveProfile: () => updateProfileMutation.mutate(formData),
     updateFormField,
     isUpdating: updateProfileMutation.isPending,
-    refetch: () => queryClient.invalidateQueries({ queryKey: ["currentUser"] }),
+    refetch: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
   };
 };

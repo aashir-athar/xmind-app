@@ -103,8 +103,7 @@ export const useAutoVerification = () => {
   }, [
     currentUser,
     userPosts,
-    hasAttemptedAutoVerification,
-    handleAutoVerification,
+    hasAttemptedAutoVerification
   ]);
 
   // Manual verification check
