@@ -571,16 +571,22 @@ interface ValidationConfig {
 ## 📞 **Support & Contact**
 
 ### **Getting Support**
-- **GitHub Issues**: [Create an issue](https://github.com/yourusername/xmind-app/issues)
-- **Documentation**: [Read the docs](https://github.com/yourusername/xmind-app/wiki)
-- **Discussions**: [Join discussions](https://github.com/yourusername/xmind-app/discussions)
-- **Email Support**: support@xmind-app.com
+- **GitHub Issues**: [Create an issue](https://github.com/aashir-athar/xmind-app/issues)
+- **Documentation**: [Read the docs](https://github.com/aashir-athar/xmind-app/wiki)
+- **Discussions**: [Join discussions](https://github.com/aashir-athar/xmind-app/discussions)
+- **Email Support**: aashirathar@gmail.com
 
 ### **Business Inquiries**
-- **Partnerships**: partnerships@xmind-app.com
-- **Enterprise Solutions**: enterprise@xmind-app.com
-- **Investment**: investors@xmind-app.com
-- **Media**: press@xmind-app.com
+- **Partnerships**: aashirathar@gmail.com
+- **Enterprise Solutions**: aashirathar@gmail.com
+- **Investment**: aashirathar@gmail.com
+- **Media**: aashirathar@gmail.com
+
+### **Connect With Me**
+- **GitHub**: [@aashir-athar](https://github.com/aashir-athar)
+- **LinkedIn**: [@aashirathar](https://www.linkedin.com/in/aashirathar/)
+- **Instagram**: [@aashirathar](https://instagram.com/aashirathar)
+- **X (Twitter)**: [@aashirathar](https://x.com/aashirathar)
 
 ---
 
@@ -588,12 +594,12 @@ interface ValidationConfig {
   
   **🌟 Star this repository if you find it helpful! 🌟**
   
-  [![GitHub stars](https://img.shields.io/github/stars/yourusername/xmind-app?style=social)](https://github.com/yourusername/xmind-app)
-  [![GitHub forks](https://img.shields.io/github/forks/yourusername/xmind-app?style=social)](https://github.com/yourusername/xmind-app)
-  [![GitHub issues](https://img.shields.io/github/issues/yourusername/xmind-app)](https://github.com/yourusername/xmind-app/issues)
-  [![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/xmind-app)](https://github.com/yourusername/xmind-app/pulls)
+  [![GitHub stars](https://img.shields.io/github/stars/aashir-athar/xmind-app?style=social)](https://github.com/aashir-athar/xmind-app)
+  [![GitHub forks](https://img.shields.io/github/forks/aashir-athar/xmind-app?style=social)](https://github.com/aashir-athar/xmind-app)
+  [![GitHub issues](https://img.shields.io/github/issues/aashir-athar/xmind-app)](https://github.com/aashir-athar/xmind-app/issues)
+  [![GitHub pull requests](https://img.shields.io/github/issues-pr/aashir-athar/xmind-app)](https://github.com/aashir-athar/xmind-app/pulls)
   
-  **Built with ❤️ by the xMind Development Team**
+  **Built with ❤️ by [Aashir Athar](https://github.com/aashir-athar)**
   
   *Empowering minds to connect, share, and grow together.*
   
