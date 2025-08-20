@@ -418,7 +418,7 @@ const EditProfileModal = ({
                                 left: 0,
                                 right: 0,
                                 bottom: 0,
-                                backgroundColor: `${BRAND_COLORS.PRIMARY}20`,
+                                backgroundColor: `${BRAND_COLORS.PRIMARY}80`,
                                 justifyContent: "center",
                                 alignItems: "center",
                               }}
@@ -426,11 +426,11 @@ const EditProfileModal = ({
                               <Feather
                                 name="camera"
                                 size={responsiveIconSize(24)}
-                                color={BRAND_COLORS.PRIMARY}
+                                color={BRAND_COLORS.SURFACE}
                               />
                               <Text
                                 style={{
-                                  color: BRAND_COLORS.PRIMARY,
+                                  color: BRAND_COLORS.SURFACE,
                                   fontSize: responsiveFontSize(12),
                                   fontWeight: "600",
                                   marginTop: responsiveMargin(4),
@@ -533,7 +533,7 @@ const EditProfileModal = ({
                                   left: 0,
                                   right: 0,
                                   bottom: 0,
-                                  backgroundColor: `${BRAND_COLORS.PRIMARY}20`,
+                                  backgroundColor: `${BRAND_COLORS.PRIMARY}80`,
                                   justifyContent: "center",
                                   alignItems: "center",
                                   borderRadius: responsiveBorderRadius(60),
@@ -542,7 +542,7 @@ const EditProfileModal = ({
                                 <Feather
                                   name="camera"
                                   size={responsiveIconSize(20)}
-                                  color={BRAND_COLORS.PRIMARY}
+                                  color={BRAND_COLORS.SURFACE}
                                 />
                               </View>
                             </>
