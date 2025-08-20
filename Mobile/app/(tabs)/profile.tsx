@@ -31,19 +31,17 @@ import PostsList from "@/components/PostsList";
 import { format } from "date-fns";
 import { usePosts } from "@/hooks/usePosts";
 import { useProfile } from "@/hooks/useProfile";
-
-import { useAutoVerification } from "@/hooks/useAutoVerification";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import EditProfileModal from "@/components/EditProfileModal";
 import CustomAlert from "@/components/CustomAlert";
 
 import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
-import { 
-  responsiveSize, 
-  responsivePadding, 
-  responsiveMargin, 
-  responsiveBorderRadius, 
-  responsiveFontSize, 
+import {
+  responsiveSize,
+  responsivePadding,
+  responsiveMargin,
+  responsiveBorderRadius,
+  responsiveFontSize,
   responsiveIconSize,
   baseScale,
 } from "@/utils/responsive";
@@ -65,6 +63,7 @@ const ProfileScreen = () => {
     isLoading: isRefetching,
   } = usePosts(currentUser?.username);
 
+  // Use the new combined useProfile hook
   const {
     isEditModalVisible,
     openEditModal,
@@ -74,9 +73,19 @@ const ProfileScreen = () => {
     updateFormField,
     isUpdating,
     refetch: refetchProfile,
+    selectedProfileImage,
+    selectedBannerImage,
+    pickImageFromGallery,
+    takePhoto,
+    removeImage,
+    verificationResult,
+    checkVerification,
+    handleAutoVerification,
+    getVerificationProgressValue,
+    getVerificationStatusMessageValue,
+    getVerificationRequirementsValue,
+    isCheckingVerification,
   } = useProfile();
-
-
 
   const {
     showInfo,
@@ -87,19 +96,6 @@ const ProfileScreen = () => {
     isVisible,
     hideAlert,
   } = useCustomAlert();
-
-  // Auto-verification hook
-  const {
-    verificationResult,
-    progress,
-    isChecking,
-    isEligible,
-    isVerified,
-    statusMessage,
-    missingRequirements,
-    checkVerification,
-    handleAutoVerification,
-  } = useAutoVerification();
 
   // Animation values
   const headerOpacity = useSharedValue(0);
@@ -154,6 +150,7 @@ const ProfileScreen = () => {
     if (currentUser?._id && !isLoading) {
       // Refresh profile data to ensure we have the latest information
       refetchProfile();
+      checkVerification();
     }
   }, [currentUser?._id, isLoading]);
 
@@ -167,7 +164,12 @@ const ProfileScreen = () => {
         location: currentUser.location,
       });
     }
-  }, [currentUser?.firstName, currentUser?.lastName, currentUser?.bio, currentUser?.location]);
+  }, [
+    currentUser?.firstName,
+    currentUser?.lastName,
+    currentUser?.bio,
+    currentUser?.location,
+  ]);
 
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     // Header stays fixed, no scroll effects
@@ -223,12 +225,16 @@ const ProfileScreen = () => {
 
   const handleVerificationRequest = useCallback(async () => {
     try {
+      const progress = getVerificationProgressValue();
+      const requirements = getVerificationRequirementsValue();
+      const isEligible = verificationResult?.isEligible || false;
+
       if (isEligible) {
         // User meets all criteria - trigger automatic verification
         await handleAutoVerification();
       } else {
         // Show what's missing
-        const missingList = (missingRequirements ?? []).join("\n• ");
+        const missingList = (requirements ?? []).join("\n• ");
         showInfo(
           "Verification Requirements",
           `You need to complete these requirements:\n\n• ${missingList}\n\nKeep building your profile and you'll be automatically verified when ready!`
@@ -242,8 +248,8 @@ const ProfileScreen = () => {
       );
     }
   }, [
-    isEligible,
-    missingRequirements,
+    verificationResult,
+    getVerificationRequirementsValue,
     handleAutoVerification,
     showInfo,
     showError,
@@ -260,7 +266,7 @@ const ProfileScreen = () => {
         }}
       >
         <CustomLoading
-          message="Loading notifications..."
+          message="Loading profile..."
           size="large"
           variant="screen"
           colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
@@ -307,7 +313,7 @@ const ProfileScreen = () => {
           <BlurView
             intensity={HEADER_CONFIG.BLUR_INTENSITY}
             tint="light"
-            style={{ 
+            style={{
               paddingHorizontal: responsivePadding(
                 HEADER_CONFIG.PADDING_HORIZONTAL
               ),
@@ -360,8 +366,8 @@ const ProfileScreen = () => {
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing} // Add this prop
-              onRefresh={handleRefresh} // Use the new async handler
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
               tintColor={BRAND_COLORS.PRIMARY_LIGHT}
               progressBackgroundColor={BRAND_COLORS.SURFACE}
               colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
@@ -399,8 +405,6 @@ const ProfileScreen = () => {
                 }}
               />
             </Animated.View>
-
-            {/* Banner Edit Button - Moved to EditProfileModal */}
           </Animated.View>
 
           {/* Enhanced Profile Section */}
@@ -422,8 +426,8 @@ const ProfileScreen = () => {
           >
             <View
               className="flex-row justify-between items-end"
-              style={{ 
-                marginTop: responsiveMargin(-40), 
+              style={{
+                marginTop: responsiveMargin(-40),
                 marginBottom: responsiveMargin(20),
               }}
             >
@@ -452,15 +456,13 @@ const ProfileScreen = () => {
                         ? { uri: currentUser.profilePicture }
                         : require("../../assets/images/default-avatar.jpeg")
                     }
-                    style={{ 
-                      width: responsiveSize(120), 
+                    style={{
+                      width: responsiveSize(120),
                       height: responsiveSize(120),
                     }}
                     resizeMode="cover"
                   />
                 </View>
-
-                {/* Profile Picture Edit Button - Moved to EditProfileModal */}
               </Animated.View>
 
               <Animated.View style={editButtonAnimatedStyle}>
@@ -509,7 +511,7 @@ const ProfileScreen = () => {
                   >
                     {currentUser.firstName} {currentUser.lastName}
                   </Text>
-                  {currentUser.user?.verified && (
+                  {currentUser.verified && (
                     <View
                       style={{
                         width: responsiveSize(24),
@@ -753,12 +755,12 @@ const ProfileScreen = () => {
             {/* Verification Status */}
             <VerificationProgress
               isVerified={currentUser?.verified}
-              progress={progress}
-              statusMessage={statusMessage}
-              isEligible={isEligible}
+              progress={getVerificationProgressValue()}
+              statusMessage={getVerificationStatusMessageValue()}
+              isEligible={verificationResult?.isEligible || false}
               onVerificationRequest={handleVerificationRequest}
-              isChecking={isChecking}
-              missingRequirements={missingRequirements}
+              isChecking={isCheckingVerification}
+              missingRequirements={getVerificationRequirementsValue()}
             />
           </View>
 
@@ -783,23 +785,16 @@ const ProfileScreen = () => {
 
         <EditProfileModal
           isVisible={isEditModalVisible}
-          onClose={() => {
-            closeEditModal();
-            // Refresh the current user data when modal closes
-            if (currentUser) {
-              refetchProfile();
-            }
-          }}
+          onClose={closeEditModal}
           formData={formData}
-          saveProfile={async () => {
-            await saveProfile();
-            // Additional refresh after save to ensure UI updates
-            setTimeout(() => {
-              refetchProfile();
-            }, 100);
-          }}
+          saveProfile={saveProfile}
           updateFormField={updateFormField}
           isUpdating={isUpdating}
+          selectedProfileImage={selectedProfileImage}
+          selectedBannerImage={selectedBannerImage}
+          pickImageFromGallery={pickImageFromGallery}
+          takePhoto={takePhoto}
+          removeImage={removeImage}
         />
 
         {/* Custom Alert */}

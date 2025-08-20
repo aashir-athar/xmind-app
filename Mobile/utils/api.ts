@@ -100,40 +100,99 @@ export const useApiClient = (): AxiosInstance => {
   return createApiClient(getToken);
 };
 
+// Add these functions to your existing api.ts file
+
+// User API functions for profile management
 export const userApi = {
-  syncUser: (api: AxiosInstance) => api.post("/users/sync"),
-  getCurrentUser: (api: AxiosInstance) => api.get("/users/me"),
-  updateProfile: (api: AxiosInstance, data: any) =>
-    api.post("/users/profile", data),
-  updateUsername: (api: AxiosInstance, username: string) =>
-    api.put("/users/username", { username }),
-  checkUsernameAvailability: (api: AxiosInstance, username: string) =>
-    api.get(`/users/check-username/${username}`),
-  getUserProfile: (api: AxiosInstance, username: string) =>
+  // Get current user
+  getCurrentUser: (api: any) => api.get("/users/me"),
+
+  // Get user profile by username
+  getUserProfile: (api: any, username: string) =>
     api.get(`/users/profile/${username}`),
-  followUser: (api: AxiosInstance, targetUserId: string) =>
+
+  // Update profile with images (same structure as posts)
+  updateProfile: (api: any, profileData: FormData) =>
+    api.post("/users/profile", profileData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
+  // Update username separately
+  updateUsername: (api: any, username: string) =>
+    api.put("/users/username", { username }),
+
+  // Check username availability
+  checkUsernameAvailability: (api: any, username: string) =>
+    api.get(`/users/check-username/${username}`),
+
+  // Follow/unfollow user
+  followUser: (api: any, targetUserId: string) =>
     api.post(`/users/follow/${targetUserId}`),
-  toggleVerification: (api: AxiosInstance, targetUserId: string) =>
+
+  // Auto-verification
+  autoVerifyUser: (api: any) => api.post("/users/verify"),
+
+  // Toggle verification (admin)
+  toggleVerification: (api: any, targetUserId: string) =>
     api.post(`/users/verify/${targetUserId}`),
+
+  // Sync user data
+  syncUser: (api: any) => api.post("/users/sync"),
 };
 
-
-
+// Post API functions (if not already present)
 export const postApi = {
-  createPost: (api: AxiosInstance, data: { content: string; image?: string }) =>
-    api.post("/posts", data),
-  getPosts: (api: AxiosInstance) => api.get("/posts"),
-  getUserPosts: (api: AxiosInstance, username: string) =>
+  // Get all posts
+  getPosts: (api: any) => api.get("/posts"),
+
+  // Get post by ID
+  getPost: (api: any, postId: string) => api.get(`/posts/${postId}`),
+
+  // Get user posts
+  getUserPosts: (api: any, username: string) =>
     api.get(`/posts/user/${username}`),
-  likePost: (api: AxiosInstance, postId: string) =>
-    api.post(`/posts/${postId}/like`),
-  deletePost: (api: AxiosInstance, postId: string) =>
-    api.delete(`/posts/${postId}`),
+
+  // Create post with image (same structure as profile update)
+  createPost: (api: any, postData: FormData) =>
+    api.post("/posts", postData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
+  // Like/unlike post
+  likePost: (api: any, postId: string) => api.post(`/posts/${postId}/like`),
+
+  // Delete post
+  deletePost: (api: any, postId: string) => api.delete(`/posts/${postId}`),
 };
 
+// Comment API functions (if not already present)
 export const commentApi = {
-  createComment: (api: AxiosInstance, postId: string, content: string) =>
-    api.post(`/comments/post/${postId}`, { content }),
-  deleteComment: (api: AxiosInstance, commentId: string) =>
+  // Create comment
+  createComment: (api: any, postId: string, content: string) =>
+    api.post("/comments", { postId, content }),
+
+  // Delete comment
+  deleteComment: (api: any, commentId: string) =>
     api.delete(`/comments/${commentId}`),
+
+  // Get comments for post
+  getComments: (api: any, postId: string) =>
+    api.get(`/comments/post/${postId}`),
+};
+
+// Notification API functions (if not already present)
+export const notificationApi = {
+  // Get user notifications
+  getNotifications: (api: any) => api.get("/notifications"),
+
+  // Mark notification as read
+  markAsRead: (api: any, notificationId: string) =>
+    api.put(`/notifications/${notificationId}/read`),
+
+  // Mark all notifications as read
+  markAllAsRead: (api: any) => api.put("/notifications/read-all"),
+
+  // Delete notification
+  deleteNotification: (api: any, notificationId: string) =>
+    api.delete(`/notifications/${notificationId}`),
 };
