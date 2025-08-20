@@ -111,6 +111,38 @@ export const useCustomAlert = () => {
     });
   }, [showAlert]);
 
+  const showSignOutConfirmation = useCallback((
+    title: string,
+    message: string,
+    signOut: () => void,
+    onCancel?: () => void
+  ) => {
+    setIsVisible(true);
+    showAlert({
+      title,
+      message,
+      buttons: [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => {
+            setIsVisible(false);
+            onCancel?.();
+          },
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: () => {
+            setIsVisible(false);
+            signOut();
+          },
+        },
+      ],
+      type: "warning",
+    });
+  }, [showAlert]);
+
   const showChoiceDialog = useCallback((
     title: string,
     message: string,
@@ -150,5 +182,6 @@ export const useCustomAlert = () => {
     showConfirmation,
     showDeleteConfirmation,
     showChoiceDialog,
+    showSignOutConfirmation,
   };
 };

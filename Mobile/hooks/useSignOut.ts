@@ -5,7 +5,7 @@ import { useCustomAlert } from "@/hooks/useCustomAlert";
 
 export const useSignOut = () => {
   const { signOut } = useClerk();
-  const { showError, showDeleteConfirmation } = useCustomAlert();
+  const { showError, showSignOutConfirmation, alertConfig, isVisible, hideAlert } = useCustomAlert();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const confirmAndSignOut = useCallback(async () => {
@@ -18,16 +18,23 @@ export const useSignOut = () => {
     } finally {
       setIsSigningOut(false);
     }
-  }, [signOut]);
+  }, [signOut, showError]);
 
   const handleSignOut = useCallback(() => {
     if (isSigningOut) return;
-    showDeleteConfirmation(
-      "Logout",
-      "Are you sure you want to logout?",
-      () => void confirmAndSignOut()
+    
+    showSignOutConfirmation(
+      "Sign Out",
+      "Are you sure you want to sign out?",
+      confirmAndSignOut
     );
-  }, [isSigningOut, confirmAndSignOut, showDeleteConfirmation]);
+  }, [isSigningOut, confirmAndSignOut, showSignOutConfirmation]);
 
-  return { handleSignOut, isSigningOut };
+  return { 
+    handleSignOut, 
+    isSigningOut,
+    alertConfig,
+    isVisible,
+    hideAlert
+  };
 };

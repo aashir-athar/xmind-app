@@ -230,7 +230,7 @@ const HomeScreen = () => {
         />
       </Animated.View>
 
-      <SafeAreaView className="flex-1" edges={["top"]}>
+      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         {/* Enhanced Header with Blur Effect */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView

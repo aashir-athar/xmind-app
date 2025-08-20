@@ -85,6 +85,9 @@ const ProfileScreen = () => {
     getVerificationStatusMessageValue,
     getVerificationRequirementsValue,
     isCheckingVerification,
+    usernameValidation,
+    usernameValidate,
+    usernameValidateErrors,
   } = useProfile();
 
   const {
@@ -255,7 +258,7 @@ const ProfileScreen = () => {
     showError,
   ]);
 
-  if (isLoading || !currentUser._id) {
+  if (isLoading || !currentUser?._id) {
     return (
       <View
         style={{
@@ -307,7 +310,7 @@ const ProfileScreen = () => {
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
       />
 
-      <SafeAreaView className="flex-1" edges={["top"]}>
+      <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         {/* Enhanced Header */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView
@@ -333,7 +336,7 @@ const ProfileScreen = () => {
                     letterSpacing: 0.5,
                   }}
                 >
-                  {currentUser.firstName} {currentUser.lastName}
+                  {currentUser?.firstName} {currentUser?.lastName}
                 </Text>
                 <Text
                   style={{
@@ -345,11 +348,11 @@ const ProfileScreen = () => {
                     ),
                   }}
                 >
-                  {userPosts.length === 0
+                  {userPosts?.length === 0
                     ? "No thoughts yet"
-                    : userPosts.length === 1
+                    : userPosts?.length === 1
                       ? "1 Thought"
-                      : `${userPosts.length} Thoughts`}
+                      : `${userPosts?.length || 0} Thoughts`}
                 </Text>
               </View>
               <SignOutButton />
@@ -380,7 +383,7 @@ const ProfileScreen = () => {
           >
             <Image
               source={
-                currentUser.bannerImage
+                currentUser?.bannerImage
                   ? { uri: currentUser.bannerImage }
                   : require("../../assets/images/default-banner.jpeg")
               }
@@ -452,7 +455,7 @@ const ProfileScreen = () => {
                 >
                   <Image
                     source={
-                      currentUser.profilePicture
+                      currentUser?.profilePicture
                         ? { uri: currentUser.profilePicture }
                         : require("../../assets/images/default-avatar.jpeg")
                     }
@@ -509,9 +512,9 @@ const ProfileScreen = () => {
                       letterSpacing: 0.3,
                     }}
                   >
-                    {currentUser.firstName} {currentUser.lastName}
+                    {currentUser?.firstName} {currentUser?.lastName}
                   </Text>
-                  {currentUser.verified && (
+                  {currentUser?.verified && (
                     <View
                       style={{
                         width: responsiveSize(24),
@@ -543,7 +546,7 @@ const ProfileScreen = () => {
                     fontWeight: "500",
                   }}
                 >
-                  @{currentUser.username}
+                  @{currentUser?.username}
                 </Text>
 
                 <Text
@@ -614,7 +617,7 @@ const ProfileScreen = () => {
                       }}
                     >
                       Joined{" "}
-                      {format(new Date(currentUser.createdAt), "MMMM yyyy")}
+                      {currentUser?.createdAt && format(new Date(currentUser.createdAt), "MMMM yyyy")}
                     </Text>
                   </View>
                 </View>
@@ -736,7 +739,7 @@ const ProfileScreen = () => {
                         color: BRAND_COLORS.ACCENT_YELLOW,
                       }}
                     >
-                      {formatNumber(userPosts.length)}
+                      {formatNumber(userPosts?.length || 0)}
                     </Text>
                   </View>
                   <Text
@@ -795,6 +798,9 @@ const ProfileScreen = () => {
           pickImageFromGallery={pickImageFromGallery}
           takePhoto={takePhoto}
           removeImage={removeImage}
+          usernameValidation={usernameValidation}
+          usernameValidate={usernameValidate}
+          usernameValidateErrors={usernameValidateErrors}
         />
 
         {/* Custom Alert */}

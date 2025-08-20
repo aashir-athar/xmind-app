@@ -621,13 +621,13 @@ function checkLength(username: string, config: ValidationConfig): CheckResult {
   if (username.length < config.minLength) {
     return {
       valid: false,
-      error: `Username must be at least ${config.minLength} characters long.`,
+      error: `Please choose a username with at least ${config.minLength} characters.`,
     };
   }
   if (username.length > config.maxLength) {
     return {
       valid: false,
-      error: `Username must be no more than ${config.maxLength} characters long.`,
+      error: `Your username should be ${config.maxLength} characters or fewer.`,
     };
   }
   return { valid: true };
@@ -642,7 +642,7 @@ function checkCharacters(
     return {
       valid: false,
       error:
-        "Username can only contain lowercase letters, numbers, and underscores.",
+        "Use only lowercase letters, numbers, or underscores in your username.",
     };
   }
   // Platform-specific: For 'x', no hyphens (already in regex)
@@ -650,17 +650,28 @@ function checkCharacters(
 }
 
 // Check 3: Uniqueness (Async; simulated DB) [general best practice]
-async function checkUniqueness(username: string): Promise<CheckResult> {
-  // Mock existing usernames (lowercase)
-  const existingUsernames: Set<string> = new Set([
-    "user1",
-    "john_doe",
-    "example",
-    "admin",
-  ]);
-  if (existingUsernames.has(username.toLowerCase())) {
-    return { valid: false, error: "Username is already taken." };
+async function checkUniqueness(
+  currentUser: string,
+  username: string,
+  existingUsernames: string[] = []
+): Promise<CheckResult> {
+  // Use provided existing usernames or fallback to mock data
+  const usernamesToCheck =
+    existingUsernames.length > 0
+      ? existingUsernames
+      : ["user1", "john_doe", "example", "admin"]; // Fallback mock data
+
+  if (usernamesToCheck.includes(username.toLowerCase())) {
+    if (usernamesToCheck.includes(currentUser.toLowerCase()) && username === currentUser) {
+      return {
+        valid: false,
+        error: "This username is already linked to your account.",
+      };
+    } else {
+      return { valid: false, error: "Sorry, this username is already in use." };
+    }
   }
+
   // Real impl: await db.users.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
   // Consider case-insensitive index in DB
   return { valid: true };
@@ -673,7 +684,10 @@ function checkReserved(
 ): CheckResult {
   const uname = username.toLowerCase();
   if (config.reservedWords.map((w) => w.toLowerCase()).includes(uname)) {
-    return { valid: false, error: "Username is a reserved name." };
+    return {
+      valid: false,
+      error: "This username is reserved. Please choose another.",
+    };
   }
   // Note: domain-like patterns are already blocked by allowedCharsRegex.
   // Keep this as a defense-in-depth check for future regex changes.
@@ -683,7 +697,8 @@ function checkReserved(
   ) {
     return {
       valid: false,
-      error: "Username cannot contain domain extensions.",
+      error:
+        "Usernames cannot include domain extensions like .com, .net, or .io.",
     };
   }
   return { valid: true };
@@ -695,7 +710,8 @@ function checkAbusive(username: string, config: ValidationConfig): CheckResult {
   if (containsWord(normalized, config.abusiveWords)) {
     return {
       valid: false,
-      error: "Username contains inappropriate or abusive language.",
+      error:
+        "Please choose a username without offensive or inappropriate words.",
     };
   }
   // Advanced regex for common variations
@@ -714,7 +730,8 @@ function checkAbusive(username: string, config: ValidationConfig): CheckResult {
   if (abusiveRegexPatterns.some((regex) => regex.test(normalized))) {
     return {
       valid: false,
-      error: "Username contains inappropriate or abusive language.",
+      error:
+        "Please choose a username without offensive or inappropriate words.",
     };
   }
   // In production, use a library like import BadWords from 'bad-words'; if (new BadWords().isProfane(username)) ...
@@ -731,7 +748,8 @@ function checkImpersonation(
   if (containsWord(normalized, config.impersonationKeywords)) {
     return {
       valid: false,
-      error: "Username may impersonate someone else or a brand.",
+      error:
+        "This username might suggest you're someone else. Please pick a different one.",
     };
   }
   // Advanced: Use string similarity (e.g., Levenshtein distance) to famous names
@@ -748,13 +766,15 @@ function checkFormatting(
   if (!config.noLeadingTrailingRegex.test(username.toLowerCase())) {
     return {
       valid: false,
-      error: "Username cannot start or end with an underscore.",
+      error:
+        "Usernames cannot start or end with an underscore. Try a different format.",
     };
   }
   if (!config.noConsecutiveRegex.test(username.toLowerCase())) {
     return {
       valid: false,
-      error: "Username cannot have consecutive underscores.",
+      error:
+        "Avoid using multiple underscores in a row. Please try a different username.",
     };
   }
   // No spaces (already in char check)
@@ -783,7 +803,8 @@ async function checkCrossPlatform(username: string): Promise<CheckResult> {
   if (username.includes("@")) {
     return {
       valid: false,
-      error: "Username cannot contain email-like patterns.",
+      error:
+        "Usernames cannot resemble email addresses. Please remove the '@' symbol.",
     };
   }
   // Real: API calls to other platforms or services
@@ -805,7 +826,8 @@ function checkSecurity(username: string): CheckResult {
   if (dangerousPatterns.some((pattern) => pattern.test(username))) {
     return {
       valid: false,
-      error: "Username contains potentially malicious content.",
+      error:
+        "This username contains unsafe content. Please choose a safer option.",
     };
   }
   // Also, no HTML entities or encoded attacks
@@ -814,8 +836,10 @@ function checkSecurity(username: string): CheckResult {
 
 // Main Validation Function (Async for uniqueness and cross-platform)
 async function validateUsername(
+  currentUser: string,
   username: string,
-  customConfig?: Partial<ValidationConfig>
+  customConfig?: Partial<ValidationConfig>,
+  existingUsernames?: string[]
 ): Promise<{ valid: boolean; errors: string[] }> {
   const config = { ...defaultConfig, ...customConfig };
   const syncChecks: CheckResult[] = [
@@ -830,7 +854,7 @@ async function validateUsername(
   ];
 
   const asyncChecks = await Promise.all([
-    checkUniqueness(username),
+    checkUniqueness(currentUser, username, existingUsernames),
     checkCrossPlatform(username),
   ]);
 

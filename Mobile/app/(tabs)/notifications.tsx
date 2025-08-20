@@ -172,7 +172,7 @@ const NotificationsScreen = () => {
         />
       </Animated.View>
 
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
         {/* Enhanced Header */}
         <Animated.View style={headerAnimatedStyle}>
           <BlurView
