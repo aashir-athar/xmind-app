@@ -3,17 +3,40 @@
 <div align="center">
   <img src="Mobile/assets/images/xMind-Logo1.png" alt="xMind Logo" width="200" height="200">
   
-  [![React Native](https://img.shields.io/badge/React%20Native-0.72+-blue.svg)](https://reactnative.dev/)
-  [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-  [![Expo](https://img.shields.io/badge/Expo-SDK%2049+-blue.svg)](https://expo.dev/)
+  [![React Native](https://img.shields.io/badge/React%20Native-0.79+-blue.svg)](https://reactnative.dev/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-blue.svg)](https://www.typescriptlang.org/)
+  [![Expo](https://img.shields.io/badge/Expo-SDK%2053+-blue.svg)](https://expo.dev/)
   [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-  [![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-green.svg)](https://www.mongodb.com/)
+  [![MongoDB](https://img.shields.io/badge/MongoDB-8.0+-green.svg)](https://www.mongodb.com/)
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](CONTRIBUTING.md)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](http://makeapullrequest.com)
   
-  **The Next Generation of Mindful Social Media**
+  **The Next Generation of Mindful Social Media** 🚀
   
   *Connect. Share. Grow. Mindfully.*
 </div>
+
+---
+
+## 📋 **Table of Contents**
+
+- [🚀 Executive Summary](#-executive-summary)
+- [🌟 Core Features & Capabilities](#-core-features--capabilities)
+- [🏗️ Technical Architecture](#️-technical-architecture--implementation)
+- [🎯 Unique Selling Points](#-unique-selling-points-usp)
+- [📱 User Experience & Interface Design](#-user-experience--interface-design)
+- [🔧 Advanced Features & Capabilities](#-advanced-features--capabilities)
+- [📊 Performance & Scalability](#-performance--scalability)
+- [🔒 Security & Privacy Features](#-security--privacy-features)
+- [🚀 Deployment & DevOps](#-deployment--devops)
+- [📈 Analytics & Monitoring](#-analytics--monitoring)
+- [🧪 Testing & Quality Assurance](#-testing--quality-assurance)
+- [🌟 Future Roadmap & Vision](#-future-roadmap--vision)
+- [🤝 Contributing & Community](#-contributing--community)
+- [📄 License & Legal](#-license--legal)
+- [🙏 Acknowledgments & Credits](#-acknowledgments--credits)
+- [📞 Support & Contact](#-support--contact)
 
 ---
 
@@ -29,6 +52,8 @@
 - **📱 Cross-Platform Excellence**: Seamless experience across iOS and Android
 - **⚡ Performance First**: 60fps animations and instant response times
 - **🌐 Scalable Architecture**: Built to handle millions of users
+- **🤖 AI-Powered Feed**: Proprietary algorithm for optimal content discovery
+- **🔍 Advanced Search**: Multi-entity search with intelligent suggestions
 
 ---
 
@@ -46,7 +71,7 @@
 #### **Comprehensive User Profiles**
 - **High-Resolution Images**: Profile pictures (1:1) and banner images (16:9) with automatic optimization
 - **Rich Bio System**: 160-character bio with formatting and emoji support
-- **Location Services**: Privacy-controlled location sharing with map integration
+- **Location Services**: Privacy-controlled location sharing
 - **Custom Display Names**: Flexible naming with real-time validation
 - **Username System**: Unique, validated usernames with availability checking
 
@@ -159,9 +184,9 @@ Our proprietary algorithm considers multiple factors for optimal content discove
 ### **📱 Frontend Architecture (React Native)**
 
 #### **Core Framework & Performance**
-- **React Native 0.72+**: Latest stable version with performance optimizations
-- **TypeScript 5.0+**: Strict type checking with advanced type features
-- **Expo SDK 49+**: Latest Expo features with native module support
+- **React Native 0.79+**: Latest stable version with performance optimizations
+- **TypeScript 5.8+**: Strict type checking with advanced type features
+- **Expo SDK 53+**: Latest Expo features with native module support
 - **Performance Monitoring**: Real-time performance tracking and optimization
 
 #### **State Management & Data Flow**
@@ -186,13 +211,13 @@ Our proprietary algorithm considers multiple factors for optimal content discove
 
 #### **Server Infrastructure**
 - **Node.js 18+**: Latest LTS with performance and security improvements
-- **Express.js 4.18+**: Minimal, flexible web framework
+- **Express.js 5.1+**: Minimal, flexible web framework
 - **Middleware Architecture**: Extensible request processing pipeline
 - **Error Handling**: Comprehensive error management and logging
 
 #### **Database Design (MongoDB)**
-- **MongoDB 6.0+**: Latest version with advanced aggregation features
-- **Mongoose 7.0+**: Object modeling with TypeScript support
+- **MongoDB 8.0+**: Latest version with advanced aggregation features
+- **Mongoose 8.16+**: Object modeling with TypeScript support
 - **Schema Validation**: Comprehensive data validation and sanitization
 - **Indexing Strategy**: Optimized queries with proper indexing
 - **Change Streams**: Real-time database change notifications
@@ -236,7 +261,38 @@ Our proprietary algorithm considers multiple factors for optimal content discove
 
 ---
 
-## 🎯 **User Experience & Interface Design**
+## 🎯 **Unique Selling Points (USP)**
+
+### **🚀 What Makes xMind Different?**
+
+#### **1. Mindful Design Philosophy**
+- **Mental Health Focus**: Every feature designed with user well-being in mind
+- **Reduced Cognitive Load**: Clean, intuitive interface that doesn't overwhelm
+- **Intentional Interactions**: Purpose-driven features that add real value
+
+#### **2. Proprietary Feed Algorithm**
+- **AI-Powered Ranking**: Multi-factor scoring system for optimal content discovery
+- **Personalized Experience**: Content tailored to individual user preferences
+- **Engagement Optimization**: Maximizes meaningful interactions over passive scrolling
+
+#### **3. Advanced User Experience**
+- **60fps Animations**: Smooth, professional-grade interactions
+- **Responsive Design**: Perfect experience on all device sizes
+- **Accessibility First**: Built for users of all abilities
+
+#### **4. Enterprise-Grade Security**
+- **Clerk Authentication**: Bank-level security with multi-factor authentication
+- **GDPR Compliance**: Full privacy regulation compliance
+- **Data Protection**: End-to-end encryption and secure data handling
+
+#### **5. Scalable Architecture**
+- **Microservices Ready**: Built for horizontal scaling
+- **Cloud-Native**: Optimized for cloud deployment and management
+- **Performance Optimized**: Handles millions of users efficiently
+
+---
+
+## 📱 **User Experience & Interface Design**
 
 ### **Design Philosophy & Principles**
 
@@ -360,7 +416,7 @@ interface ValidationConfig {
 - **Indexing Strategy**: Optimized database indexes for common queries
 - **Query Optimization**: Efficient aggregation pipelines and queries
 - **Connection Pooling**: Optimized database connection management
-- **Caching Layer**: Redis-based caching for frequently accessed data
+- **Caching Layer**: In-memory caching for frequently accessed data
 
 #### **API Performance**
 - **Response Compression**: Gzip compression for all API responses
@@ -408,7 +464,7 @@ interface ValidationConfig {
 
 #### **Prerequisites & Requirements**
 - **Node.js 18+**: Latest LTS version for optimal performance
-- **MongoDB 6.0+**: Database with advanced aggregation features
+- **MongoDB 8.0+**: Database with advanced aggregation features
 - **Expo CLI**: Latest version for React Native development
 - **Development Tools**: VS Code, Android Studio, Xcode (macOS)
 
@@ -465,61 +521,86 @@ interface ValidationConfig {
 ### **Testing Strategy**
 
 #### **Frontend Testing**
-- **Unit Testing**: Jest for component and utility testing
-- **Integration Testing**: React Native Testing Library
-- **E2E Testing**: Detox for end-to-end testing
+- **Manual Testing**: Comprehensive manual testing across devices
 - **Performance Testing**: Performance benchmarking and optimization
+- **Cross-Platform Testing**: iOS and Android compatibility testing
+- **Accessibility Testing**: Screen reader and accessibility compliance
 
 #### **Backend Testing**
-- **API Testing**: Supertest for endpoint testing
+- **API Testing**: Comprehensive endpoint testing
 - **Database Testing**: Database integration and performance testing
 - **Security Testing**: Security vulnerability assessment
 - **Load Testing**: Performance under high load conditions
 
 ### **Code Quality**
 
-#### **Linting & Formatting**
-- **ESLint**: Advanced linting with custom rules
-- **Prettier**: Consistent code formatting
+#### **Development Standards**
 - **TypeScript**: Strict type checking and validation
-- **Husky**: Pre-commit hooks for code quality
+- **ESLint**: Code quality and consistency enforcement
+- **Code Review**: Comprehensive code review process
+- **Documentation**: Inline code documentation and API docs
 
 ---
 
 ## 🌟 **Future Roadmap & Vision**
 
 ### **Phase 2 Features (Q2 2024)**
-- **Video Content**: Advanced video upload and streaming
-- **Live Streaming**: Real-time live content creation
-- **Advanced Analytics**: User insights and content performance
-- **AI Content Moderation**: Automated content filtering
+- **Enhanced Analytics**: User insights and content performance metrics
+- **Advanced Moderation**: Content filtering and community guidelines
+- **Performance Optimization**: Further speed and efficiency improvements
+- **Accessibility Enhancements**: Improved accessibility features
 
 ### **Phase 3 Features (Q3 2024)**
-- **E-commerce Integration**: In-app shopping and monetization
-- **Creator Tools**: Advanced content creation and editing
+- **Creator Tools**: Advanced content creation and editing features
 - **Community Features**: Group creation and management
-- **Advanced Search**: AI-powered content discovery
+- **Advanced Search**: Enhanced search capabilities and filters
+- **Performance Monitoring**: Real-time performance analytics
 
 ### **Long-term Vision (2025+)**
-- **Metaverse Integration**: Virtual reality social experiences
-- **Blockchain Integration**: Decentralized content ownership
-- **Global Expansion**: Multi-language and cultural adaptation
+- **Global Expansion**: Multi-language support and cultural adaptation
 - **Enterprise Solutions**: Business and organization tools
+- **Advanced AI Features**: Machine learning for content recommendations
+- **Scalability Improvements**: Enhanced performance for millions of users
 
 ---
 
 ## 🤝 **Contributing & Community**
 
-### **How to Contribute**
+### **Open Source Contribution**
 
-#### **Development Setup**
+#### **Why Contribute?**
+- **Learn Modern Tech**: Work with cutting-edge React Native and Node.js
+- **Build Portfolio**: Add a professional project to your GitHub profile
+- **Community Impact**: Help build the future of social media
+- **Skill Development**: Improve your full-stack development skills
+
+#### **How to Contribute**
+
+##### **1. Development Setup**
+```bash
+# Fork and clone the repository
+git clone https://github.com/aashir-athar/xmind-app.git
+cd xmind-app
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+# Configure your .env file with your API keys
+
+# Start development server
+npm run dev
+```
+
+##### **2. Contribution Workflow**
 1. **Fork Repository**: Create your own fork of the project
-2. **Clone Locally**: Set up local development environment
-3. **Install Dependencies**: Install all required packages
-4. **Create Feature Branch**: Work on new features in separate branches
-5. **Submit Pull Request**: Submit changes for review and integration
+2. **Create Feature Branch**: `git checkout -b feature/amazing-feature`
+3. **Make Changes**: Implement your feature or fix
+4. **Test Thoroughly**: Ensure all tests pass
+5. **Submit Pull Request**: Create a detailed PR description
 
-#### **Contribution Guidelines**
+##### **3. Contribution Guidelines**
 - **Code Standards**: Follow established coding conventions
 - **Testing Requirements**: Ensure all code is properly tested
 - **Documentation**: Update documentation for new features
@@ -532,6 +613,12 @@ interface ValidationConfig {
 - **Discussions**: Community discussions and Q&A
 - **Documentation**: Comprehensive documentation and guides
 - **Examples**: Code examples and implementation guides
+
+#### **Community Guidelines**
+- **Respectful Communication**: Be kind and constructive
+- **Help Others**: Answer questions and mentor newcomers
+- **Share Knowledge**: Contribute to documentation and examples
+- **Celebrate Success**: Recognize and appreciate contributions
 
 ---
 
@@ -595,7 +682,7 @@ interface ValidationConfig {
   **🌟 Star this repository if you find it helpful! 🌟**
   
   [![GitHub stars](https://img.shields.io/github/stars/aashir-athar/xmind-app?style=social)](https://github.com/aashir-athar/xmind-app)
-  [![GitHub forks](https://img.shields.io/github/forks/aashir-athar/xmind-app?style=social)](https://github.com/aashir-athar/xmind-app)
+  [![GitHub forks](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/aashir-athar/xmind-app)
   [![GitHub issues](https://img.shields.io/github/issues/aashir-athar/xmind-app)](https://github.com/aashir-athar/xmind-app/issues)
   [![GitHub pull requests](https://img.shields.io/github/issues-pr/aashir-athar/xmind-app)](https://github.com/aashir-athar/xmind-app/pulls)
   
