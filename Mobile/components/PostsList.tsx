@@ -1,89 +1,44 @@
-import { View, Text, ActivityIndicator, TouchableOpacity } from "react-native";
-import React, { useState, useEffect } from "react";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
-  interpolate,
-  runOnJS,
-} from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
+import React, { memo, useCallback, useMemo, useState } from "react";
+import { View } from "react-native";
+import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
+import { Feather } from "@expo/vector-icons";
+
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePosts } from "@/hooks/usePosts";
-import { Post } from "@/types";
-import PostCard from "./PostCard";
-import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
+import type { Post } from "@/types";
+
 import CommentsModal from "./CommentsModal";
-import { BRAND_COLORS } from "@/constants/colors";
-import { Feather } from "@expo/vector-icons";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveMargin,
-  responsiveBorderRadius,
-  responsiveFontSize,
-  responsiveIconSize,
-  baseScale,
-} from "@/utils/responsive";
-import CustomLoading from "./CustomLoading";
+import PostCard from "./PostCard";
 
-// New component to handle individual post animations
-const AnimatedPostCard = ({
-  post,
-  index,
-  onLike,
-  onDelete,
-  onComment,
-  currentUser,
-  isLiked,
-}: {
-  post: Post;
-  index: number;
-  onLike: (postId: string) => void;
-  onDelete: (postId: string) => void;
-  onComment: (post: Post) => void;
-  currentUser: any; // Replace with proper type
-  isLiked: boolean;
-}) => {
-  // Animation values for this specific post
-  const translateY = useSharedValue(50 * baseScale);
-  const opacity = useSharedValue(0);
-
-  // Trigger animation on mount
-  useEffect(() => {
-    translateY.value = withDelay(index * 100, withSpring(0, { damping: 15 }));
-    opacity.value = withDelay(index * 100, withTiming(1, { duration: 400 }));
-  }, [index, translateY, opacity]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <PostCard
-        key={post._id}
-        post={post}
-        onLike={onLike}
-        onDelete={onDelete}
-        onComment={onComment}
-        currentUser={currentUser}
-        isLiked={isLiked}
-      />
-    </Animated.View>
-  );
-};
-
-const PostsList = ({
-  username,
-  posts: customPosts,
-}: {
-  username?: string;
+export interface PostsListProps {
+  /** When provided, a custom posts array is rendered instead of fetched feed. */
   posts?: Post[];
-}) => {
+  /** Restrict the fetch to one user's posts. */
+  username?: string;
+  /** Header rendered above the list (composer on home, banner on profile). */
+  ListHeaderComponent?: React.ComponentType<unknown> | React.ReactElement | null;
+}
+
+/**
+ * Feed renderer.
+ *
+ * Why FlashList:
+ *  - Recycles cells aggressively. On a 2GB Android device that's the
+ *    difference between 60fps scroll and dropped frames after ~20 posts.
+ *
+ * Why no per-item entrance animation:
+ *  - The previous implementation animated each card with a 100ms-per-index
+ *    delay. On a list of 25 ranked posts that meant the last card animated
+ *    in 2.5s after mount and any item recycled mid-scroll re-played its
+ *    entrance — a continuous flicker. We removed it. The list now feels
+ *    like the OS instead of a keynote.
+ */
+function PostsListImpl({ posts: customPosts, username, ListHeaderComponent }: PostsListProps) {
+  const { colors, spacing } = useTheme();
   const { currentUser } = useCurrentUser();
   const {
     posts: fetchedPosts,
@@ -95,266 +50,115 @@ const PostsList = ({
     checkIsLiked,
   } = usePosts(username);
 
-  // Use custom posts if provided, otherwise use fetched posts
-  const posts = customPosts || fetchedPosts;
+  const posts = customPosts ?? fetchedPosts;
+
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const selectedPost = useMemo(
+    () =>
+      selectedPostId
+        ? posts.find((p: Post) => p._id === selectedPostId) ?? null
+        : null,
+    [selectedPostId, posts]
+  );
 
-  // Animation values for loading, content, and error states
-  const loadingOpacity = useSharedValue(1);
-  const contentOpacity = useSharedValue(0);
-  const errorOpacity = useSharedValue(0);
-  const retryButtonScale = useSharedValue(1);
+  const handleLike = useCallback(
+    (postId: string) => toggleLike(postId),
+    [toggleLike]
+  );
+  const handleDelete = useCallback(
+    (postId: string) => deletePost(postId),
+    [deletePost]
+  );
+  const handleComment = useCallback((post: Post) => setSelectedPostId(post._id), []);
+  const handleCloseComments = useCallback(() => setSelectedPostId(null), []);
 
-  useEffect(() => {
-    if (customPosts) {
-      // If using custom posts, show content immediately
-      loadingOpacity.value = withTiming(0, { duration: 300 });
-      contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
-    } else if (!isLoading) {
-      // If fetching posts, handle loading states
-      loadingOpacity.value = withTiming(0, { duration: 300 });
-      if (error) {
-        errorOpacity.value = withDelay(300, withTiming(1, { duration: 400 }));
-      } else {
-        contentOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
-      }
-    }
-  }, [
-    isLoading,
-    error,
-    loadingOpacity,
-    contentOpacity,
-    errorOpacity,
-    customPosts,
-  ]);
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<Post>) => (
+      <PostCard
+        post={item}
+        currentUser={currentUser}
+        isLiked={checkIsLiked(item.likes, currentUser)}
+        onLike={handleLike}
+        onComment={handleComment}
+        onDelete={handleDelete}
+      />
+    ),
+    [checkIsLiked, currentUser, handleComment, handleDelete, handleLike]
+  );
 
-  const selectedPost = selectedPostId
-    ? posts.find((p: Post) => p._id === selectedPostId)
-    : null;
+  const keyExtractor = useCallback((item: Post) => item._id, []);
 
-  const handleRetry = () => {
-    retryButtonScale.value = withSpring(0.95, { damping: 15 }, () => {
-      retryButtonScale.value = withSpring(1);
-      runOnJS(refetch)();
-    });
-  };
-
-  const loadingAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: loadingOpacity.value,
-    transform: [
-      {
-        scale: interpolate(loadingOpacity.value, [1, 0], [1, 0.8]),
-      },
-    ],
-  }));
-
-  const contentAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(
-          contentOpacity.value,
-          [0, 1],
-          [20 * baseScale, 0]
-        ),
-      },
-    ],
-  }));
-
-  const errorAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: errorOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(
-          errorOpacity.value,
-          [0, 1],
-          [20 * baseScale, 0]
-        ),
-      },
-    ],
-  }));
-
-  const retryButtonAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: retryButtonScale.value }],
-  }));
-
+  // Loading state — skeleton stack feels like content, not a spinner.
   if (isLoading && !customPosts) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: BRAND_COLORS.BACKGROUND,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <CustomLoading
-          message="Loading minds..."
-          size="large"
-          variant="modal"
-          intensity={8}
-          colors={[`${BRAND_COLORS.PRIMARY}05`, `${BRAND_COLORS.SURFACE}95`]}
-          showDots={true}
-          accessibilityLabel="Custom loading spinner"
-        />
+      <View style={{ paddingHorizontal: spacing.base, gap: spacing.md, marginTop: spacing.md }}>
+        {[0, 1, 2].map((i) => (
+          <View
+            key={i}
+            style={{
+              flexDirection: "row",
+              gap: spacing.md,
+              padding: spacing.base,
+              borderRadius: 20,
+              backgroundColor: colors.surface.primary,
+              borderWidth: 1,
+              borderColor: colors.border.subtle,
+            }}
+          >
+            <Skeleton width={44} height={44} radius={22} />
+            <View style={{ flex: 1, gap: spacing.sm }}>
+              <Skeleton width="40%" height={12} />
+              <Skeleton width="100%" height={12} />
+              <Skeleton width="80%" height={12} />
+            </View>
+          </View>
+        ))}
       </View>
     );
   }
 
   if (error && !customPosts) {
     return (
-      <Animated.View
-        style={[
-          {
-            padding: responsivePadding(40),
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          errorAnimatedStyle,
-        ]}
-      >
-        <View
-          style={{
-            width: responsiveSize(60),
-            height: responsiveSize(60),
-            borderRadius: responsiveBorderRadius(30),
-            backgroundColor: `${BRAND_COLORS.DANGER}15`,
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: responsiveMargin(20),
-          }}
-        >
-          <Feather
-            name="wifi-off"
-            size={responsiveIconSize(24)}
-            color={BRAND_COLORS.DANGER}
-          />
-        </View>
-
-        <Text
-          style={{
-            color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: responsiveFontSize(16),
-            marginBottom: responsiveMargin(20),
-            textAlign: "center",
-          }}
-        >
-          Failed to sync minds
-        </Text>
-
-        <Animated.View style={retryButtonAnimatedStyle}>
-          <TouchableOpacity
-            style={{
-              paddingHorizontal: responsivePadding(28),
-              paddingVertical: responsivePadding(14),
-              borderRadius: responsiveBorderRadius(24),
-              shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: responsiveSize(4) },
-              shadowOpacity: 0.2,
-              shadowRadius: responsiveSize(8),
-              elevation: 6,
-            }}
-            onPress={handleRetry}
-          >
-            <LinearGradient
-              colors={[BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_LIGHT]}
-              style={{
-                paddingHorizontal: responsivePadding(20),
-                paddingVertical: responsivePadding(12),
-                borderRadius: responsiveBorderRadius(20),
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  color: BRAND_COLORS.SURFACE,
-                  fontSize: responsiveFontSize(15),
-                  fontWeight: "700",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Reconnect
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      </Animated.View>
+      <EmptyState
+        icon={<Feather name="wifi-off" size={28} color={colors.tint.danger} />}
+        title="We couldn't reach the feed"
+        description="Probably the network. Your drafts are safe — try again in a moment."
+        action={<Button label="Try again" variant="primary" onPress={() => refetch()} />}
+      />
     );
   }
 
-  if (posts.length === 0) {
+  if (!posts || posts.length === 0) {
     return (
-      <Animated.View
-        style={[
-          {
-            padding: responsivePadding(40),
-            alignItems: "center",
-            justifyContent: "center",
-          },
-          contentAnimatedStyle,
-        ]}
-      >
-        <View
-          style={{
-            width: responsiveSize(80),
-            height: responsiveSize(80),
-            borderRadius: responsiveBorderRadius(40),
-            backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: responsiveMargin(20),
-            borderWidth: 2,
-            borderColor: `${BRAND_COLORS.PRIMARY}20`,
-          }}
-        >
-          <Feather
-            name="feather"
-            size={responsiveIconSize(32)}
-            color={BRAND_COLORS.PRIMARY}
-          />
-        </View>
-        <Text
-          style={{
-            color: BRAND_COLORS.TEXT_SECONDARY,
-            fontSize: responsiveFontSize(16),
-            textAlign: "center",
-            lineHeight: responsiveSize(24),
-          }}
-        >
-          No thoughts shared yet{"\n"}Start expressing your mind!
-        </Text>
-      </Animated.View>
+      <EmptyState
+        icon={<Feather name="feather" size={28} color={colors.tint.primary} />}
+        title="Your feed is quiet"
+        description="Follow a few people and post one thought. The feed fills out fast."
+      />
     );
   }
 
   return (
-    <Animated.View style={[{ flex: 1 }, contentAnimatedStyle]}>
+    <View style={{ flex: 1 }}>
       <FlashList<Post>
         data={posts}
-        renderItem={({ item, index }: ListRenderItemInfo<Post>) => (
-          <AnimatedPostCard
-            post={item}
-            index={index}
-            onLike={toggleLike}
-            onDelete={deletePost}
-            onComment={(post: Post) => setSelectedPostId(post._id)}
-            currentUser={currentUser}
-            isLiked={checkIsLiked(item.likes, currentUser)}
-          />
-        )}
-        keyExtractor={(item) => item._id}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={ListHeaderComponent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 140 }}
+        // Saves memory on long sessions; cells off-screen are detached.
+        removeClippedSubviews
       />
 
-      {selectedPost && (
-        <CommentsModal
-          selectedPost={selectedPost}
-          onClose={() => setSelectedPostId(null)}
-        />
-      )}
-    </Animated.View>
+      {selectedPost ? (
+        <CommentsModal selectedPost={selectedPost} onClose={handleCloseComments} />
+      ) : null}
+    </View>
   );
-};
+}
+
+export const PostsList = memo(PostsListImpl);
+PostsList.displayName = "PostsList";
 
 export default PostsList;

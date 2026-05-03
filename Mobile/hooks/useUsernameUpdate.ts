@@ -7,14 +7,18 @@ export const useUsernameUpdate = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const { showSuccess, showError, showInfo } = useCustomAlert();
+  // Always called from inside <UsernameEditModal> — native Alert avoids
+  // the stacked-Modal restriction in React Native.
+  const { showSuccess, showError, showInfo } = useCustomAlert({
+    useNative: true,
+  });
 
   const updateUsernameMutation = useMutation({
     mutationFn: (username: string) => userApi.updateUsername(api, username),
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       showSuccess(
-        "Username Updated!",
-        `Your username has been successfully changed to @${response.data.user.username}`
+        "Username updated",
+        `Your handle is now @${response?.data?.user?.username ?? ""}.`
       );
 
       // Invalidate and refetch user data
@@ -25,8 +29,8 @@ export const useUsernameUpdate = () => {
     },
     onError: (error: any) => {
       const errorMessage =
-        error.response?.data?.error || "Failed to update username";
-      showError("Update Failed", errorMessage);
+        error.response?.data?.error || "Try a different one in a moment.";
+      showError("Couldn't update username", errorMessage);
       setIsUpdating(false);
     },
   });
@@ -35,35 +39,29 @@ export const useUsernameUpdate = () => {
     const candidate = (newUsername ?? "").trim();
 
     if (candidate.length === 0) {
-      showError("Invalid Username", "Username cannot be empty");
+      showError("Pick a username", "It can't be blank.");
       return false;
     }
     if (candidate.length < 4 || candidate.length > 15) {
-      showError(
-        "Invalid Username",
-        "Username must be between 4 and 15 characters"
-      );
+      showError("Username length", "Use 4 to 15 characters.");
       return false;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(candidate)) {
       showError(
-        "Invalid Username",
-        "Username can only contain letters, numbers, and underscores"
+        "Invalid characters",
+        "Letters, numbers, and underscores only."
       );
       return false;
     }
     if (candidate.startsWith("_") || candidate.endsWith("_")) {
       showError(
-        "Invalid Username",
-        "Username cannot start or end with an underscore"
+        "Watch the edges",
+        "A username can't start or end with an underscore."
       );
       return false;
     }
     if (candidate.includes("__")) {
-      showError(
-        "Invalid Username",
-        "Username cannot have consecutive underscores"
-      );
+      showError("Trim the underscores", "No double underscores allowed.");
       return false;
     }
     const reservedWords = [
@@ -93,7 +91,7 @@ export const useUsernameUpdate = () => {
       "netlify",
     ];
     if (reservedWords.includes(candidate.toLowerCase())) {
-      showError("Invalid Username", "Username contains a reserved word");
+      showError("Reserved word", "That handle is reserved — try another.");
       return false;
     }
 

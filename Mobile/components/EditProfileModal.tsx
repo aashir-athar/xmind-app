@@ -1,46 +1,27 @@
+import React, { memo, useCallback } from "react";
 import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  TextInput,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
   ActionSheetIOS,
   Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
 } from "react-native";
-import React, { useEffect } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
-  interpolate,
-} from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import { BRAND_COLORS } from "@/constants/colors";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveMargin,
-  responsiveBorderRadius,
-  responsiveFontSize,
-  responsiveIconSize,
-  baseScale,
-} from "@/utils/responsive";
-import { ProfileFormData } from "@/hooks/useProfile";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 
-const { width, height } = Dimensions.get("window");
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Surface } from "@/components/ui/Surface";
+import { Text } from "@/components/ui/Text";
+import { TextField } from "@/components/ui/TextField";
+import { useTheme } from "@/hooks/useTheme";
+import type { ProfileFormData } from "@/hooks/useProfile";
 
-interface EditProfileModalProps {
+export interface EditProfileModalProps {
   isVisible: boolean;
   onClose: () => void;
   formData: ProfileFormData;
@@ -57,7 +38,20 @@ interface EditProfileModalProps {
   usernameValidateErrors: string[];
 }
 
-const EditProfileModal = ({
+/**
+ * Edit profile sheet.
+ *
+ * Form architecture:
+ *  - Each field is independently controlled by `updateFormField`. We
+ *    don't run username validation on every keystroke — that's the
+ *    parent hook's job, debounced upstream.
+ *  - Image actions go through a platform-aware menu: ActionSheet on iOS,
+ *    Alert on Android. Both routes terminate in the same handlers.
+ *
+ * Performance: the modal is mounted in the tree but only paints when
+ * `isVisible`, which keeps form state hot without a re-mount cost.
+ */
+function EditProfileModalImpl({
   isVisible,
   onClose,
   formData,
@@ -69,756 +63,234 @@ const EditProfileModal = ({
   pickImageFromGallery,
   takePhoto,
   removeImage,
+  usernameValidation,
   usernameValidate,
   usernameValidateErrors,
-  usernameValidation,
-}: EditProfileModalProps) => {
+}: EditProfileModalProps) {
+  const { colors, spacing, radii } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Animation values (same structure as CommentsModal)
-  const modalOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.9);
-  const headerOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (isVisible) {
-      modalOpacity.value = withTiming(1, { duration: 300 });
-      modalScale.value = withSpring(1, { damping: 15 });
-      headerOpacity.value = withDelay(150, withTiming(1, { duration: 200 }));
-      contentOpacity.value = withDelay(250, withTiming(1, { duration: 400 }));
-    } else {
-      modalOpacity.value = withTiming(0, { duration: 200 });
-      modalScale.value = withTiming(0.9, { duration: 200 });
-      headerOpacity.value = withTiming(0, { duration: 100 });
-      contentOpacity.value = withTiming(0, { duration: 100 });
-    }
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (formData?.username) {
-      usernameValidation(formData.username);
-    }
-  }, [formData?.username]);
-
-  const handleClose = () => {
-    onClose();
-  };
-
-  const handleSave = async () => {
-    await saveProfile();
-  };
-
-  const showImageActionSheet = (type: "profilePicture" | "bannerImage") => {
-    const title =
-      type === "profilePicture" ? "Profile Picture" : "Banner Image";
-    const hasCurrentImage =
-      type === "profilePicture" ? selectedProfileImage : selectedBannerImage;
-
-    const options = ["Choose from Library", "Take Photo"];
-    const destructiveButtonIndex = hasCurrentImage ? 2 : -1;
-
-    if (hasCurrentImage) {
-      options.push("Remove Image");
-    }
-    options.push("Cancel");
-
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title: `Select ${title}`,
-          options: options,
-          cancelButtonIndex: options.length - 1,
-          destructiveButtonIndex: destructiveButtonIndex,
-        },
-        (buttonIndex) => {
-          switch (buttonIndex) {
-            case 0:
-              pickImageFromGallery(type);
-              break;
-            case 1:
-              takePhoto(type);
-              break;
-            case 2:
-              if (hasCurrentImage) {
-                removeImage(type);
-              }
-              break;
+  const showImageMenu = useCallback(
+    (type: "profilePicture" | "bannerImage") => {
+      const options = ["Cancel", "Choose from gallery", "Take photo", "Remove"];
+      if (Platform.OS === "ios") {
+        ActionSheetIOS.showActionSheetWithOptions(
+          { options, cancelButtonIndex: 0, destructiveButtonIndex: 3 },
+          (i: number) => {
+            if (i === 1) pickImageFromGallery(type);
+            if (i === 2) takePhoto(type);
+            if (i === 3) removeImage(type);
           }
-        }
-      );
-    } else {
-      Alert.alert(`Select ${title}`, "", [
-        {
-          text: "Choose from Library",
-          onPress: () => pickImageFromGallery(type),
-        },
-        { text: "Take Photo", onPress: () => takePhoto(type) },
-        ...(hasCurrentImage
-          ? [
-              {
-                text: "Remove Image",
-                onPress: () => removeImage(type),
-                style: "destructive" as const,
-              },
-            ]
-          : []),
-        { text: "Cancel", style: "cancel" as const },
-      ]);
-    }
-  };
+        );
+      } else {
+        Alert.alert("Update image", undefined, [
+          { text: "Choose from gallery", onPress: () => pickImageFromGallery(type) },
+          { text: "Take photo", onPress: () => takePhoto(type) },
+          { text: "Remove", style: "destructive", onPress: () => removeImage(type) },
+          { text: "Cancel", style: "cancel" },
+        ]);
+      }
+    },
+    [pickImageFromGallery, removeImage, takePhoto]
+  );
 
-  const modalAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: modalOpacity.value,
-    transform: [{ scale: modalScale.value }],
-  }));
-
-  const headerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(
-          headerOpacity.value,
-          [0, 1],
-          [-10 * baseScale, 0]
-        ),
-      },
-    ],
-  }));
-
-  const contentAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(
-          contentOpacity.value,
-          [0, 1],
-          [20 * baseScale, 0]
-        ),
-      },
-    ],
-  }));
+  const onSave = useCallback(async () => {
+    const ok = formData.username ? await usernameValidation(formData.username) : true;
+    if (!ok) return;
+    await saveProfile();
+  }, [formData.username, saveProfile, usernameValidation]);
 
   return (
     <Modal
       visible={isVisible}
-      animationType="none"
-      presentationStyle="pageSheet"
-      transparent={true}
-      style={{ flex: 1 }}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+      statusBarTranslucent
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: `${BRAND_COLORS.PRIMARY_DARK}40`,
-        }}
-      >
-        <BlurView
-          intensity={20}
-          tint="dark"
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Animated.View
-            style={[
-              {
-                flex: 1,
-                width: width - responsiveSize(32),
-                maxHeight: height * 0.9,
-                borderRadius: responsiveBorderRadius(28),
-                overflow: "hidden",
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(20) },
-                shadowOpacity: 0.3,
-                shadowRadius: responsiveSize(30),
-                elevation: 20,
-              },
-              modalAnimatedStyle,
-            ]}
+      <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
+        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={insets.top + 8}
+            style={{ flex: 1, padding: spacing.base }}
           >
-            <LinearGradient
-              colors={[BRAND_COLORS.SURFACE, `${BRAND_COLORS.BACKGROUND}95`]}
-              style={{ flex: 1 }}
+            <Surface
+              variant="solid"
+              radius={radii.xl}
+              style={{
+                flex: 1,
+                overflow: "hidden",
+                borderWidth: 1,
+                borderColor: colors.border.subtle,
+              }}
             >
-              {/* Enhanced Header - matching CommentsModal pattern */}
-              <Animated.View style={headerAnimatedStyle}>
-                <BlurView
-                  intensity={10}
-                  tint="light"
+              {/* Header */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border.subtle,
+                  gap: spacing.md,
+                }}
+              >
+                <IconButton accessibilityLabel="Close" onPress={onClose}>
+                  <Feather name="x" size={20} color={colors.text.primary} />
+                </IconButton>
+                <Text variant="title" tone="primary" style={{ flex: 1 }}>
+                  Edit profile
+                </Text>
+                <Button label="Save" size="sm" loading={isUpdating} onPress={onSave} />
+              </View>
+
+              <ScrollView
+                contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Banner */}
+                <Pressable
+                  onPress={() => showImageMenu("bannerImage")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Change banner image"
                   style={{
-                    paddingHorizontal: responsivePadding(24),
-                    paddingVertical: responsivePadding(20),
-                    borderBottomWidth: 1,
-                    borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
+                    height: 140,
+                    borderRadius: radii.lg,
+                    overflow: "hidden",
+                    backgroundColor: colors.surface.secondary,
+                    justifyContent: "center",
+                    alignItems: "center",
                   }}
                 >
+                  {selectedBannerImage || formData.bannerImage ? (
+                    <Image
+                      source={{ uri: selectedBannerImage || formData.bannerImage }}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Feather name="image" size={28} color={colors.text.tertiary} />
+                  )}
                   <View
                     style={{
-                      flexDirection: "row",
+                      position: "absolute",
+                      right: spacing.sm,
+                      bottom: spacing.sm,
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: "rgba(0,0,0,0.55)",
                       alignItems: "center",
-                      justifyContent: "space-between",
+                      justifyContent: "center",
                     }}
                   >
-                    <TouchableOpacity
-                      onPress={handleClose}
-                      style={{
-                        paddingHorizontal: responsivePadding(16),
-                        paddingVertical: responsivePadding(8),
-                        borderRadius: responsiveBorderRadius(20),
-                        backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: BRAND_COLORS.TEXT_SECONDARY,
-                          fontSize: responsiveFontSize(16),
-                          fontWeight: "600",
-                        }}
-                      >
-                        Cancel
-                      </Text>
-                    </TouchableOpacity>
+                    <Feather name="camera" size={16} color="#fff" />
+                  </View>
+                </Pressable>
 
+                {/* Avatar */}
+                <View style={{ alignItems: "center", marginTop: -64 }}>
+                  <Pressable
+                    onPress={() => showImageMenu("profilePicture")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change profile picture"
+                    style={{
+                      width: 96,
+                      height: 96,
+                      borderRadius: 48,
+                      overflow: "hidden",
+                      borderWidth: 4,
+                      borderColor: colors.surface.primary,
+                      backgroundColor: colors.surface.secondary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {selectedProfileImage || formData.profilePicture ? (
+                      <Image
+                        source={{ uri: selectedProfileImage || formData.profilePicture }}
+                        style={{ width: 96, height: 96 }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Feather name="user" size={28} color={colors.text.tertiary} />
+                    )}
                     <View
                       style={{
-                        paddingHorizontal: responsivePadding(20),
-                        paddingVertical: responsivePadding(8),
-                        borderRadius: responsiveBorderRadius(20),
-                        backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
-                        borderWidth: 1,
-                        borderColor: `${BRAND_COLORS.PRIMARY}20`,
+                        position: "absolute",
+                        right: 0,
+                        bottom: 0,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: colors.tint.primary,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 2,
+                        borderColor: colors.surface.primary,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: responsiveFontSize(18),
-                          fontWeight: "800",
-                          color: BRAND_COLORS.TEXT_PRIMARY,
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        Edit Profile
-                      </Text>
+                      <Feather name="camera" size={12} color={colors.text.onTint} />
                     </View>
+                  </Pressable>
+                </View>
 
-                    <TouchableOpacity
-                      onPress={handleSave}
-                      disabled={isUpdating}
-                      style={{
-                        paddingHorizontal: responsivePadding(16),
-                        paddingVertical: responsivePadding(8),
-                        borderRadius: responsiveBorderRadius(20),
-                        backgroundColor: isUpdating
-                          ? `${BRAND_COLORS.BORDER_LIGHT}40`
-                          : BRAND_COLORS.PRIMARY,
-                        shadowColor: BRAND_COLORS.PRIMARY,
-                        shadowOffset: { width: 0, height: responsiveSize(4) },
-                        shadowOpacity: isUpdating ? 0 : 0.3,
-                        shadowRadius: responsiveSize(8),
-                        elevation: isUpdating ? 0 : 6,
-                      }}
-                    >
-                      {isUpdating ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={BRAND_COLORS.TEXT_SECONDARY}
-                        />
-                      ) : (
-                        <Text
-                          style={{
-                            color: BRAND_COLORS.SURFACE,
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                          }}
-                        >
-                          Save
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </BlurView>
-              </Animated.View>
-
-              {/* Enhanced Content - matching CommentsModal pattern */}
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={insets.bottom + responsiveSize(60)}
-                style={{ flex: 1 }}
-              >
-                <ScrollView
-                  style={{ flex: 1 }}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <Animated.View
-                    style={[
-                      { padding: responsivePadding(24) },
-                      contentAnimatedStyle,
-                    ]}
-                  >
-                    {/* Banner Image Section */}
-                    <View style={{ marginBottom: responsiveMargin(24) }}>
-                      <Text
-                        style={{
-                          fontSize: responsiveFontSize(16),
-                          fontWeight: "700",
-                          color: BRAND_COLORS.TEXT_PRIMARY,
-                          marginBottom: responsiveMargin(12),
-                        }}
-                      >
-                        Banner Image
-                      </Text>
-
-                      <TouchableOpacity
-                        onPress={() => showImageActionSheet("bannerImage")}
-                        style={{
-                          width: "100%",
-                          height: responsiveSize(120),
-                          borderRadius: responsiveBorderRadius(16),
-                          borderWidth: 2,
-                          borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                          borderStyle: "dashed",
-                          overflow: "hidden",
-                          backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                        }}
-                      >
-                        {selectedBannerImage ? (
-                          <>
-                            <Image
-                              source={{ uri: selectedBannerImage }}
-                              style={{ width: "100%", height: "100%" }}
-                              resizeMode="cover"
-                            />
-                            <View
-                              style={{
-                                position: "absolute",
-                                top: responsiveSize(8),
-                                right: responsiveSize(8),
-                                backgroundColor: `${BRAND_COLORS.DANGER}90`,
-                                borderRadius: responsiveBorderRadius(12),
-                                padding: responsivePadding(4),
-                              }}
-                            >
-                              <Feather
-                                name="x"
-                                size={responsiveIconSize(12)}
-                                color={BRAND_COLORS.SURFACE}
-                              />
-                            </View>
-                          </>
-                        ) : formData.bannerImage ? (
-                          <>
-                            <Image
-                              source={{ uri: formData.bannerImage }}
-                              style={{ width: "100%", height: "100%" }}
-                              resizeMode="cover"
-                            />
-                            <View
-                              style={{
-                                position: "absolute",
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: `${BRAND_COLORS.PRIMARY}80`,
-                                justifyContent: "center",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Feather
-                                name="camera"
-                                size={responsiveIconSize(24)}
-                                color={BRAND_COLORS.SURFACE}
-                              />
-                              <Text
-                                style={{
-                                  color: BRAND_COLORS.SURFACE,
-                                  fontSize: responsiveFontSize(12),
-                                  fontWeight: "600",
-                                  marginTop: responsiveMargin(4),
-                                }}
-                              >
-                                Change Banner
-                              </Text>
-                            </View>
-                          </>
-                        ) : (
-                          <View
-                            style={{
-                              flex: 1,
-                              justifyContent: "center",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Feather
-                              name="image"
-                              size={responsiveIconSize(32)}
-                              color={BRAND_COLORS.TEXT_SECONDARY}
-                            />
-                            <Text
-                              style={{
-                                color: BRAND_COLORS.TEXT_SECONDARY,
-                                fontSize: responsiveFontSize(14),
-                                fontWeight: "500",
-                                marginTop: responsiveMargin(8),
-                              }}
-                            >
-                              Add Banner Image
-                            </Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Profile Picture Section */}
-                    <View style={{ marginBottom: responsiveMargin(24) }}>
-                      <Text
-                        style={{
-                          fontSize: responsiveFontSize(16),
-                          fontWeight: "700",
-                          color: BRAND_COLORS.TEXT_PRIMARY,
-                          marginBottom: responsiveMargin(12),
-                        }}
-                      >
-                        Profile Picture
-                      </Text>
-
-                      <View style={{ alignItems: "center" }}>
-                        <TouchableOpacity
-                          onPress={() => showImageActionSheet("profilePicture")}
-                          style={{
-                            width: responsiveSize(120),
-                            height: responsiveSize(120),
-                            borderRadius: responsiveBorderRadius(60),
-                            borderWidth: 2,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderStyle: "dashed",
-                            overflow: "hidden",
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          }}
-                        >
-                          {selectedProfileImage ? (
-                            <>
-                              <Image
-                                source={{ uri: selectedProfileImage }}
-                                style={{ width: "100%", height: "100%" }}
-                                resizeMode="cover"
-                              />
-                              <View
-                                style={{
-                                  position: "absolute",
-                                  top: responsiveSize(4),
-                                  right: responsiveSize(4),
-                                  backgroundColor: `${BRAND_COLORS.DANGER}90`,
-                                  borderRadius: responsiveBorderRadius(10),
-                                  padding: responsivePadding(2),
-                                }}
-                              >
-                                <Feather
-                                  name="x"
-                                  size={responsiveIconSize(10)}
-                                  color={BRAND_COLORS.SURFACE}
-                                />
-                              </View>
-                            </>
-                          ) : formData.profilePicture ? (
-                            <>
-                              <Image
-                                source={{ uri: formData.profilePicture }}
-                                style={{ width: "100%", height: "100%" }}
-                                resizeMode="cover"
-                              />
-                              <View
-                                style={{
-                                  position: "absolute",
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  backgroundColor: `${BRAND_COLORS.PRIMARY}80`,
-                                  justifyContent: "center",
-                                  alignItems: "center",
-                                  borderRadius: responsiveBorderRadius(60),
-                                }}
-                              >
-                                <Feather
-                                  name="camera"
-                                  size={responsiveIconSize(20)}
-                                  color={BRAND_COLORS.SURFACE}
-                                />
-                              </View>
-                            </>
-                          ) : (
-                            <View
-                              style={{
-                                flex: 1,
-                                justifyContent: "center",
-                                alignItems: "center",
-                              }}
-                            >
-                              <Feather
-                                name="user"
-                                size={responsiveIconSize(32)}
-                                color={BRAND_COLORS.TEXT_SECONDARY}
-                              />
-                              <Text
-                                style={{
-                                  color: BRAND_COLORS.TEXT_SECONDARY,
-                                  fontSize: responsiveFontSize(12),
-                                  fontWeight: "500",
-                                  marginTop: responsiveMargin(4),
-                                }}
-                              >
-                                Add Photo
-                              </Text>
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Form Fields */}
-                    <View style={{ gap: responsiveSize(20) }}>
-                      {/* First Name */}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            marginBottom: responsiveMargin(8),
-                          }}
-                        >
-                          First Name
-                        </Text>
-                        <TextInput
-                          style={{
-                            borderWidth: 1,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderRadius: responsiveBorderRadius(12),
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          }}
-                          placeholder="Enter your first name"
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData.firstName}
-                          onChangeText={(text) =>
-                            updateFormField("firstName", text)
-                          }
-                        />
-                      </View>
-
-                      {/* Last Name */}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            marginBottom: responsiveMargin(8),
-                          }}
-                        >
-                          Last Name
-                        </Text>
-                        <TextInput
-                          style={{
-                            borderWidth: 1,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderRadius: responsiveBorderRadius(12),
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          }}
-                          placeholder="Enter your last name"
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData.lastName}
-                          onChangeText={(text) =>
-                            updateFormField("lastName", text)
-                          }
-                        />
-                      </View>
-
-                      {/* Username with validation */}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            marginBottom: responsiveMargin(8),
-                          }}
-                        >
-                          Username
-                        </Text>
-                        <TextInput
-                          style={{
-                            borderWidth: 1,
-                            borderColor: usernameValidate 
-                              ? BRAND_COLORS.SUCCESS 
-                              : (usernameValidateErrors?.length || 0) > 0 
-                                ? BRAND_COLORS.DANGER 
-                                : `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderRadius: responsiveBorderRadius(12),
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          }}
-                          placeholder="Enter your username"
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData?.username || ""}
-                          onChangeText={(text) =>
-                            updateFormField("username", text.toLowerCase())
-                          }
-                          autoCapitalize="none"
-                        />
-                        {/* Username validation display */}
-                        {(usernameValidateErrors?.length || 0) > 0 && (
-                          <View style={{ marginTop: responsiveMargin(8) }}>
-                            {usernameValidateErrors?.map((error, index) => (
-                              <View
-                                key={index}
-                                style={{
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  marginBottom: responsiveMargin(4),
-                                }}
-                              >
-                                <Feather
-                                  name="alert-circle"
-                                  size={responsiveIconSize(14)}
-                                  color={BRAND_COLORS.DANGER}
-                                  style={{ marginRight: responsiveMargin(6) }}
-                                />
-                                <Text
-                                  style={{
-                                    fontSize: responsiveFontSize(12),
-                                    color: BRAND_COLORS.DANGER,
-                                    fontWeight: "500",
-                                    flex: 1,
-                                  }}
-                                >
-                                  {error}
-                                </Text>
-                              </View>
-                            ))}
-                          </View>
-                        )}
-                        {usernameValidate && (formData?.username?.length || 0) > 0 && (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              marginTop: responsiveMargin(8),
-                            }}
-                          >
-                            <Feather
-                              name="check-circle"
-                              size={responsiveIconSize(14)}
-                              color={BRAND_COLORS.SUCCESS}
-                              style={{ marginRight: responsiveMargin(6) }}
-                            />
-                            <Text
-                              style={{
-                                fontSize: responsiveFontSize(12),
-                                color: BRAND_COLORS.SUCCESS,
-                                fontWeight: "500",
-                              }}
-                            >
-                              Username is available
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Bio */}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            marginBottom: responsiveMargin(8),
-                          }}
-                        >
-                          Bio
-                        </Text>
-                        <TextInput
-                          style={{
-                            borderWidth: 1,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderRadius: responsiveBorderRadius(12),
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                            minHeight: responsiveSize(100),
-                            textAlignVertical: "top",
-                          }}
-                          placeholder="Tell us about yourself..."
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData.bio}
-                          onChangeText={(text) => updateFormField("bio", text)}
-                          multiline
-                          numberOfLines={4}
-                          maxLength={160}
-                        />
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(12),
-                            color: BRAND_COLORS.TEXT_SECONDARY,
-                            textAlign: "right",
-                            marginTop: responsiveMargin(4),
-                          }}
-                        >
-                          {(formData?.bio?.length || 0)}/160
-                        </Text>
-                      </View>
-
-                      {/* Location */}
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: responsiveFontSize(16),
-                            fontWeight: "700",
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            marginBottom: responsiveMargin(8),
-                          }}
-                        >
-                          Location
-                        </Text>
-                        <TextInput
-                          style={{
-                            borderWidth: 1,
-                            borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                            borderRadius: responsiveBorderRadius(12),
-                            padding: responsivePadding(16),
-                            fontSize: responsiveFontSize(16),
-                            color: BRAND_COLORS.TEXT_PRIMARY,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                          }}
-                          placeholder="Where are you located?"
-                          placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                          value={formData.location}
-                          onChangeText={(text) =>
-                            updateFormField("location", text)
-                          }
-                        />
-                      </View>
-                    </View>
-
-                    {/* Bottom Spacing */}
-                    <View style={{ height: responsiveSize(40) }} />
-                  </Animated.View>
-                </ScrollView>
-              </KeyboardAvoidingView>
-            </LinearGradient>
-          </Animated.View>
-        </BlurView>
+                {/* Fields */}
+                <TextField
+                  label="First name"
+                  value={formData.firstName}
+                  onChangeText={(t) => updateFormField("firstName", t)}
+                  placeholder="First name"
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+                <TextField
+                  label="Last name"
+                  value={formData.lastName}
+                  onChangeText={(t) => updateFormField("lastName", t)}
+                  placeholder="Last name"
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+                <TextField
+                  label="Username"
+                  value={formData.username}
+                  onChangeText={(t) => updateFormField("username", t.toLowerCase())}
+                  placeholder="username"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  error={usernameValidate ? undefined : usernameValidateErrors[0]}
+                  helper="Letters, numbers, underscores. 3–30 characters."
+                />
+                <TextField
+                  label="Bio"
+                  value={formData.bio}
+                  onChangeText={(t) => updateFormField("bio", t)}
+                  placeholder="A short line about you"
+                  multiline
+                  maxLength={160}
+                  helper={`${formData.bio.length}/160`}
+                  style={{ height: 96, textAlignVertical: "top" }}
+                />
+                <TextField
+                  label="Location"
+                  value={formData.location}
+                  onChangeText={(t) => updateFormField("location", t)}
+                  placeholder="City, country (optional)"
+                />
+              </ScrollView>
+            </Surface>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </View>
     </Modal>
   );
-};
+}
+
+export const EditProfileModal = memo(EditProfileModalImpl);
+EditProfileModal.displayName = "EditProfileModal";
 
 export default EditProfileModal;

@@ -1,172 +1,87 @@
-import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
-import { BRAND_COLORS } from "@/constants/colors";
-import { User } from "@/types";
+import React, { memo, useCallback } from "react";
+import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { Feather } from "@expo/vector-icons";
-import { 
-  responsiveSize, 
-  responsivePadding, 
-  responsiveMargin, 
-  responsiveBorderRadius, 
-  responsiveFontSize, 
-  responsiveIconSize
-} from "@/utils/responsive";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 
-interface UserSearchResultProps {
+import { Avatar } from "@/components/ui/Avatar";
+import { Text } from "@/components/ui/Text";
+import { useTheme } from "@/hooks/useTheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import type { User } from "@/types";
+
+export interface UserSearchResultProps {
   user: User;
 }
 
-const UserSearchResult = ({ user }: UserSearchResultProps) => {
+/**
+ * Search-result row.
+ * Tapping the row routes to the right profile (own vs. someone else's)
+ * — symmetry the previous version got right and we preserve.
+ */
+function UserSearchResultImpl({ user }: UserSearchResultProps) {
+  const { colors } = useTheme();
   const router = useRouter();
   const { currentUser } = useCurrentUser();
-  const isOwnProfile = currentUser?._id === user._id;
 
-  const handleUserPress = () => {
-    if (isOwnProfile) {
-      // Navigate to own profile
+  const onPress = useCallback(() => {
+    if (currentUser?._id === user._id) {
       router.push("/(tabs)/profile");
     } else {
-      // Navigate to user profile
       router.push({
         pathname: "/user-profile",
-        params: {
-          userId: user._id,
-          username: user.username,
-        },
+        params: { userId: user._id, username: user.username },
       });
     }
-  };
+  }, [currentUser?._id, router, user._id, user.username]);
 
   return (
-    <TouchableOpacity
-      onPress={handleUserPress}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: responsivePadding(16),
-        paddingHorizontal: responsivePadding(20),
-        borderBottomWidth: 1,
-        borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-      }}
-      activeOpacity={0.7}
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: colors.overlay.press }}
+      className="flex-row items-center gap-md px-lg py-md border-t border-subtle"
+      style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
     >
-      <View
-        style={{
-          width: responsiveSize(56),
-          height: responsiveSize(56),
-          borderRadius: responsiveBorderRadius(28),
-          marginRight: responsiveMargin(16),
-          overflow: "hidden",
-          borderWidth: 2,
-          borderColor: `${BRAND_COLORS.PRIMARY}25`,
-          shadowColor: BRAND_COLORS.PRIMARY,
-          shadowOffset: { width: 0, height: responsiveSize(2) },
-          shadowOpacity: 0.15,
-          shadowRadius: responsiveSize(4),
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Image
-          source={
-            user.profilePicture
-              ? { uri: user.profilePicture }
-              : require("@/assets/images/default-avatar.jpeg")
-          }
-          style={{ width: responsiveSize(56), height: responsiveSize(56) }}
-          resizeMode="cover"
-        />
-      </View>
+      <Avatar
+        source={user.profilePicture}
+        name={`${user.firstName} ${user.lastName}`}
+        size={48}
+      />
 
-      <View style={{ flex: 1, marginLeft: responsiveMargin(16) }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: responsiveMargin(4),
-          }}
-        >
-          <Text
-            style={{
-              fontSize: responsiveFontSize(16),
-              fontWeight: "700",
-              color: BRAND_COLORS.TEXT_PRIMARY,
-              letterSpacing: 0.2,
-            }}
-          >
+      <View className="flex-1 min-w-0">
+        <View className="flex-row items-center gap-xs">
+          <Text variant="subtitle" tone="primary" numberOfLines={1}>
             {user.firstName} {user.lastName}
           </Text>
-          {user.verified && (
+          {user.verified ? (
             <View
-              style={{
-                width: responsiveSize(18),
-                height: responsiveSize(18),
-                borderRadius: responsiveBorderRadius(9),
-                backgroundColor: BRAND_COLORS.PRIMARY,
-                justifyContent: "center",
-                alignItems: "center",
-                marginLeft: responsiveMargin(8),
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(1) },
-                shadowOpacity: 0.3,
-                shadowRadius: responsiveSize(2),
-                elevation: 2,
-              }}
+              className="w-[16px] h-[16px] rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.tint.primary }}
             >
-              <Text
-                style={{
-                  color: BRAND_COLORS.SURFACE,
-                  fontSize: responsiveFontSize(10),
-                  fontWeight: "700",
-                }}
-              >
-                ✓
-              </Text>
+              <MaterialCommunityIcons name="check" size={10} color={colors.text.onTint} />
             </View>
-          )}
+          ) : null}
         </View>
-
-        <Text
-          style={{
-            fontSize: responsiveFontSize(14),
-            color: BRAND_COLORS.PRIMARY,
-            fontWeight: "600",
-            marginBottom: responsiveMargin(6),
-            letterSpacing: 0.1,
-          }}
-        >
+        <Text variant="bodySm" tone="tertiary">
           @{user.username}
         </Text>
-
-        {user.bio && (
+        {user.bio ? (
           <Text
-            style={{
-              fontSize: responsiveFontSize(14),
-              color: BRAND_COLORS.TEXT_SECONDARY,
-              lineHeight: responsiveSize(20),
-            }}
+            variant="bodySm"
+            tone="secondary"
+            numberOfLines={2}
+            className="mt-[2px]"
           >
             {user.bio}
           </Text>
-        )}
+        ) : null}
       </View>
 
-      <View
-        style={{
-          width: responsiveSize(32),
-          height: responsiveSize(32),
-          borderRadius: responsiveBorderRadius(16),
-          backgroundColor: `${BRAND_COLORS.PRIMARY}10`,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Feather name="chevron-right" size={responsiveIconSize(16)} color={BRAND_COLORS.PRIMARY} />
-      </View>
-    </TouchableOpacity>
+      <Feather name="chevron-right" size={18} color={colors.text.tertiary} />
+    </Pressable>
   );
-};
+}
+
+export const UserSearchResult = memo(UserSearchResultImpl, (prev, next) => prev.user._id === next.user._id);
+UserSearchResult.displayName = "UserSearchResult";
 
 export default UserSearchResult;

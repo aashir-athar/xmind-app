@@ -1,130 +1,84 @@
-import React from "react";
-import { TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { memo } from "react";
+import { ActivityIndicator, Pressable, type ViewStyle } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { BRAND_COLORS } from "@/constants/colors";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveBorderRadius,
-  responsiveIconSize,
-  responsiveMargin,
-} from "@/utils/responsive";
 
-interface ProfileImageEditButtonProps {
+import { useTheme } from "@/hooks/useTheme";
+
+export interface ProfileImageEditButtonProps {
   onPress: () => void;
   isLoading?: boolean;
   size?: "small" | "medium" | "large";
   position?: "top-right" | "bottom-right" | "center" | "above-profile";
   variant?: "profile" | "banner";
+  style?: ViewStyle;
 }
 
-export const ProfileImageEditButton: React.FC<ProfileImageEditButtonProps> = ({
+/**
+ * Floating edit-image affordance pinned over an image. Themed via
+ * `useTheme` so it adapts to dark mode automatically.
+ */
+function ProfileImageEditButtonImpl({
   onPress,
   isLoading = false,
   size = "medium",
   position = "bottom-right",
   variant = "profile",
-}) => {
-  // Size configurations
-  const sizeConfig = {
-    small: {
-      buttonSize: responsiveSize(32),
-      iconSize: responsiveIconSize(14),
-      padding: responsivePadding(6),
-    },
-    medium: {
-      buttonSize: responsiveSize(40),
-      iconSize: responsiveIconSize(18),
-      padding: responsivePadding(8),
-    },
-    large: {
-      buttonSize: responsiveSize(48),
-      iconSize: responsiveIconSize(22),
-      padding: responsivePadding(10),
-    },
-  };
+  style,
+}: ProfileImageEditButtonProps) {
+  const { colors, spacing } = useTheme();
 
-  const config = sizeConfig[size];
+  const dim = size === "small" ? 32 : size === "large" ? 48 : 40;
+  const iconSize = size === "small" ? 14 : size === "large" ? 22 : 18;
 
-  // Position configurations
-  const positionConfig = {
-    "top-right": {
-      top: responsivePadding(8),
-      right: responsivePadding(8),
-    },
-    "bottom-right": {
-      bottom: responsivePadding(8),
-      right: responsivePadding(8),
-    },
-    "center": {
-      top: responsivePadding(8),
-      left: responsivePadding(8),
-      transform: [
-        { translateX: -config.buttonSize / 2 },
-        { translateY: -config.buttonSize / 2 },
-      ],
-    },
-    "above-profile": {
-      top: responsiveMargin(-20),
-      right: responsivePadding(8),
-    },
-  };
+  const positionStyle: ViewStyle =
+    position === "top-right"
+      ? { top: spacing.sm, right: spacing.sm }
+      : position === "bottom-right"
+      ? { bottom: spacing.sm, right: spacing.sm }
+      : position === "above-profile"
+      ? { top: -spacing.lg, right: spacing.sm }
+      : { top: spacing.sm, left: spacing.sm };
 
-  const positionStyle = positionConfig[position];
-
-  // Variant-specific styling
-  const variantConfig = {
-    profile: {
-      backgroundColor: BRAND_COLORS.PRIMARY,
-      borderColor: BRAND_COLORS.SURFACE,
-      iconColor: BRAND_COLORS.SURFACE,
-    },
-    banner: {
-      backgroundColor: BRAND_COLORS.SURFACE,
-      borderColor: BRAND_COLORS.PRIMARY,
-      iconColor: BRAND_COLORS.PRIMARY,
-    },
-  };
-
-  const variantStyle = variantConfig[variant];
+  const isProfile = variant === "profile";
 
   return (
-    <TouchableOpacity
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Edit image"
+      accessibilityState={{ busy: isLoading }}
       onPress={onPress}
       disabled={isLoading}
-      style={{
-        position: "absolute",
-        width: config.buttonSize,
-        height: config.buttonSize,
-        borderRadius: responsiveBorderRadius(
-          config.buttonSize / 2
-        ),
-        backgroundColor: variantStyle.backgroundColor,
-        borderWidth: 2,
-        borderColor: variantStyle.borderColor,
-        justifyContent: "center",
-        alignItems: "center",
-        shadowColor: BRAND_COLORS.PRIMARY,
-        shadowOffset: { width: 0, height: responsiveSize(2) },
-        shadowOpacity: 0.2,
-        shadowRadius: responsiveSize(4),
-        elevation: 4,
-        zIndex: 10,
-        ...positionStyle,
-      }}
-      activeOpacity={0.8}
+      style={[
+        {
+          position: "absolute",
+          width: dim,
+          height: dim,
+          borderRadius: dim / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: isProfile ? colors.tint.primary : colors.surface.primary,
+          borderWidth: 2,
+          borderColor: isProfile ? colors.surface.primary : colors.tint.primary,
+          zIndex: 10,
+        },
+        positionStyle,
+        style,
+      ]}
     >
       {isLoading ? (
-        <ActivityIndicator size="small" color={variantStyle.iconColor} />
+        <ActivityIndicator size="small" color={isProfile ? colors.text.onTint : colors.tint.primary} />
       ) : (
         <Feather
           name="edit-3"
-          size={config.iconSize}
-          color={variantStyle.iconColor}
+          size={iconSize}
+          color={isProfile ? colors.text.onTint : colors.tint.primary}
         />
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
-};
+}
+
+export const ProfileImageEditButton = memo(ProfileImageEditButtonImpl);
+ProfileImageEditButton.displayName = "ProfileImageEditButton";
 
 export default ProfileImageEditButton;

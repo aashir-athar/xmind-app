@@ -169,7 +169,7 @@ export const getVerificationStatusMessage = (
   postCount: number = 0
 ): string => {
   if (user.verified) {
-    return "Your account is verified and authentic";
+    return "You're verified.";
   }
 
   const result = checkVerificationEligibility(user, postCount);
@@ -177,18 +177,18 @@ export const getVerificationStatusMessage = (
   const remaining = result.missingRequirements.length;
 
   if (result.isEligible) {
-    return "Ready for verification! Tap 'Request' to get verified";
+    return "You're ready. Tap Request to get verified.";
   }
 
-  // Smart progress messaging based on completion level
+  // Goal-gradient phrasing: closer to the finish line, sharper the line.
   if (progress >= 80) {
-    return `Almost there! ${remaining} step${remaining === 1 ? "" : "s"} remaining`;
+    return `Almost there — ${remaining} ${remaining === 1 ? "step" : "steps"} left.`;
   } else if (progress >= 50) {
-    return `Great progress! Complete ${remaining} more requirement${remaining === 1 ? "" : "s"}`;
+    return `Halfway there. ${remaining} ${remaining === 1 ? "thing" : "things"} left.`;
   } else if (progress >= 25) {
-    return `Getting started - ${remaining} requirement${remaining === 1 ? "" : "s"} to complete`;
+    return `Good start. ${remaining} ${remaining === 1 ? "thing" : "things"} left.`;
   } else {
-    return `Build your profile to unlock verification`;
+    return "Finish your profile to start the path to verification.";
   }
 };
 

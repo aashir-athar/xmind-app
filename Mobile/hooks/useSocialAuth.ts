@@ -5,7 +5,9 @@ import { useCustomAlert } from "@/hooks/useCustomAlert";
 export const useSocialAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { startSSOFlow } = useSSO();
-  const { showError } = useCustomAlert();
+  // Social auth runs over Clerk's web modal flow; our CustomAlert (a
+  // Modal) wouldn't reliably stack on top. Use native Alert instead.
+  const { showError } = useCustomAlert({ useNative: true });
 
   const handleSocialAuth = async (strategy: "oauth_google" | "oauth_apple") => {
     setIsLoading(true);
@@ -18,8 +20,8 @@ export const useSocialAuth = () => {
       console.log("Error in social auth", err);
       const provider = strategy === "oauth_google" ? "Google" : "Apple";
       showError(
-        "Error",
-        `Failed to sign in with ${provider}. Please try again.`
+        "Sign-in didn't go through",
+        `${provider} couldn't complete the sign-in. Try once more.`
       );
     } finally {
       setIsLoading(false);

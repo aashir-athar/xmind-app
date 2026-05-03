@@ -1,95 +1,78 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { memo, useEffect } from "react";
+import { View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
   Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
 } from "react-native-reanimated";
-import { BRAND_COLORS } from "@/constants/colors";
-import { BlurView } from "expo-blur";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveMargin,
-  responsiveBorderRadius,
-  responsiveFontSize,
-  responsiveIconSize,
-  baseScale,
-} from "@/utils/responsive";
 
-const NoNotificationsFound = () => {
+import { Text } from "@/components/ui/Text";
+import { useTheme } from "@/hooks/useTheme";
+
+/**
+ * Empty notifications state.
+ *
+ * The previous implementation drove the icon pulse with `setInterval`
+ * — a JS-thread loop that allocated work every second forever and was
+ * never cleaned up reliably. We swapped to a single `withRepeat` driver
+ * on a shared value so the animation stays on the UI thread and stops
+ * automatically when the component unmounts.
+ */
+function NoNotificationsFoundImpl() {
+  const { colors, spacing, radii } = useTheme();
   const pulse = useSharedValue(1);
 
-  const animatedIconStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        scale: withTiming(pulse.value, {
-          duration: 1000,
-          easing: Easing.inOut(Easing.ease),
-        }),
-      },
-    ],
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1.08, { duration: 1100, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true
+    );
+  }, [pulse]);
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
   }));
 
-  React.useEffect(() => {
-    pulse.value = 1.1;
-    const interval = setInterval(() => {
-      pulse.value = pulse.value === 1 ? 1.1 : 1;
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <View style={styles.container}>
-      <Animated.View style={animatedIconStyle}>
-        <Feather
-          name="bell"
-          size={responsiveIconSize(80)}
-          color={BRAND_COLORS.ICON_SECONDARY}
-        />
+    <View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.huge,
+        gap: spacing.base,
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            width: 80,
+            height: 80,
+            borderRadius: radii.pill,
+            backgroundColor: colors.surface.secondary,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          iconStyle,
+        ]}
+      >
+        <Feather name="bell" size={32} color={colors.tint.primary} />
       </Animated.View>
-      <Text style={styles.title}>No notifications yet</Text>
-      <Text style={styles.description}>
-        When people like, comment, or follow you, you&apos;ll see it here.
+      <Text variant="title" tone="primary" align="center">
+        It's quiet in here
+      </Text>
+      <Text variant="body" tone="secondary" align="center" style={{ maxWidth: 280 }}>
+        Reactions, replies, and follows land here. Posting is the fastest way to start one.
       </Text>
     </View>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: responsivePadding(32),
-    minHeight: 400,
-  },
-  blurContainer: {
-    alignItems: "center",
-    padding: responsivePadding(24),
-    borderRadius: responsiveBorderRadius(60),
-    backgroundColor: `${BRAND_COLORS.SURFACE}80`,
-    shadowColor: BRAND_COLORS.PRIMARY_DARK,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  title: {
-    fontSize: responsiveFontSize(24),
-    fontWeight: "600",
-    color: BRAND_COLORS.TEXT_SECONDARY,
-    marginTop: responsiveMargin(16),
-    marginBottom: responsiveMargin(8),
-  },
-  description: {
-    fontSize: responsiveFontSize(16),
-    color: BRAND_COLORS.PLACEHOLDER,
-    textAlign: "center",
-    maxWidth: 240,
-    lineHeight: 24,
-  },
-});
+export const NoNotificationsFound = memo(NoNotificationsFoundImpl);
+NoNotificationsFound.displayName = "NoNotificationsFound";
 
 export default NoNotificationsFound;

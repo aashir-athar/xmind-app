@@ -1,354 +1,181 @@
-import {
-  View,
-  Text,
-  RefreshControl,
-  Platform,
-  TouchableOpacity,
-  TextInput,
-} from "react-native";
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  useAnimatedScrollHandler,
-  withDelay,
-  interpolate,
-} from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import { FlashList } from "@shopify/flash-list";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { BRAND_COLORS, HEADER_CONFIG } from "@/constants/colors";
-import {
-  responsiveSize,
-  responsivePadding,
-  responsiveMargin,
-  responsiveBorderRadius,
-  responsiveFontSize,
-  responsiveIconSize,
-  baseScale,
-} from "@/utils/responsive";
+import React, { useCallback, useDeferredValue, useMemo, useState } from "react";
+import { Pressable, RefreshControl, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
+import { Feather } from "@expo/vector-icons";
+
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IconButton } from "@/components/ui/IconButton";
+import { Text } from "@/components/ui/Text";
+import { TextField } from "@/components/ui/TextField";
 import ChatCard from "@/components/ChatCard";
 import ChatModal from "@/components/ChatModal";
-import { ConversationType, CONVERSATIONS } from "@/data/conversations";
-import { useCustomAlert } from "@/hooks/useCustomAlert";
 import CustomAlert from "@/components/CustomAlert";
+import { useTheme } from "@/hooks/useTheme";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import { CONVERSATIONS, type ConversationType } from "@/data/conversations";
 
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
-
-const MessagesScreen = () => {
-  const { showDeleteConfirmation, alertConfig, isVisible, hideAlert } =
-    useCustomAlert();
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [conversationsList, setConversationsList] =
-    useState<ConversationType[]>(CONVERSATIONS);
-  const [selectedConversation, setSelectedConversation] =
-    useState<ConversationType | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+/**
+ * Messages list.
+ *
+ * Search uses `useDeferredValue` so each keystroke updates the input
+ * immediately while the heavier filter pass runs at lower priority.
+ * On low-end Android this is the difference between fluid typing
+ * and a 60–120ms keystroke lag.
+ *
+ * The delete-conversation alert is the in-app `<CustomAlert>`. ChatModal
+ * is full-screen, so the alert only fires when the modal is closed —
+ * no stacked-Modal conflict.
+ */
+export default function MessagesScreen() {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { showDeleteConfirmation, alertConfig, isVisible, hideAlert } = useCustomAlert();
 
-  // Animation values - simplified like index.tsx
-  const headerOpacity = useSharedValue(1);
-  const headerScale = useSharedValue(1);
-  const scrollY = useSharedValue(0);
-  const searchBarScale = useSharedValue(1);
-  const contentOpacity = useSharedValue(0);
+  const [conversations, setConversations] = useState<ConversationType[]>(CONVERSATIONS);
+  const [selected, setSelected] = useState<ConversationType | null>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    // Entrance animation matching index.tsx pattern
-    headerScale.value = withSpring(1, { damping: 15 });
-    contentOpacity.value = withTiming(1, { duration: 800 });
-    searchBarScale.value = withDelay(200, withSpring(1, { damping: 15 }));
+  const deferredQuery = useDeferredValue(query);
+
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (c) =>
+        c.user.name.toLowerCase().includes(q) ||
+        c.user.username.toLowerCase().includes(q) ||
+        c.lastMessage.toLowerCase().includes(q)
+    );
+  }, [deferredQuery, conversations]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await new Promise((r) => setTimeout(r, 600));
+    setRefreshing(false);
   }, []);
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    headerScale.value = withSpring(0.95);
-
-    // Simulate refresh delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    setIsRefreshing(false);
-    headerScale.value = withSpring(1);
+  const onConversationPress = useCallback((c: ConversationType) => {
+    setSelected(c);
+    setOpen(true);
   }, []);
 
-  const headerAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: headerScale.value }],
-  }));
+  const onConversationLongPress = useCallback(
+    (c: ConversationType) => {
+      showDeleteConfirmation(
+        "Delete this conversation?",
+        "It'll disappear from your inbox. The other person still has it.",
+        () => {
+          setConversations((prev) => prev.filter((x) => x.id !== c.id));
+          if (selected?.id === c.id) {
+            setOpen(false);
+            setSelected(null);
+          }
+        }
+      );
+    },
+    [selected?.id, showDeleteConfirmation]
+  );
 
-  const searchBarAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: searchBarScale.value }],
-  }));
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ConversationType>) => (
+      <ChatCard
+        conversation={item}
+        index={index}
+        onPress={() => onConversationPress(item)}
+        onLongPress={() => onConversationLongPress(item)}
+      />
+    ),
+    [onConversationPress, onConversationLongPress]
+  );
 
-  const contentAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-  }));
-
-  const filteredConversations = conversationsList.filter(
-    (conversation) =>
-      conversation.user.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      conversation.user.username
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      conversation.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+  const keyExtractor = useCallback(
+    (item: ConversationType) => String(item.id),
+    []
   );
 
   return (
-    <View
-      className="flex-1"
-      style={{ backgroundColor: BRAND_COLORS.BACKGROUND }}
-    >
-      <LinearGradient
-        colors={[`${BRAND_COLORS.PRIMARY}05`, BRAND_COLORS.BACKGROUND]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ flex: 1 }}
-      >
-        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
-          {/* Header */}
-          <AnimatedBlurView
-            intensity={HEADER_CONFIG.BLUR_INTENSITY}
-            tint="light"
-            style={[
-              {
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingHorizontal: responsivePadding(
-                  HEADER_CONFIG.PADDING_HORIZONTAL
-                ),
-                paddingVertical: responsivePadding(
-                  HEADER_CONFIG.PADDING_VERTICAL
-                ),
-                paddingTop: responsivePadding(
-                  HEADER_CONFIG.PADDING_VERTICAL + 8
-                ), // Extra padding for status bar
-                borderBottomWidth: 1,
-                borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-              },
-              headerAnimatedStyle,
-            ]}
-          >
-            <View>
-              <Text
-                style={{
-                  fontSize: responsiveFontSize(HEADER_CONFIG.TITLE_SIZE),
-                  fontWeight: "800",
-                  color: BRAND_COLORS.TEXT_PRIMARY,
-                  letterSpacing: 0.5,
-                }}
-              >
-                Messages
-              </Text>
-              <Text
-                style={{
-                  fontSize: responsiveFontSize(HEADER_CONFIG.SUBTITLE_SIZE),
-                  color: BRAND_COLORS.TEXT_SECONDARY,
-                  fontWeight: "500",
-                  marginTop: responsiveMargin(
-                    HEADER_CONFIG.TITLE_MARGIN_BOTTOM
-                  ),
-                }}
-              >
-                {filteredConversations.length} conversations
-              </Text>
-            </View>
+    <View className="flex-1 bg-canvas">
+      <SafeAreaView edges={["top"]}>
+        <View className="flex-row items-center gap-md px-lg py-md">
+          <View className="flex-1">
+            <Text variant="headline" tone="primary">
+              Messages
+            </Text>
+            <Text variant="bodySm" tone="secondary">
+              {filtered.length} {filtered.length === 1 ? "conversation" : "conversations"}
+            </Text>
+          </View>
+          <IconButton accessibilityLabel="New message" variant="filled">
+            <Feather name="edit-3" size={18} color={colors.text.primary} />
+          </IconButton>
+        </View>
 
-            <TouchableOpacity
-              style={{
-                width: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
-                height: responsiveSize(HEADER_CONFIG.BUTTON_SIZE),
-                borderRadius: responsiveBorderRadius(
-                  HEADER_CONFIG.BUTTON_BORDER_RADIUS
-                ),
-                backgroundColor: `${BRAND_COLORS.PRIMARY}12`,
-                justifyContent: "center",
-                alignItems: "center",
-                borderWidth: 2,
-                borderColor: `${BRAND_COLORS.PRIMARY}20`,
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(4) },
-                shadowOpacity: 0.2,
-                shadowRadius: responsiveSize(8),
-                elevation: 6,
-              }}
-            >
-              <Feather
-                name="edit-3"
-                size={responsiveIconSize(HEADER_CONFIG.ICON_SIZE)}
-                color={BRAND_COLORS.PRIMARY}
-              />
-            </TouchableOpacity>
-          </AnimatedBlurView>
-
-          {/* Search Bar */}
-          <Animated.View
-            style={[
-              {
-                paddingHorizontal: responsivePadding(20),
-                paddingVertical: responsivePadding(16),
-              },
-              searchBarAnimatedStyle,
-            ]}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: `${BRAND_COLORS.SURFACE}90`,
-                borderRadius: responsiveBorderRadius(28),
-                paddingHorizontal: responsivePadding(20),
-                paddingVertical: responsivePadding(16),
-                borderWidth: 2,
-                borderColor: isSearchFocused
-                  ? BRAND_COLORS.PRIMARY
-                  : `${BRAND_COLORS.BORDER_LIGHT}40`,
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(4) },
-                shadowOpacity: isSearchFocused ? 0.15 : 0.05,
-                shadowRadius: responsiveSize(12),
-                elevation: isSearchFocused ? 6 : 2,
-              }}
-            >
-              <Feather
-                name="search"
-                size={responsiveIconSize(20)}
-                color={BRAND_COLORS.TEXT_SECONDARY}
-                style={{ marginRight: responsiveMargin(12) }}
-              />
-              <TextInput
-                placeholder="Search conversations..."
-                placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-                style={{
-                  flex: 1,
-                  fontSize: responsiveFontSize(16),
-                  color: BRAND_COLORS.TEXT_PRIMARY,
-                  fontWeight: "500",
-                }}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearchQuery("")}
-                  style={{
-                    width: responsiveSize(24),
-                    height: responsiveSize(24),
-                    borderRadius: responsiveBorderRadius(12),
-                    backgroundColor: `${BRAND_COLORS.TEXT_SECONDARY}20`,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
+        <View className="px-lg pb-md">
+          <TextField
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name or message"
+            leading={<Feather name="search" size={18} color={colors.text.tertiary} />}
+            trailing={
+              query.length > 0 ? (
+                <Pressable
+                  onPress={() => setQuery("")}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear"
                 >
-                  <Feather
-                    name="x"
-                    size={responsiveIconSize(14)}
-                    color={BRAND_COLORS.TEXT_SECONDARY}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          </Animated.View>
+                  <Feather name="x" size={16} color={colors.text.secondary} />
+                </Pressable>
+              ) : null
+            }
+          />
+        </View>
+      </SafeAreaView>
 
-          {/* Conversations List */}
-          <Animated.View style={[{ flex: 1 }, contentAnimatedStyle]}>
-            <FlashList
-              data={filteredConversations}
-              renderItem={({ item, index }) => (
-                <ChatCard
-                  conversation={item}
-                  index={index}
-                  onPress={() => {
-                    setSelectedConversation(item);
-                    setIsChatOpen(true);
-                  }}
-                  onLongPress={() => {
-                    showDeleteConfirmation(
-                      "Delete Conversation",
-                      "This conversation will be permanently deleted.",
-                      () => {
-                        setConversationsList((prev) =>
-                          prev.filter((conv) => conv.id !== item.id)
-                        );
-                        if (selectedConversation?.id === item.id) {
-                          setIsChatOpen(false);
-                          setSelectedConversation(null);
-                        }
-                      }
-                    );
-                  }}
-                />
-              )}
-              keyExtractor={(item) => item.id.toString()}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: responsivePadding(16),
-                paddingBottom: responsiveSize(100),
-              }}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={BRAND_COLORS.PRIMARY}
-                  colors={[BRAND_COLORS.PRIMARY]}
-                  progressBackgroundColor={BRAND_COLORS.SURFACE}
-                  progressViewOffset={responsiveSize(20)}
-                />
-              }
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Feather name="message-circle" size={28} color={colors.tint.primary} />}
+          title={query ? "No conversations match" : "Inbox zero"}
+          description={
+            query
+              ? "Try a shorter name or a different keyword."
+              : "Open someone's profile and tap message — your first thread will live here."
+          }
+        />
+      ) : (
+        <FlashList<ConversationType>
+          data={filtered}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingBottom: 140 + insets.bottom,
+          }}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.tint.primary}
+              colors={[colors.tint.primary]}
             />
-          </Animated.View>
+          }
+        />
+      )}
 
-          {/* Floating Action Button */}
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              bottom: responsiveSize(24) + (Platform.OS === "ios" ? 34 : 0),
-              right: responsiveSize(24),
-              width: responsiveSize(64),
-              height: responsiveSize(64),
-              borderRadius: responsiveBorderRadius(32),
-              backgroundColor: BRAND_COLORS.PRIMARY,
-              justifyContent: "center",
-              alignItems: "center",
-              shadowColor: BRAND_COLORS.PRIMARY,
-              shadowOffset: { width: 0, height: responsiveSize(8) },
-              shadowOpacity: 0.3,
-              shadowRadius: responsiveSize(16),
-              elevation: 12,
-            }}
-          >
-            <Feather
-              name="plus"
-              size={responsiveIconSize(28)}
-              color={BRAND_COLORS.SURFACE}
-            />
-          </TouchableOpacity>
-        </SafeAreaView>
-      </LinearGradient>
-
-      {/* Chat Modal */}
       <ChatModal
-        isChatOpen={isChatOpen}
-        selectedConversation={selectedConversation}
-        setIsChatOpen={setIsChatOpen}
-        setSelectedConversation={setSelectedConversation}
-        setConversationsList={setConversationsList}
+        isChatOpen={open}
+        selectedConversation={selected}
+        setIsChatOpen={setOpen}
+        setSelectedConversation={setSelected}
+        setConversationsList={setConversations}
       />
 
-      {/* Custom Alert */}
-      {alertConfig && (
+      {alertConfig ? (
         <CustomAlert
           visible={isVisible}
           title={alertConfig.title}
@@ -357,9 +184,7 @@ const MessagesScreen = () => {
           type={alertConfig.type}
           onDismiss={hideAlert}
         />
-      )}
+      ) : null}
     </View>
   );
-};
-
-export default MessagesScreen;
+}

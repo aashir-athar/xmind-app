@@ -115,7 +115,7 @@ export class FeedRankingAlgorithm {
       limits: { ...DEFAULT_CONFIG.limits, ...(config?.limits ?? {}) },
       timeDecay: { ...DEFAULT_CONFIG.timeDecay, ...(config?.timeDecay ?? {}) },
       trendingThreshold: {
-        ...DEFAULT_CONFIG.trendingThreshold,
+        ...DEFAULT_CONFIG.trendingThreshold!,
         ...(config?.trendingThreshold ?? {}),
       },
     };
@@ -264,9 +264,11 @@ export class FeedRankingAlgorithm {
       decayScore *= 0.5;
     }
     const engagementCount = post.likes.length + post.comments.length;
+    const trending = this.config.trendingThreshold;
     if (
-      ageHours < this.config.trendingThreshold.maxAgeHours &&
-      engagementCount > this.config.trendingThreshold.minEngagement
+      trending &&
+      ageHours < (trending.maxAgeHours ?? Infinity) &&
+      engagementCount > (trending.minEngagement ?? Infinity)
     ) {
       decayScore = Math.min(decayScore + 0.2, 1);
       reason.value += `Trending boost applied (recent with ${engagementCount} engagements). `;
@@ -480,9 +482,11 @@ export class FeedRankingAlgorithm {
     const finalFeed: Post[] = [];
     let adIndex = 0;
     const adFreq = this.config.limits.adFrequency;
+    const ads = this.config.adPosts;
     organicPosts.forEach((post, index) => {
-      if ((index + 1) % adFreq === 0 && adIndex < this.config.adPosts.length) {
-        finalFeed.push(this.config.adPosts[adIndex]);
+      if (ads && (index + 1) % adFreq === 0 && adIndex < ads.length) {
+        const next = ads[adIndex];
+        if (next) finalFeed.push(next);
         adIndex++;
       }
       finalFeed.push(post);

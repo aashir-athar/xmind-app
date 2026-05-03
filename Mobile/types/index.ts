@@ -1,3 +1,9 @@
+/**
+ * Public domain types shared across screens, hooks, and components.
+ * The shape mirrors the backend response so frontend code never has to
+ * reach for `any` to traverse a payload.
+ */
+
 export interface User {
   _id: string;
   username: string;
@@ -30,6 +36,8 @@ export interface Post {
   comments: Comment[];
 }
 
+export type NotificationType = "like" | "comment" | "follow";
+
 export interface Notification {
   _id: string;
   from: {
@@ -39,7 +47,7 @@ export interface Notification {
     profilePicture?: string;
   };
   to: string;
-  type: "like" | "comment" | "follow";
+  type: NotificationType;
   post?: {
     _id: string;
     content: string;
@@ -52,32 +60,5 @@ export interface Notification {
   createdAt: string;
 }
 
-// Main exports
-export { default } from "../components/CustomTabBar";
-export { default as CustomTabBar } from "../components/CustomTabBar";
-
-// Component exports for advanced customization
-export { TabIcon } from "../components/TabIcon";
-export { TabBackground } from "../components/TabBackground";
-export { AnimatedTabContainer } from "../components/AnimatedTabContainer";
-
-// Types (if you want to extend them)
-export interface TabRoute {
-  name: string;
-  key: string;
-}
-
-export interface TabIconConfig {
-  iconName: string;
-  gradientColors: [string, string];
-}
-
-export interface CustomTabBarConfig {
-  routes: TabRoute[];
-  tabWidth?: number;
-  animationDuration?: number;
-  springConfig?: {
-    damping: number;
-    stiffness: number;
-  };
-}
+/** Re-export the active tab bar for any consumer that wants the symbol. */
+export { default as PillTabBar } from "../components/PillTabBar";

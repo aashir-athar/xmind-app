@@ -20,8 +20,17 @@ interface UseFeedRankingOptions {
   };
 }
 
+const DEFAULT_WEIGHTS = {
+  engagementLikelihood: 0.4,
+  recency: 0.3,
+  connectionStrength: 0.15,
+  diversity: 0.1,
+  quality: 0.05,
+} as const;
+
 export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
   const { useAdvancedAlgorithm = true, maxPosts = 20, customWeights } = options;
+  const weights = { ...DEFAULT_WEIGHTS, ...(customWeights ?? {}) };
 
   const { posts, isLoading, error, refetch } = usePosts();
   const { currentUser } = useCurrentUser();
@@ -36,13 +45,7 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
       if (useAdvancedAlgorithm) {
         // Use the advanced feed ranking algorithm
         const ranked = rankFeedPosts(posts, currentUser, [], {
-          weights: customWeights || {
-            engagementLikelihood: 0.4,
-            recency: 0.3,
-            connectionStrength: 0.15,
-            diversity: 0.1,
-            quality: 0.05,
-          },
+          weights,
           limits: {
             maxPostsPerFeed: maxPosts,
             maxPostsPerAccount: 2,
@@ -74,24 +77,19 @@ export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
       // Create a basic user profile for the algorithm
       const userProfile = {
         userId: currentUser._id,
-        interests: [], // Could be extracted from user data if available
+        interests: [] as string[],
         followedAccounts: currentUser.following || [],
-        interactionHistory: [], // Could be populated from user interactions
+        interactionHistory: [] as never[],
         preferences: {
-          contentTypes: ["text", "image"] as const,
-          topics: [],
-          mutedAccounts: [],
+          contentTypes: ["text", "image"] as ("text" | "image" | "video")[],
+          topics: [] as string[],
+          mutedAccounts: [] as string[],
         },
+        blockedAccounts: [] as string[],
       };
 
       const algorithm = new FeedRankingAlgorithm(userProfile, currentUser, {
-        weights: customWeights || {
-          engagementLikelihood: 0.4,
-          recency: 0.3,
-          connectionStrength: 0.15,
-          diversity: 0.1,
-          quality: 0.05,
-        },
+        weights,
         limits: {
           maxPostsPerFeed: maxPosts,
           maxPostsPerAccount: 2,

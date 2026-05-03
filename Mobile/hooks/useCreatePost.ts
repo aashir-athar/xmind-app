@@ -9,7 +9,11 @@ export const useCreatePost = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const { showSuccess, showError, showInfo } = useCustomAlert();
+  // PostComposer can be rendered inside modals (e.g. future create-post
+  // sheet). Use native Alert so the success / error toast always appears.
+  const { showSuccess, showError, showInfo } = useCustomAlert({
+    useNative: true,
+  });
 
   const createPostMutation = useMutation({
     mutationFn: async (postData: { content: string; imageUri?: string }) => {
@@ -44,10 +48,13 @@ export const useCreatePost = () => {
       setContent("");
       setSelectedImage(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      showSuccess("Success", "Post created successfully!");
+      showSuccess("Posted", "Your thought is live in the feed.");
     },
     onError: () => {
-      showError("Error", "Failed to create post. Please try again.");
+      showError(
+        "Couldn't post",
+        "Your draft is still here. Try sending again in a moment."
+      );
     },
   });
 
@@ -60,7 +67,7 @@ export const useCreatePost = () => {
       const source = useCamera ? "camera" : "photo library";
       showInfo(
         "Permission needed",
-        `Please grant permission to access your ${source}`
+        `xMind needs access to your ${source} for this. Open Settings to allow it.`
       );
       return;
     }
@@ -84,8 +91,8 @@ export const useCreatePost = () => {
   const createPost = () => {
     if (!content.trim() && !selectedImage) {
       showInfo(
-        "Empty Post",
-        "Please write something or add an image before posting!"
+        "Nothing to post yet",
+        "Write a line, add an image, or both — then tap Post."
       );
       return;
     }

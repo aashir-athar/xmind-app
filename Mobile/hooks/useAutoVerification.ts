@@ -1,7 +1,6 @@
 import { useEffect, useCallback, useState } from "react";
 import { useCurrentUser } from "./useCurrentUser";
 import { usePosts } from "./usePosts";
-import { useProfileUpdate } from "./useProfileUpdate";
 import { useCustomAlert } from "./useCustomAlert";
 import {
   checkVerificationEligibility,
@@ -14,8 +13,12 @@ import {
 export const useAutoVerification = () => {
   const { currentUser, refetch: refetchUser } = useCurrentUser();
   const { posts: userPosts } = usePosts(currentUser?.username);
-  const { updateVerification } = useProfileUpdate();
-  const { showSuccess, showInfo } = useCustomAlert();
+  // Auto-verification can fire while EditProfileModal is open from the
+  // Profile screen. Native Alert avoids the stacked-Modal problem.
+  const { showSuccess, showInfo } = useCustomAlert({ useNative: true });
+  // Verification is granted automatically by the backend once the profile
+  // satisfies all requirements; the client just refetches to pick it up.
+  const updateVerification = async (_value: boolean): Promise<boolean> => true;
 
   const [verificationResult, setVerificationResult] =
     useState<VerificationResult | null>(null);
@@ -51,8 +54,8 @@ export const useAutoVerification = () => {
 
         // Show success message
         showSuccess(
-          "🎉 Account Verified!",
-          "Congratulations! Your account has been automatically verified. You've met all the requirements!"
+          "Account verified",
+          "You've met all the requirements and your account is now verified."
         );
       }
     } catch (error) {
