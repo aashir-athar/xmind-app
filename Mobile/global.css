@@ -1,3 +1,65 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * NativeWind 4 + CSS variables for light/dark theming.
+ *
+ * Tokens here mirror `Mobile/constants/tokens.ts` exactly. The Tailwind
+ * config references each variable with `var(--color-…)`, so a single
+ * class — e.g. `bg-canvas`, `text-primary`, `border-subtle` — resolves
+ * to the right value in both schemes without `dark:` prefixes scattered
+ * everywhere.
+ *
+ * `@media (prefers-color-scheme: dark)` is mapped by NativeWind to
+ * `useColorScheme()`, so it changes live on the device.
+ */
+:root {
+  /* Surfaces */
+  --color-bg-canvas: #F7F7FB;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-muted: #EEEEF4;
+  --color-surface: #FFFFFF;
+  --color-surface-secondary: #F3F3F8;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #ECECF1;
+
+  /* Text */
+  --color-text-primary: #0E0E12;
+  --color-text-secondary: #48485A;
+  --color-text-tertiary: #8C8CA1;
+  --color-text-inverse: #FFFFFF;
+
+  /* Borders */
+  --color-border-subtle: rgba(15, 15, 22, 0.08);
+  --color-border-strong: rgba(15, 15, 22, 0.16);
+
+  /* Tints (mode-aware on dark) */
+  --color-tint-primary: #5B3DF5;
+  --color-tint-primary-strong: #3F23D9;
+  --color-tint-primary-soft: #8A75FF;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-canvas: #08080C;
+    --color-bg-elevated: #13131A;
+    --color-bg-muted: #1A1A24;
+    --color-surface: #13131A;
+    --color-surface-secondary: #1A1A24;
+    --color-surface-raised: #1F1F2B;
+    --color-surface-sunken: #0E0E14;
+
+    --color-text-primary: #F5F5FA;
+    --color-text-secondary: #B6B6C7;
+    --color-text-tertiary: #7A7A90;
+    --color-text-inverse: #0E0E12;
+
+    --color-border-subtle: rgba(255, 255, 255, 0.08);
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+
+    --color-tint-primary: #8A75FF;
+    --color-tint-primary-strong: #5B3DF5;
+    --color-tint-primary-soft: #8A75FF;
+  }
+}

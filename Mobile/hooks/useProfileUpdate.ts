@@ -21,7 +21,11 @@ export const useProfileUpdate = () => {
 
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const { showSuccess, showError, showInfo } = useCustomAlert();
+  // Conservative default: this hook can be called from screens that
+  // open profile-edit modals. Native Alert avoids stacked-Modal issues.
+  const { showSuccess, showError, showInfo } = useCustomAlert({
+    useNative: true,
+  });
   const { refetch: refetchUser } = useCurrentUser();
 
   // Main profile update mutation (handles both text fields and images)

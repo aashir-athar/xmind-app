@@ -14,7 +14,7 @@ export const useSignOut = () => {
       await signOut();
     } catch (e) {
       console.error("Sign-out failed", e);
-      showError("Error", "Failed to sign out. Please try again.");
+      showError("Sign-out failed", "Something blocked the sign-out. Try once more.");
     } finally {
       setIsSigningOut(false);
     }
@@ -22,10 +22,10 @@ export const useSignOut = () => {
 
   const handleSignOut = useCallback(() => {
     if (isSigningOut) return;
-    
+
     showSignOutConfirmation(
-      "Sign Out",
-      "Are you sure you want to sign out?",
+      "Sign out?",
+      "You'll need to sign in again to read your feed.",
       confirmAndSignOut
     );
   }, [isSigningOut, confirmAndSignOut, showSignOutConfirmation]);

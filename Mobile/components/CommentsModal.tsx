@@ -1,521 +1,275 @@
-import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  TextInput,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
-} from "react-native";
-import React, { useEffect } from "react";
-import { Comment, Post } from "@/types";
+import React, { memo, useCallback } from "react";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
+import { Feather } from "@expo/vector-icons";
+
+import { Avatar } from "@/components/ui/Avatar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { IconButton } from "@/components/ui/IconButton";
+import { Surface } from "@/components/ui/Surface";
+import { Text } from "@/components/ui/Text";
+import { useTheme } from "@/hooks/useTheme";
 import { useComments } from "@/hooks/useComments";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { FlashList } from "@shopify/flash-list";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
-  interpolate,
-} from "react-native-reanimated";
-import { LinearGradient } from "expo-linear-gradient";
-import { BlurView } from "expo-blur";
-import { BRAND_COLORS } from "@/constants/colors";
-import { Feather } from "@expo/vector-icons";
-import { 
-  responsiveSize, 
-  responsivePadding, 
-  responsiveMargin, 
-  responsiveBorderRadius, 
-  responsiveFontSize, 
-  responsiveIconSize,
-  baseScale 
-} from "@/utils/responsive";
+import { formatDate } from "@/utils/formatter";
+import type { Comment, Post } from "@/types";
 
-const { width, height } = Dimensions.get("window");
-
-interface CommentsModalProps {
+export interface CommentsModalProps {
   selectedPost: Post | null;
   onClose: () => void;
 }
 
-const CommentsModal = ({ selectedPost, onClose }: CommentsModalProps) => {
-  const { commentText, setCommentText, createComment, deleteComment, isCreatingComment, isDeletingComment } =
-    useComments();
-  const { currentUser } = useCurrentUser();
+/**
+ * Comments sheet.
+ * Shows the parent post for context, then a FlashList of comments and
+ * a sticky composer at the bottom. KeyboardAvoidingView keeps the
+ * composer above the keyboard on both platforms.
+ */
+function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
+  const { colors, spacing, radii } = useTheme();
   const insets = useSafeAreaInsets();
+  const { currentUser } = useCurrentUser();
 
-  // Animation values
-  const modalOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.9);
-  const headerOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
+  const {
+    commentText,
+    setCommentText,
+    createComment,
+    deleteComment,
+    isCreatingComment,
+  } = useComments();
 
-  useEffect(() => {
-    if (selectedPost) {
-      modalOpacity.value = withTiming(1, { duration: 300 });
-      modalScale.value = withSpring(1, { damping: 15 });
-      headerOpacity.value = withDelay(150, withTiming(1, { duration: 200 }));
-      contentOpacity.value = withDelay(250, withTiming(1, { duration: 400 }));
-    } else {
-      modalOpacity.value = withTiming(0, { duration: 200 });
-      modalScale.value = withTiming(0.9, { duration: 200 });
-      headerOpacity.value = withTiming(0, { duration: 100 });
-      contentOpacity.value = withTiming(0, { duration: 100 });
-    }
-  }, [selectedPost]);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose();
     setCommentText("");
-  };
+  }, [onClose, setCommentText]);
 
-  const modalAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: modalOpacity.value,
-    transform: [{ scale: modalScale.value }],
-  }));
+  const handleSubmit = useCallback(() => {
+    if (!selectedPost || !commentText.trim()) return;
+    createComment(selectedPost._id);
+  }, [commentText, createComment, selectedPost]);
 
-  const headerAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(headerOpacity.value, [0, 1], [-10 * baseScale, 0]),
-      },
-    ],
-  }));
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<Comment>) => (
+      <CommentRow
+        comment={item}
+        canDelete={!!currentUser && item.user._id === currentUser._id}
+        onDelete={() => deleteComment(item._id)}
+      />
+    ),
+    [currentUser, deleteComment, selectedPost?._id]
+  );
 
-  const contentAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: contentOpacity.value,
-    transform: [
-      {
-        translateY: interpolate(contentOpacity.value, [0, 1], [20 * baseScale, 0]),
-      },
-    ],
-  }));
-
-  const renderContentWithHashtagsAndNewlines = (content: string) => {
-    return content.split("\n").map((line, lineIndex) => (
-      <Text key={lineIndex} style={{ flexWrap: "wrap" }}>
-        {line.split(/\s+/).map((word, wordIndex) => {
-          if (word.startsWith("#")) {
-            return (
-              <Text
-                key={`${lineIndex}-${wordIndex}`}
-                style={{
-                  color: BRAND_COLORS.PRIMARY,
-                  fontWeight: "600",
-                }}
-                onPress={() => console.log(`Clicked hashtag: ${word}`)}
-              >
-                {word + " "}
-              </Text>
-            );
-          }
-          return (
-            <Text
-              key={`${lineIndex}-${wordIndex}`}
-              style={{
-                color: BRAND_COLORS.TEXT_PRIMARY,
-              }}
-            >
-              {word + " "}
-            </Text>
-          );
-        })}
-        {"\n"}
-      </Text>
-    ));
-  };
+  const keyExtractor = useCallback((c: Comment) => c._id, []);
 
   return (
     <Modal
       visible={!!selectedPost}
-      animationType="none"
-      presentationStyle="pageSheet"
-      transparent={true}
-      style={{ flex: 1 }}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+      statusBarTranslucent
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: `${BRAND_COLORS.PRIMARY_DARK}40`,
-        }}
-      >
-        <BlurView
-          intensity={20}
-          tint="dark"
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Animated.View
-            style={[
-              {
+      <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
+        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
+          <View style={{ flex: 1, padding: spacing.base }}>
+            <Surface
+              variant="solid"
+              radius={radii.xl}
+              style={{
                 flex: 1,
-                width: width - responsiveSize(32),
-                maxHeight: height * 0.8,
-                borderRadius: responsiveBorderRadius(28),
                 overflow: "hidden",
-                shadowColor: BRAND_COLORS.PRIMARY,
-                shadowOffset: { width: 0, height: responsiveSize(20) },
-                shadowOpacity: 0.3,
-                shadowRadius: responsiveSize(30),
-                elevation: 20,
-              },
-              modalAnimatedStyle,
-            ]}
-          >
-            <LinearGradient
-              colors={[BRAND_COLORS.SURFACE, `${BRAND_COLORS.BACKGROUND}95`]}
-              style={{ flex: 1 }}
+                borderWidth: 1,
+                borderColor: colors.border.subtle,
+              }}
             >
-              {/* Enhanced Header */}
-              <Animated.View style={headerAnimatedStyle}>
-                <BlurView
-                  intensity={10}
-                  tint="light"
-                  style={{ paddingHorizontal: responsivePadding(24), paddingVertical: responsivePadding(20) }}
-                >
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <TouchableOpacity
-                      onPress={handleClose}
-                      style={{
-                        paddingHorizontal: responsivePadding(16),
-                        paddingVertical: responsivePadding(8),
-                        borderRadius: responsiveBorderRadius(20),
-                        backgroundColor: `${BRAND_COLORS.BORDER_LIGHT}20`,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: BRAND_COLORS.TEXT_SECONDARY,
-                          fontSize: responsiveFontSize(16),
-                          fontWeight: "600",
-                        }}
-                      >
-                        Close
-                      </Text>
-        </TouchableOpacity>
-
-                    <View
-                      style={{
-                        paddingHorizontal: responsivePadding(20),
-                        paddingVertical: responsivePadding(8),
-                        borderRadius: responsiveBorderRadius(20),
-                        backgroundColor: `${BRAND_COLORS.PRIMARY}15`,
-                        borderWidth: 1,
-                        borderColor: `${BRAND_COLORS.PRIMARY}20`,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: responsiveFontSize(18),
-                          fontWeight: "800",
-                          color: BRAND_COLORS.TEXT_PRIMARY,
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        Comments
-                      </Text>
-      </View>
-
-                    <View style={{ width: responsiveSize(80) }} />
-                  </View>
-                </BlurView>
-              </Animated.View>
-
-              {/* Enhanced Content */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={insets.bottom + responsiveSize(60)}
-                style={{ flex: 1 }}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.border.subtle,
+                  gap: spacing.md,
+                }}
               >
-                <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                  <Animated.View style={[{ padding: responsivePadding(24) }, contentAnimatedStyle]}>
-                    {selectedPost && (
-                      <>
-                        {/* Post Preview */}
-                        <View
-                          style={{
-                            borderBottomWidth: 1,
-                            borderBottomColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                            backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                            padding: responsivePadding(20),
-                            borderRadius: responsiveBorderRadius(20),
-                            marginBottom: responsiveMargin(24),
-                            shadowColor: BRAND_COLORS.PRIMARY,
-                            shadowOffset: { width: 0, height: responsiveSize(2) },
-                            shadowOpacity: 0.05,
-                            shadowRadius: responsiveSize(4),
-                            elevation: 2,
-                          }}
-                        >
-                          <View style={{ flexDirection: "row" }}>
-                <Image
-                  source={{ uri: selectedPost.user.profilePicture }}
-                              style={{
-                                width: responsiveSize(48),
-                                height: responsiveSize(48),
-                                borderRadius: responsiveBorderRadius(24),
-                                marginRight: responsiveMargin(12),
-                              }}
-                            />
+                <IconButton accessibilityLabel="Close" onPress={handleClose}>
+                  <Feather name="x" size={20} color={colors.text.primary} />
+                </IconButton>
+                <Text variant="title" tone="primary" style={{ flex: 1 }}>
+                  Comments
+                </Text>
+              </View>
 
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: responsiveMargin(4) }}>
-                                <Text
-                                  style={{
-                                    fontWeight: "700",
-                                    marginRight: responsiveMargin(4),
-                                    color: BRAND_COLORS.TEXT_PRIMARY,
-                                    fontSize: responsiveFontSize(16),
-                                  }}
-                                >
+              {selectedPost ? (
+                <View
+                  style={{
+                    paddingHorizontal: spacing.lg,
+                    paddingTop: spacing.md,
+                    paddingBottom: spacing.sm,
+                    flexDirection: "row",
+                    gap: spacing.md,
+                    borderBottomWidth: 1,
+                    borderBottomColor: colors.border.subtle,
+                  }}
+                >
+                  <Avatar
+                    source={selectedPost.user.profilePicture}
+                    name={`${selectedPost.user.firstName} ${selectedPost.user.lastName}`}
+                    size={36}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="subtitle" tone="primary" numberOfLines={1}>
                       {selectedPost.user.firstName} {selectedPost.user.lastName}
                     </Text>
-                                <Text
-                                  style={{
-                                    color: BRAND_COLORS.TEXT_SECONDARY,
-                                    marginLeft: responsiveMargin(4),
-                                    fontSize: responsiveFontSize(14),
-                                  }}
-                                >
-                      @{selectedPost.user.username}
+                    <Text variant="bodySm" tone="secondary" numberOfLines={4}>
+                      {selectedPost.content}
                     </Text>
                   </View>
-                  {selectedPost?.content && (
-                                <Text
-                                  style={{
-                                    color: BRAND_COLORS.TEXT_PRIMARY,
-                                    fontSize: responsiveFontSize(15),
-                                    lineHeight: responsiveSize(22),
-                                    marginBottom: responsiveMargin(12),
-                                  }}
-                                >
-                                  {renderContentWithHashtagsAndNewlines(selectedPost.content)}
-                    </Text>
-                  )}
-                  {selectedPost?.image && (
-                    <Image
-                      source={{ uri: selectedPost.image }}
-                                  style={{
-                                    width: "100%",
-                                    height: responsiveSize(192),
-                                    borderRadius: responsiveBorderRadius(16),
-                                    marginBottom: responsiveMargin(12),
-                                  }}
-                      resizeMode="cover"
-                    />
-                  )}
                 </View>
-              </View>
-            </View>
+              ) : null}
 
-                        {/* Comments List */}
-            {selectedPost.comments && selectedPost.comments.length > 0 ? (
-                          <View style={{ gap: responsiveSize(16) }}>
-                            {selectedPost.comments.map((comment: Comment) => (
-                              <View
-                                key={comment._id}
-                                style={{
-                                  backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                                  padding: responsivePadding(20),
-                                  borderRadius: responsiveBorderRadius(20),
-                                  borderWidth: 1,
-                                  borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                                  shadowColor: BRAND_COLORS.PRIMARY,
-                                  shadowOffset: { width: 0, height: responsiveSize(2) },
-                                  shadowOpacity: 0.05,
-                                  shadowRadius: responsiveSize(4),
-                                  elevation: 2,
-                                }}
-                              >
-                                <View style={{ flexDirection: "row" }}>
-                      <Image
-                                    style={{
-                                      width: responsiveSize(40),
-                                      height: responsiveSize(40),
-                                      borderRadius: responsiveBorderRadius(20),
-                                      marginRight: responsiveMargin(12),
-                                    }}
-                                    source={{ uri: comment.user.profilePicture }}
-                                  />
-                                  <View style={{ flex: 1 }}>
-                                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: responsiveMargin(4) }}>
-                                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                        <Text
-                                          style={{
-                                            fontWeight: "700",
-                                            color: BRAND_COLORS.TEXT_PRIMARY,
-                                            marginRight: responsiveMargin(4),
-                                            fontSize: responsiveFontSize(15),
-                                          }}
-                                        >
-                                          {comment.user.firstName} {comment.user.lastName}
-                          </Text>
-                                        <Text
-                                          style={{
-                                            color: BRAND_COLORS.TEXT_SECONDARY,
-                                            marginLeft: responsiveMargin(4),
-                                            fontSize: responsiveFontSize(13),
-                                          }}
-                                        >
-                                          @{comment.user.username}
-                          </Text>
-                        </View>
-                                      {currentUser?._id === comment.user._id && (
-                                        <TouchableOpacity
-                                          onPress={() => deleteComment(comment._id)}
-                                          disabled={isDeletingComment}
-                                          style={{
-                                            width: responsiveSize(32),
-                                            height: responsiveSize(32),
-                                            borderRadius: responsiveBorderRadius(16),
-                                            backgroundColor: `${BRAND_COLORS.DANGER}15`,
-                                            justifyContent: "center",
-                                            alignItems: "center",
-                                          }}
-                                        >
-                                          <Feather
-                                            name="trash"
-                                            size={responsiveIconSize(16)}
-                                            color={BRAND_COLORS.DANGER}
-                                          />
-                                        </TouchableOpacity>
-                                      )}
-                                    </View>
-                                    <Text
-                                      style={{
-                                        color: BRAND_COLORS.TEXT_PRIMARY,
-                                        fontSize: responsiveFontSize(15),
-                                        lineHeight: responsiveSize(22),
-                                      }}
-                                    >
-                                      {comment.content}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                            ))}
-                          </View>
-                        ) : (
-                          <View
-                            style={{
-                              alignItems: "center",
-                              padding: responsivePadding(40),
-                              backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                              borderRadius: responsiveBorderRadius(20),
-                              borderWidth: 1,
-                              borderColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                            }}
-                          >
-                            <Text style={{ color: BRAND_COLORS.TEXT_SECONDARY, fontSize: responsiveFontSize(16) }}>
-                              No comments yet
-                            </Text>
-              </View>
-            )}
-
-                        {/* Comment Input */}
-                        <View
-                          style={{
-                            paddingTop: responsivePadding(24),
-                            borderTopWidth: 1,
-                            borderTopColor: `${BRAND_COLORS.BORDER_LIGHT}30`,
-                            marginTop: responsiveMargin(24),
-                          }}
-                        >
-                          <View style={{ flexDirection: "row" }}>
-                <Image
-                  source={{ uri: currentUser?.profilePicture }}
-                              style={{
-                                width: responsiveSize(40),
-                                height: responsiveSize(40),
-                                borderRadius: responsiveBorderRadius(20),
-                                marginRight: responsiveMargin(12),
-                              }}
-                            />
-                            <View style={{ flex: 1 }}>
-                              <View
-                                style={{
-                                  borderRadius: responsiveBorderRadius(16),
-                                  backgroundColor: `${BRAND_COLORS.BACKGROUND}80`,
-                                  borderWidth: 1,
-                                  borderColor: `${BRAND_COLORS.BORDER_LIGHT}60`,
-                                  shadowColor: BRAND_COLORS.PRIMARY,
-                                  shadowOffset: { width: 0, height: responsiveSize(2) },
-                                  shadowOpacity: 0.05,
-                                  shadowRadius: responsiveSize(4),
-                                  elevation: 2,
-                                  marginBottom: responsiveMargin(12),
-                                }}
-                              >
-                  <TextInput
-                                  style={{
-                                    padding: responsivePadding(16),
-                                    fontSize: responsiveFontSize(16),
-                                    color: BRAND_COLORS.TEXT_PRIMARY,
-                                    fontWeight: "500",
-                                    minHeight: responsiveSize(80),
-                                    textAlignVertical: "top",
-                                  }}
-                    placeholder="Write a comment..."
-                                  placeholderTextColor={BRAND_COLORS.PLACEHOLDER}
-                    value={commentText}
-                    onChangeText={setCommentText}
-                    multiline
-                    numberOfLines={3}
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={insets.top + 24}
+                style={{ flex: 1 }}
+              >
+                {selectedPost && selectedPost.comments && selectedPost.comments.length > 0 ? (
+                  <FlashList<Comment>
+                    data={selectedPost.comments}
+                    renderItem={renderItem}
+                    keyExtractor={keyExtractor}
+                    contentContainerStyle={{
+                      paddingHorizontal: spacing.lg,
+                      paddingTop: spacing.md,
+                      paddingBottom: spacing.md,
+                    }}
+                    showsVerticalScrollIndicator={false}
                   />
-                              </View>
-                  <TouchableOpacity
-                                style={{
-                                  paddingHorizontal: responsivePadding(20),
-                                  paddingVertical: responsivePadding(12),
-                                  borderRadius: responsiveBorderRadius(20),
-                                  backgroundColor: commentText.trim() ? BRAND_COLORS.PRIMARY : `${BRAND_COLORS.BORDER_LIGHT}60`,
-                                  alignSelf: "flex-start",
-                                  shadowColor: BRAND_COLORS.PRIMARY,
-                                  shadowOffset: { width: 0, height: responsiveSize(4) },
-                                  shadowOpacity: commentText.trim() ? 0.3 : 0,
-                                  shadowRadius: responsiveSize(8),
-                                  elevation: commentText.trim() ? 6 : 0,
-                                }}
-                    onPress={() => createComment(selectedPost._id)}
-                    disabled={isCreatingComment || !commentText.trim()}
+                ) : (
+                  <EmptyState
+                    icon={<Feather name="message-square" size={26} color={colors.tint.primary} />}
+                    title="Be the first to reply"
+                    description="A short, kind reply goes further than a clever one."
+                  />
+                )}
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "flex-end",
+                    gap: spacing.sm,
+                    paddingHorizontal: spacing.base,
+                    paddingTop: spacing.sm,
+                    paddingBottom: spacing.md,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border.subtle,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      borderRadius: radii.lg,
+                      backgroundColor: colors.surface.secondary,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: 8,
+                      minHeight: 44,
+                      maxHeight: 120,
+                      justifyContent: "center",
+                    }}
                   >
-                    {isCreatingComment ? (
-                                  <ActivityIndicator size="small" color={BRAND_COLORS.SURFACE} />
-                    ) : (
-                      <Text
-                                    style={{
-                                      fontWeight: "700",
-                                      color: commentText.trim() ? BRAND_COLORS.SURFACE : BRAND_COLORS.TEXT_SECONDARY,
-                                      fontSize: responsiveFontSize(16),
-                                      letterSpacing: 0.3,
-                                    }}
-                      >
-                        Reply
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                    <TextInput
+                      value={commentText}
+                      onChangeText={setCommentText}
+                      placeholder="Add a thoughtful reply"
+                      placeholderTextColor={colors.text.tertiary}
+                      multiline
+                      style={{
+                        fontSize: 15,
+                        lineHeight: 20,
+                        color: colors.text.primary,
+                        textAlignVertical: "center",
+                      }}
+                    />
+                  </View>
+                  <Pressable
+                    onPress={handleSubmit}
+                    disabled={!commentText.trim() || isCreatingComment}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send comment"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: radii.pill,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: commentText.trim()
+                        ? colors.tint.primary
+                        : colors.surface.sunken,
+                    }}
+                  >
+                    <Feather
+                      name="send"
+                      size={18}
+                      color={commentText.trim() ? colors.text.onTint : colors.text.tertiary}
+                    />
+                  </Pressable>
                 </View>
-              </View>
-            </View>
-                      </>
-                    )}
-                  </Animated.View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-            </LinearGradient>
-          </Animated.View>
-        </BlurView>
+              </KeyboardAvoidingView>
+            </Surface>
+          </View>
+        </SafeAreaView>
       </View>
     </Modal>
   );
-};
+}
+
+interface CommentRowProps {
+  comment: Comment;
+  canDelete: boolean;
+  onDelete: () => void;
+}
+
+function CommentRowImpl({ comment, canDelete, onDelete }: CommentRowProps) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", gap: spacing.md, paddingVertical: spacing.sm }}>
+      <Avatar
+        source={comment.user.profilePicture}
+        name={`${comment.user.firstName} ${comment.user.lastName}`}
+        size={36}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+          <Text variant="label" tone="primary" numberOfLines={1}>
+            {comment.user.firstName} {comment.user.lastName}
+          </Text>
+          <Text variant="caption" tone="tertiary">
+            · {formatDate(comment.createdAt)}
+          </Text>
+          {canDelete ? (
+            <Pressable
+              onPress={onDelete}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Delete comment"
+              style={{ marginLeft: "auto" }}
+            >
+              <Feather name="trash-2" size={14} color={colors.text.tertiary} />
+            </Pressable>
+          ) : null}
+        </View>
+        <Text variant="body" tone="primary" style={{ marginTop: 2 }}>
+          {comment.content}
+        </Text>
+      </View>
+    </View>
+  );
+}
+const CommentRow = memo(CommentRowImpl);
+
+export const CommentsModal = memo(CommentsModalImpl);
+CommentsModal.displayName = "CommentsModal";
 
 export default CommentsModal;

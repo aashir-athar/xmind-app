@@ -7,7 +7,11 @@ export const useComments = () => {
   const [commentText, setCommentText] = useState("");
   const api = useApiClient();
   const queryClient = useQueryClient();
-  const { showError, showInfo, showDeleteConfirmation } = useCustomAlert();
+  // CommentsModal hosts a <Modal>; nested Modals don't stack in RN, so
+  // route alerts through the platform-native Alert.alert.
+  const { showError, showInfo, showDeleteConfirmation } = useCustomAlert({
+    useNative: true,
+  });
 
   const createCommentMutation = useMutation({
     mutationFn: async ({
@@ -25,7 +29,7 @@ export const useComments = () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
     onError: () => {
-      showError("Error", "Failed to post comment, Try again.");
+      showError("Couldn't send", "We couldn't post that reply. Try once more.");
     },
   });
 
@@ -38,13 +42,13 @@ export const useComments = () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
     onError: () => {
-      showError("Error", "Failed to delete comment, Try again.");
+      showError("Couldn't delete", "We couldn't remove that reply. Try once more.");
     },
   });
 
   const createComment = (postId: string) => {
     if (!commentText.trim()) {
-      showInfo("Empty comment", "Please enter a comment");
+      showInfo("Reply is empty", "Type something before sending.");
       return;
     }
 
@@ -56,8 +60,8 @@ export const useComments = () => {
 
   const deleteComment = (commentId: string) => {
     showDeleteConfirmation(
-      "Delete Comment",
-      "Are you sure you want to delete this comment?",
+      "Delete this reply?",
+      "It won't undo it for people who've already seen it.",
       () => deleteCommentMutation.mutate(commentId)
     );
   };

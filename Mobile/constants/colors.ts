@@ -1,23 +1,37 @@
+/**
+ * Legacy `BRAND_COLORS` map.
+ *
+ * The new design system lives in `constants/tokens.ts` and is consumed
+ * via `useTheme()`. This file is kept only as a backwards-compatibility
+ * shim for the small number of leaf components that still reference the
+ * legacy export, and it deliberately mirrors the new light palette so
+ * the visuals match the rest of the app even before each component is
+ * migrated.
+ *
+ * Do not add new usages.
+ */
+import { lightPalette } from "@/constants/tokens";
+
 export const BRAND_COLORS = {
-  PRIMARY: "#4527A0",
-  PRIMARY_LIGHT: "#7E57C2",
-  PRIMARY_DARK: "#311B92",
-  SECONDARY: "#1565C0",
-  ACCENT_MINT: "#FF7043",
-  ACCENT_YELLOW: "#42A5F5",
-  SUCCESS: "#43A047",
-  WARNING: "#FFB300",
-  DANGER: "#E53935",
-  BACKGROUND: "#FAFAFA",
-  SURFACE: "#FFFFFF",
-  SURFACE_MUTED: "#F5F5F5",
-  BORDER_LIGHT: "#E0E0E0",
-  BORDER_DARK: "#B0BEC5",
-  TEXT_PRIMARY: "#424242",
-  TEXT_SECONDARY: "#757575",
-  PLACEHOLDER: "#B0BEC5",
-  ICON_PRIMARY: "#4527A0",
-  ICON_SECONDARY: "#90A4AE",
+  PRIMARY: lightPalette.tint.primary,
+  PRIMARY_LIGHT: lightPalette.tint.primarySoft,
+  PRIMARY_DARK: lightPalette.tint.primaryStrong,
+  SECONDARY: lightPalette.tint.accent,
+  ACCENT_MINT: lightPalette.tint.success,
+  ACCENT_YELLOW: lightPalette.tint.warning,
+  SUCCESS: lightPalette.tint.success,
+  WARNING: lightPalette.tint.warning,
+  DANGER: lightPalette.tint.danger,
+  BACKGROUND: lightPalette.bg.canvas,
+  SURFACE: lightPalette.surface.primary,
+  SURFACE_MUTED: lightPalette.surface.secondary,
+  BORDER_LIGHT: "rgba(15,15,22,0.08)",
+  BORDER_DARK: "rgba(15,15,22,0.16)",
+  TEXT_PRIMARY: lightPalette.text.primary,
+  TEXT_SECONDARY: lightPalette.text.secondary,
+  PLACEHOLDER: lightPalette.text.tertiary,
+  ICON_PRIMARY: lightPalette.tint.primary,
+  ICON_SECONDARY: lightPalette.text.tertiary,
 } as const;
 
 export const TAB_GRADIENTS = {
@@ -28,37 +42,17 @@ export const TAB_GRADIENTS = {
   profile: [BRAND_COLORS.PRIMARY, BRAND_COLORS.PRIMARY_DARK],
 } as const;
 
-export const TAB_CONFIG = {
-  BORDER_RADIUS: 60, // Reduced and scaled in components
-  ICON_SIZE_ACTIVE: 28,
-  ICON_SIZE_INACTIVE: 22,
-  CONTAINER_HEIGHT: 70,
-  ICON_CONTAINER_SIZE: 56,
-  SHADOW_ELEVATION: 8,
-  BLUR_INTENSITY: 20,
-} as const;
-
+/** Kept for any header-config consumers; new code uses theme tokens. */
 export const HEADER_CONFIG = {
-  // Standard header dimensions
   HEIGHT: 80,
   PADDING_HORIZONTAL: 20,
   PADDING_VERTICAL: 16,
-  
-  // Text sizes
-  TITLE_SIZE: 20,
-  SUBTITLE_SIZE: 14,
-  
-  // Button dimensions
+  TITLE_SIZE: 22,
+  SUBTITLE_SIZE: 13,
   BUTTON_SIZE: 40,
   BUTTON_BORDER_RADIUS: 20,
-  
-  // Icon sizes
   ICON_SIZE: 20,
-  
-  // Blur settings
   BLUR_INTENSITY: 20,
-  
-  // Spacing
   TITLE_MARGIN_BOTTOM: 4,
   BUTTON_MARGIN_LEFT: 16,
 } as const;

@@ -4,7 +4,8 @@ import { useAuth } from "@clerk/clerk-expo";
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   "https://x-clone-react-native-seven.vercel.app/api";
-// ! 🔥 localhost api would not work on your actual physical device
+// Note: localhost will not resolve from a physical device — use the
+// machine's LAN IP (e.g. http://192.168.x.x:5001/api) when testing on hardware.
 // const API_BASE_URL = "http://localhost:5001/api";
 
 // this will basically create an authenticated api, pass the token into our headers

@@ -30,7 +30,12 @@ export interface ProfileFormData {
 
 export const useProfile = () => {
   const api = useApiClient();
-  const { showSuccess, showError, showInfo } = useCustomAlert();
+  // Profile screen renders <EditProfileModal>; alerts can fire while
+  // that modal is open. Route through the native Alert so they actually
+  // stack on top.
+  const { showSuccess, showError, showInfo } = useCustomAlert({
+    useNative: true,
+  });
   const queryClient = useQueryClient();
   const { currentUser, refetch: refetchCurrentUser } = useCurrentUser();
   const { posts: userPosts } = usePosts(currentUser?.username);
@@ -139,13 +144,14 @@ export const useProfile = () => {
 
       // Close modal and show success
       setIsEditModalVisible(false);
-      showSuccess("Success", "Profile updated successfully!");
+      showSuccess("Profile saved", "Your changes are live across the app.");
     },
     onError: (error: any) => {
       console.error("Profile update error:", error);
       showError(
-        "Error",
-        error.response?.data?.error || "Failed to update profile"
+        "Couldn't save",
+        error.response?.data?.error ||
+          "We couldn't save those changes. Try once more."
       );
     },
   });
@@ -160,13 +166,16 @@ export const useProfile = () => {
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await queryClient.refetchQueries({ queryKey: ["authUser"] });
       await refetchCurrentUser();
-      showSuccess("Success", "Username updated successfully!");
+      showSuccess(
+        "Username updated",
+        "Your handle is live everywhere now."
+      );
     },
     onError: (error: any) => {
       console.error("Username update error:", error);
       showError(
-        "Error",
-        error.response?.data?.error || "Failed to update username"
+        "Couldn't update username",
+        error.response?.data?.error || "Try a different one in a moment."
       );
     },
   });
@@ -181,15 +190,15 @@ export const useProfile = () => {
       await queryClient.invalidateQueries({ queryKey: ["authUser"] });
       await refetchCurrentUser();
       showSuccess(
-        "🎉 Account Verified!",
-        "Congratulations! Your account has been automatically verified."
+        "Account verified",
+        "Your account is now verified — the badge appears on your profile."
       );
     },
     onError: (error: any) => {
       console.error("Auto-verification failed:", error);
       showInfo(
-        "Verification Update",
-        "Your verification status will be updated shortly."
+        "Almost there",
+        "Your verification status will sync in a moment."
       );
     },
   });
@@ -204,7 +213,7 @@ export const useProfile = () => {
       const source = useCamera ? "camera" : "photo library";
       showInfo(
         "Permission needed",
-        `Please grant permission to access your ${source}`
+        `xMind needs access to your ${source} to use this. Open Settings to allow it.`
       );
       return false;
     }
@@ -344,7 +353,7 @@ export const useProfile = () => {
     const hasImages = selectedProfileImage || selectedBannerImage;
 
     if (!hasTextData && !hasImages && !usernameChanged) {
-      showInfo("No Changes", "Please make some changes before saving");
+      showInfo("Nothing to save", "Edit something first, then tap Save.");
       return;
     }
 
@@ -365,7 +374,7 @@ export const useProfile = () => {
       // If only username was changed and no other data, close modal manually
       if (usernameChanged && !hasTextData && !hasImages) {
         setIsEditModalVisible(false);
-        showSuccess("Success", "Username updated successfully!");
+        showSuccess("Username updated", "Your handle is live everywhere now.");
       }
     } catch (error) {
       console.error("Error saving profile:", error);
