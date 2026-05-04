@@ -11,20 +11,25 @@ import { Text } from "./Text";
 import { useTheme } from "@/hooks/useTheme";
 
 export interface TextFieldProps extends TextInputProps {
-  /** Label rendered above the input. */
   label?: string;
-  /** Inline help text — replaced by `error` when present. */
   helper?: string;
   error?: string;
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
   containerStyle?: ViewStyle;
+  /**
+   * Visual treatment of the input. `pill` is the IG-search aesthetic
+   * (rounded-pill on a sunken surface); `panel` is the FB-form aesthetic
+   * (rounded-md on a solid card with stronger borders).
+   */
+  shape?: "pill" | "panel";
 }
 
 /**
- * Themed input. Focus ring uses the brand tint to draw the eye and
- * confirm the active field — meaningful colour movement that maps to
- * a user action, not decoration.
+ * TextField.
+ *
+ * Adds the `pill` variant used by the new search/inbox bars. Focus ring
+ * picks up the coral primary, so the eye lands on the active field.
  */
 const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldImpl(
   {
@@ -34,6 +39,7 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
     leading,
     trailing,
     containerStyle,
+    shape = "panel",
     style,
     onFocus,
     onBlur,
@@ -67,6 +73,10 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
     ? colors.border.focus
     : colors.border.subtle;
 
+  const isPill = shape === "pill";
+  const radius = isPill ? radii.pill : radii.lg;
+  const height = isPill ? 44 : 52;
+
   return (
     <View style={containerStyle}>
       {label ? (
@@ -80,9 +90,9 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
           flexDirection: "row",
           alignItems: "center",
           gap: spacing.sm,
-          paddingHorizontal: spacing.base,
-          height: 52,
-          borderRadius: radii.lg,
+          paddingHorizontal: isPill ? spacing.base : spacing.base,
+          height,
+          borderRadius: radius,
           backgroundColor: colors.surface.secondary,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor,

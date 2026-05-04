@@ -5,6 +5,8 @@ module.exports = function (api) {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
     ],
-    plugins: ["react-native-reanimated/plugin",]
+    // SDK 54 rename: react-native-reanimated/plugin -> react-native-worklets/plugin.
+    // The worklets plugin MUST be the last plugin in the array.
+    plugins: ["react-native-worklets/plugin"],
   };
 };

@@ -67,5 +67,46 @@ export interface Notification {
   createdAt: string;
 }
 
-/** Re-export the active tab bar for any consumer that wants the symbol. */
-export { default as PillTabBar } from "../components/PillTabBar";
+// ─────────────────────────────────────────────────────────────────────────
+// Chat — added for the new realtime chat (option A: polling on Mongo).
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Slim user shape returned alongside every conversation so the inbox can
+ * render avatar + name without a second round trip.
+ */
+export interface ChatUser {
+  _id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  profilePicture?: string;
+  verified?: boolean;
+}
+
+export interface ChatMessage {
+  _id: string;
+  conversation: string;
+  sender: string;
+  body: string;
+  createdAt: string;
+  /** User ids that have read this message. */
+  readBy?: string[];
+  /** Idempotency key the sender used. Lets the client reconcile optimistic rows. */
+  clientId?: string;
+  /** Client-only flag set on optimistic rows; never sent by the server. */
+  pending?: boolean;
+  /** Client-only flag — true when an optimistic send fails permanently. */
+  failed?: boolean;
+}
+
+export interface Conversation {
+  _id: string;
+  participants: ChatUser[];
+  lastMessage?: ChatMessage | null;
+  lastActivityAt: string;
+  /** Server-computed unread count for the current user. */
+  unreadCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}

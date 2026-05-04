@@ -1,108 +1,125 @@
-import React, { memo } from "react";
+/**
+ * ChatCard — single inbox row.
+ *
+ * v2: backed by real Conversation data (was: mock).
+ *  - Shows the OTHER participant's avatar + name.
+ *  - Bolds the last-message line + name when there's an unread count.
+ *  - Renders a coral pill with the unread number when applicable.
+ *  - Tap → opens the thread; long-press → trigger a delete-conversation
+ *    confirmation handled by the parent.
+ */
+import React, { memo, useCallback } from "react";
 import { Pressable, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
-import type { ConversationType } from "@/data/conversations";
+import { formatDate } from "@/utils/formatter";
+import type { ChatUser, Conversation } from "@/types";
 
 export interface ChatCardProps {
-  conversation: ConversationType;
-  index: number;
-  onPress: () => void;
-  onLongPress: () => void;
+  conversation: Conversation;
+  /** The current user's id — used to pick the *other* participant. */
+  currentUserId: string | null | undefined;
+  onPress: (conversation: Conversation) => void;
+  onLongPress?: (conversation: Conversation) => void;
 }
 
-// V1 mock — every conversation is treated as having one unread until
-// the user opens it. We don't have a real read-state on the mock data,
-// so we infer "unread" as "the last message wasn't sent by the viewer".
-function inferUnread(conversation: ConversationType): boolean {
-  const last = conversation.messages[conversation.messages.length - 1];
-  if (!last) return false;
-  return !last.fromUser;
+function pickOther(conversation: Conversation, currentUserId: string | null | undefined): ChatUser | null {
+  if (!conversation.participants) return null;
+  return (
+    conversation.participants.find((p) => p._id !== currentUserId) ??
+    conversation.participants[0] ??
+    null
+  );
 }
 
-/**
- * Conversation row.
- *
- * Removed the previous infinite `withRepeat` pulse on the online dot —
- * a constant micro-animation across every list row produces ambient
- * motion fatigue and keeps the GPU warm for no information gain. A
- * static green dot communicates the same fact at zero cost.
- *
- * Added a discrete unread dot + bolder name when there's an unread
- * message — the cue the user expects from every messaging app, sized
- * down to a single 8px disc so it never dominates the row.
- */
-function ChatCardImpl({ conversation, onPress, onLongPress }: ChatCardProps) {
-  const { colors } = useTheme();
+function ChatCardImpl({ conversation, currentUserId, onPress, onLongPress }: ChatCardProps) {
+  const { colors, spacing } = useTheme();
+  const other = pickOther(conversation, currentUserId);
+  const last = conversation.lastMessage;
+  const unread = conversation.unreadCount ?? 0;
 
-  if (!conversation || !conversation.user) return null;
+  const handlePress = useCallback(() => onPress(conversation), [conversation, onPress]);
+  const handleLongPress = useCallback(
+    () => onLongPress?.(conversation),
+    [conversation, onLongPress]
+  );
 
-  const unread = inferUnread(conversation);
+  if (!other) return null;
+
+  const lastBody = last?.body ?? "Tap to say hi";
+  const isMine = last?.sender === currentUserId;
 
   return (
     <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
       delayLongPress={400}
       android_ripple={{ color: colors.overlay.press }}
-      className="flex-row items-center gap-md p-base my-xs rounded-lg bg-surface border border-subtle"
-      style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
+      accessibilityRole="button"
+      accessibilityLabel={`Open conversation with ${other.firstName} ${other.lastName}`}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing.md,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
-      <View>
-        <Avatar
-          source={conversation.user.avatar}
-          name={conversation.user.name}
-          size={48}
-        />
-        <View
-          className="absolute bottom-0 right-0 w-[12px] h-[12px] rounded-full"
-          style={{
-            backgroundColor: colors.tint.success,
-            borderWidth: 2,
-            borderColor: colors.surface.primary,
-          }}
-        />
-      </View>
+      <Avatar
+        source={other.profilePicture}
+        name={`${other.firstName} ${other.lastName}`}
+        size={56}
+      />
 
-      <View className="flex-1 min-w-0">
-        <View className="flex-row items-center gap-xs">
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Text
             variant="subtitle"
             tone="primary"
-            weight={unread ? "700" : "600"}
+            weight={unread > 0 ? "800" : "700"}
             numberOfLines={1}
-            className="flex-1"
+            style={{ flex: 1 }}
           >
-            {conversation.user.name || "Unknown"}
+            {other.firstName} {other.lastName}
           </Text>
-          {conversation.user.verified ? <VerifiedBadge size={14} /> : null}
-          <Text
-            variant="caption"
-            tone={unread ? "tint" : "tertiary"}
-            weight={unread ? "700" : "500"}
-          >
-            {conversation.time || "now"}
-          </Text>
+          {other.verified ? <VerifiedBadge size={13} /> : null}
+          {last?.createdAt ? (
+            <Text variant="caption" tone="tertiary">
+              · {formatDate(last.createdAt)}
+            </Text>
+          ) : null}
         </View>
-
-        <View className="flex-row items-center gap-xs mt-[2px]">
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: 2 }}>
           <Text
             variant="bodySm"
-            tone={unread ? "primary" : "secondary"}
-            weight={unread ? "600" : "400"}
-            numberOfLines={2}
-            className="flex-1"
+            tone={unread > 0 ? "primary" : "secondary"}
+            weight={unread > 0 ? "600" : "400"}
+            numberOfLines={1}
+            style={{ flex: 1 }}
           >
-            {conversation.lastMessage || "No messages yet"}
+            {isMine ? "You: " : ""}
+            {lastBody}
           </Text>
-          {unread ? (
+          {unread > 0 ? (
             <View
-              className="w-[8px] h-[8px] rounded-full"
-              style={{ backgroundColor: colors.tint.primary }}
-            />
+              style={{
+                minWidth: 20,
+                height: 20,
+                paddingHorizontal: 6,
+                borderRadius: 10,
+                backgroundColor: colors.tint.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text variant="caption" tone="inverse" weight="800">
+                {unread > 99 ? "99+" : unread}
+              </Text>
+            </View>
           ) : null}
         </View>
       </View>
@@ -110,10 +127,13 @@ function ChatCardImpl({ conversation, onPress, onLongPress }: ChatCardProps) {
   );
 }
 
-export const ChatCard = memo(ChatCardImpl, (prev, next) =>
-  prev.conversation.id === next.conversation.id &&
-  prev.conversation.lastMessage === next.conversation.lastMessage &&
-  prev.conversation.time === next.conversation.time
+export const ChatCard = memo(
+  ChatCardImpl,
+  (prev, next) =>
+    prev.conversation._id === next.conversation._id &&
+    prev.conversation.lastActivityAt === next.conversation.lastActivityAt &&
+    prev.conversation.unreadCount === next.conversation.unreadCount &&
+    prev.currentUserId === next.currentUserId
 );
 ChatCard.displayName = "ChatCard";
 

@@ -19,7 +19,7 @@ import Animated, {
 import { Text } from "./Text";
 import { useTheme } from "@/hooks/useTheme";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "accent";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps
@@ -28,15 +28,11 @@ export interface ButtonProps
   onPress?: (event: GestureResponderEvent) => void;
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** Optional leading icon node (rendered before the label). */
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
-  /** Fill the parent's width. */
   fullWidth?: boolean;
   loading?: boolean;
-  /** Suppress haptics if the parent already triggers them. */
   haptics?: boolean;
-  /** NativeWind utility classes. */
   className?: string;
   style?: ViewStyle;
 }
@@ -44,12 +40,9 @@ export interface ButtonProps
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 /**
- * 2026 Button — capsule-shaped, motion-aware, accessible by default.
- *
- * Psychology notes:
- *  - Tap target ≥ 48px on every size (Fitts's Law + WCAG 2.5.5).
- *  - Subtle spring on press signals "I heard you" without theatrics.
- *  - Primary uses brand tint to anchor the user's focal CTA per screen.
+ * 2026 Button — Instagram-snap spring on press, capsule shape, accessible
+ * by default. Adds an `accent` variant tied to the FB-blue tone so chat
+ * sends and "Send message" affordances read distinct from coral CTAs.
  */
 function ButtonImpl({
   label,
@@ -70,7 +63,7 @@ function ButtonImpl({
   const scale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
-  const heightFor: Record<ButtonSize, number> = { sm: 40, md: 48, lg: 56 };
+  const heightFor: Record<ButtonSize, number> = { sm: 38, md: 46, lg: 54 };
   const padX: Record<ButtonSize, number> = {
     sm: spacing.base,
     md: spacing.lg,
@@ -81,9 +74,12 @@ function ButtonImpl({
   const isSecondary = variant === "secondary";
   const isGhost = variant === "ghost";
   const isDanger = variant === "danger";
+  const isAccent = variant === "accent";
 
   const bg = isPrimary
     ? colors.tint.primary
+    : isAccent
+    ? colors.tint.accent
     : isDanger
     ? colors.tint.danger
     : isSecondary
@@ -91,7 +87,7 @@ function ButtonImpl({
     : "transparent";
 
   const fg =
-    isPrimary || isDanger
+    isPrimary || isDanger || isAccent
       ? colors.text.onTint
       : isGhost
       ? colors.tint.primary
@@ -105,20 +101,18 @@ function ButtonImpl({
       : {};
 
   const handlePressIn = useCallback(() => {
-    scale.value = withSpring(0.96, { damping: 18, stiffness: 320, mass: 0.6 });
-    opacity.value = withTiming(0.9, { duration: 80 });
+    scale.value = withSpring(0.96, { damping: 16, stiffness: 360, mass: 0.5 });
+    opacity.value = withTiming(0.92, { duration: 80 });
   }, [scale, opacity]);
 
   const handlePressOut = useCallback(() => {
-    scale.value = withSpring(1, { damping: 18, stiffness: 320, mass: 0.6 });
+    scale.value = withSpring(1, { damping: 16, stiffness: 360, mass: 0.5 });
     opacity.value = withTiming(1, { duration: 120 });
   }, [scale, opacity]);
 
   const handlePress = useCallback(
     (e: GestureResponderEvent) => {
       if (haptics) {
-        // Light impact on every press. iOS feels native; Android-side
-        // expo-haptics fans out to platform implementations gracefully.
         Haptics.selectionAsync().catch(() => undefined);
       }
       onPress?.(e);
@@ -167,7 +161,6 @@ function ButtonImpl({
           {leading}
           <Text
             variant={size === "lg" ? "subtitle" : "label"}
-            tone={isPrimary || isDanger ? "inverse" : isGhost ? "tint" : "primary"}
             style={{ color: fg }}
           >
             {label}

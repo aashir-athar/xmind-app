@@ -19,7 +19,9 @@ import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePosts } from "@/hooks/usePosts";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { conversationApi, useApiClient } from "@/utils/api";
 import { formatNumber } from "@/utils/formatter";
+import type { Conversation } from "@/types";
 
 /**
  * Public profile of another user.
@@ -57,6 +59,26 @@ export default function UserProfileScreen() {
   const handleFollow = useCallback(() => {
     if (user) toggleFollow(user._id);
   }, [toggleFollow, user]);
+
+  const api = useApiClient();
+  const handleMessage = useCallback(async () => {
+    if (!user) return;
+    try {
+      const response = await conversationApi.createOrGet<Conversation>(
+        api,
+        user._id
+      );
+      const id = response.data.conversation?._id;
+      if (id) {
+        router.push({
+          pathname: "/messages/[conversationId]",
+          params: { conversationId: id },
+        });
+      }
+    } catch {
+      // Silent — failed network call leaves the user where they are.
+    }
+  }, [api, router, user]);
 
   if (isLoading) {
     return (
@@ -133,13 +155,21 @@ export default function UserProfileScreen() {
               ringColor={colors.surface.primary}
               style={{ borderWidth: 4, borderColor: colors.surface.primary }}
             />
-            <Button
-              label={isFollowing ? "Following" : "Follow"}
-              variant={isFollowing ? "secondary" : "primary"}
-              size="sm"
-              loading={isFollowLoading}
-              onPress={handleFollow}
-            />
+            <View className="flex-row gap-sm">
+              <Button
+                label="Message"
+                variant="secondary"
+                size="sm"
+                onPress={handleMessage}
+              />
+              <Button
+                label={isFollowing ? "Following" : "Follow"}
+                variant={isFollowing ? "secondary" : "primary"}
+                size="sm"
+                loading={isFollowLoading}
+                onPress={handleFollow}
+              />
+            </View>
           </View>
 
           <View className="flex-row items-center gap-sm">
