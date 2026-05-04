@@ -9,11 +9,20 @@ import {
   checkUsernameAvailability,
   toggleVerification,
   autoVerifyUser,
+  searchUsers,
+  getFollowers,
+  getFollowing,
 } from "../controllers/user.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import upload from "../middleware/upload.middleware.js";
 
 const router = express.Router();
+
+// Search must be declared BEFORE `/profile/:username` so the param
+// route doesn't swallow it.
+router.get("/search", protectRoute, searchUsers);
+router.get("/:username/followers", getFollowers);
+router.get("/:username/following", getFollowing);
 
 // public route
 router.get("/profile/:username", getUserProfile);

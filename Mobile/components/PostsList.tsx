@@ -291,7 +291,12 @@ function PostsListImpl({
         <CommentsModal selectedPost={selectedPost} onClose={handleCloseComments} />
       ) : null}
 
-      <PostMenu post={menuPost} onClose={handleCloseMenu} />
+      <PostMenu
+        post={menuPost}
+        onClose={handleCloseMenu}
+        isOwn={!!menuPost && !!currentUser && menuPost.user._id === currentUser._id}
+        onDelete={handleDelete}
+      />
     </View>
   );
 }

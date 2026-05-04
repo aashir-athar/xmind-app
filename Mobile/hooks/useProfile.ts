@@ -117,9 +117,20 @@ export const useProfile = () => {
     onSuccess: async (user) => {
       setSelectedProfileImage(null);
       setSelectedBannerImage(null);
-      // Seed the cache directly so the UI updates without a re-fetch round-trip.
+      // Seed the auth cache directly so the UI updates without a
+      // re-fetch round-trip. Then invalidate every query that holds a
+      // denormalised copy of the user (avatar, name, verified) so the
+      // updated picture / display name surfaces everywhere — feed,
+      // profile feed, conversations, post detail, comments.
       queryClient.setQueryData<User>(["authUser"], user);
-      await queryClient.invalidateQueries({ queryKey: ["userPosts", user.username] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["userPosts", user.username] }),
+        queryClient.invalidateQueries({ queryKey: ["conversations"] }),
+        queryClient.invalidateQueries({ queryKey: ["comments"] }),
+        queryClient.invalidateQueries({ queryKey: ["post"] }),
+        queryClient.invalidateQueries({ queryKey: ["userProfile", user.username] }),
+      ]);
       setIsEditModalVisible(false);
       showSuccess("Profile saved", "Your changes are live across the app.");
     },

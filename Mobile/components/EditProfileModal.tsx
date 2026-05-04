@@ -19,6 +19,8 @@ import { Surface } from "@/components/ui/Surface";
 import { Text } from "@/components/ui/Text";
 import { TextField } from "@/components/ui/TextField";
 import { useTheme } from "@/hooks/useTheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 import type { ProfileFormData } from "@/hooks/useProfile";
 
 export interface EditProfileModalProps {
@@ -68,6 +70,8 @@ function EditProfileModalImpl({
   usernameValidateErrors,
 }: EditProfileModalProps) {
   const { colors, spacing, radii } = useTheme();
+  const { currentUser } = useCurrentUser();
+  const availability = useUsernameAvailability(formData.username, currentUser?.username);
 
   const showImageMenu = useCallback(
     (type: "profilePicture" | "bannerImage") => {
@@ -289,8 +293,44 @@ function EditProfileModalImpl({
                   placeholder="username"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  error={usernameValidate ? undefined : usernameValidateErrors[0]}
-                  helper="Letters, numbers, underscores. 3–30 characters."
+                  error={
+                    availability.status === "invalid"
+                      ? availability.message
+                      : availability.status === "taken"
+                      ? availability.message ?? "That handle is taken."
+                      : usernameValidate
+                      ? undefined
+                      : usernameValidateErrors[0]
+                  }
+                  helper={
+                    availability.status === "checking"
+                      ? "Checking availability…"
+                      : availability.status === "available"
+                      ? availability.message ?? "Available"
+                      : "Letters, numbers, underscores. 3–30 characters."
+                  }
+                  trailing={
+                    availability.status === "checking" ? (
+                      <Feather
+                        name="loader"
+                        size={16}
+                        color={colors.text.tertiary}
+                      />
+                    ) : availability.status === "available" ? (
+                      <Feather
+                        name="check-circle"
+                        size={16}
+                        color={colors.tint.success}
+                      />
+                    ) : availability.status === "taken" ||
+                      availability.status === "invalid" ? (
+                      <Feather
+                        name="x-circle"
+                        size={16}
+                        color={colors.tint.danger}
+                      />
+                    ) : null
+                  }
                 />
                 <TextField
                   label="Bio"
@@ -300,7 +340,6 @@ function EditProfileModalImpl({
                   multiline
                   maxLength={160}
                   helper={`${formData.bio.length}/160`}
-                  style={{ height: 96, textAlignVertical: "top" }}
                 />
                 <TextField
                   label="Location"

@@ -13,9 +13,11 @@
  *  with less mental overhead. The face-stack also exposes social proof
  *  ("real people, my work landed") without any artificial inflation.
  */
-import React, { memo, useMemo } from "react";
-import { View } from "react-native";
+import React, { memo, useCallback, useMemo } from "react";
+import { Pressable, View } from "react-native";
+import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
@@ -68,6 +70,7 @@ function buildSentence(group: NotificationGroup): string {
 
 function GroupedNotificationCardImpl({ group }: GroupedNotificationCardProps) {
   const { colors, spacing } = useTheme();
+  const router = useRouter();
   const glyphName = FEATHER_GLYPH[group.type];
   const glyphColor =
     group.type === "like"
@@ -80,7 +83,43 @@ function GroupedNotificationCardImpl({ group }: GroupedNotificationCardProps) {
   const stack = group.notifications.slice(0, 3);
   const total = group.notifications.length;
 
+  const onPress = useCallback(() => {
+    Haptics.selectionAsync().catch(() => undefined);
+    const first = group.notifications[0];
+    if (!first) return;
+    // Route by type:
+    //   follow  → the actor's profile
+    //   like    → the post the actor liked
+    //   comment → the post the actor commented on
+    // Falls back to the actor's profile when the post id isn't available
+    // (legacy notifications without `post` populated).
+    if (group.type === "follow") {
+      router.push({
+        pathname: "/user-profile",
+        params: { userId: first.from._id ?? "", username: first.from.username },
+      });
+      return;
+    }
+
+    const postId = group.post?._id;
+    if (postId) {
+      router.push({ pathname: "/post/[postId]", params: { postId } });
+      return;
+    }
+
+    router.push({
+      pathname: "/user-profile",
+      params: { userId: first.from._id ?? "", username: first.from.username },
+    });
+  }, [group.notifications, group.post?._id, group.type, router]);
+
   return (
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: colors.overlay.press }}
+      accessibilityRole="button"
+      accessibilityLabel={sentence}
+    >
     <Card variant="solid" className="mx-base mb-sm p-base border border-subtle">
       <View style={{ flexDirection: "row", gap: spacing.md }}>
         <View
@@ -163,6 +202,7 @@ function GroupedNotificationCardImpl({ group }: GroupedNotificationCardProps) {
         </View>
       </View>
     </Card>
+    </Pressable>
   );
 }
 

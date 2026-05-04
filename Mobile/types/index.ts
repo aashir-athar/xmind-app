@@ -24,6 +24,8 @@ export interface Comment {
   content: string;
   createdAt: string;
   user: User;
+  /** User ids that have liked this comment. */
+  likes?: string[];
 }
 
 export interface Post {
@@ -48,10 +50,12 @@ export type NotificationType = "like" | "comment" | "follow";
 export interface Notification {
   _id: string;
   from: {
+    _id: string;
     username: string;
     firstName: string;
     lastName: string;
     profilePicture?: string;
+    verified?: boolean;
   };
   to: string;
   type: NotificationType;

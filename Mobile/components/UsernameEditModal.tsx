@@ -1,5 +1,5 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import React, { memo, useCallback, useEffect, useState } from "react";
+import { Modal, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/Text";
 import { TextField } from "@/components/ui/TextField";
 import { useTheme } from "@/hooks/useTheme";
 import { useUsernameUpdate } from "@/hooks/useUsernameUpdate";
+import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
 
 export interface UsernameEditModalProps {
   visible: boolean;
@@ -18,11 +19,17 @@ export interface UsernameEditModalProps {
 }
 
 /**
- * Sheet for editing a username in isolation. Validation happens locally
- * — only allowed characters and length — and the parent hook handles
- * uniqueness and the network roundtrip.
+ * Username editor with real-time availability check.
+ *
+ * As the user types, `useUsernameAvailability` debounces the input by
+ * 350 ms then asks the backend whether the handle is free. The trailing
+ * indicator inside the field flips between checking / available / taken.
  */
-function UsernameEditModalImpl({ visible, currentUsername, onClose }: UsernameEditModalProps) {
+function UsernameEditModalImpl({
+  visible,
+  currentUsername,
+  onClose,
+}: UsernameEditModalProps) {
   const { colors, spacing, radii } = useTheme();
   const { updateUsername, isUpdating } = useUsernameUpdate();
   const [next, setNext] = useState(currentUsername);
@@ -31,19 +38,44 @@ function UsernameEditModalImpl({ visible, currentUsername, onClose }: UsernameEd
     if (visible) setNext(currentUsername);
   }, [currentUsername, visible]);
 
-  const error = useMemo(() => {
-    const value = next.trim();
-    if (value.length === 0) return "Pick a username.";
-    if (value.length < 3 || value.length > 30) return "Use 3 to 30 characters.";
-    if (!/^[a-zA-Z0-9_]+$/.test(value)) return "Letters, numbers, and underscores only.";
-    return undefined;
-  }, [next]);
+  const availability = useUsernameAvailability(next, currentUsername);
+
+  const error =
+    availability.status === "invalid"
+      ? availability.message
+      : availability.status === "taken"
+      ? availability.message ?? "That handle is taken."
+      : undefined;
+
+  const helper =
+    availability.status === "checking"
+      ? "Checking availability…"
+      : availability.status === "available"
+      ? availability.message ?? "Available"
+      : "Letters, numbers, underscores. 3–30 characters.";
+
+  const canSave =
+    availability.status === "available" &&
+    next.trim().toLowerCase() !== currentUsername.toLowerCase();
 
   const onSave = useCallback(async () => {
-    if (error) return;
+    if (!canSave) return;
     await updateUsername(next.trim());
     onClose();
-  }, [error, next, onClose, updateUsername]);
+  }, [canSave, next, onClose, updateUsername]);
+
+  const trailingIcon = (() => {
+    if (availability.status === "checking") {
+      return <Feather name="loader" size={16} color={colors.text.tertiary} />;
+    }
+    if (availability.status === "available") {
+      return <Feather name="check-circle" size={16} color={colors.tint.success} />;
+    }
+    if (availability.status === "taken" || availability.status === "invalid") {
+      return <Feather name="x-circle" size={16} color={colors.tint.danger} />;
+    }
+    return null;
+  })();
 
   return (
     <Modal
@@ -95,12 +127,25 @@ function UsernameEditModalImpl({ visible, currentUsername, onClose }: UsernameEd
               autoCapitalize="none"
               autoCorrect={false}
               error={error}
-              helper="Letters, numbers, underscores. 3–30 characters."
+              helper={error ? undefined : helper}
+              trailing={trailingIcon}
             />
 
-            <View style={{ flexDirection: "row", gap: spacing.sm, justifyContent: "flex-end", marginTop: spacing.sm }}>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: spacing.sm,
+                justifyContent: "flex-end",
+                marginTop: spacing.sm,
+              }}
+            >
               <Button label="Cancel" variant="secondary" onPress={onClose} />
-              <Button label="Save" loading={isUpdating} disabled={!!error} onPress={onSave} />
+              <Button
+                label="Save"
+                loading={isUpdating}
+                disabled={!canSave}
+                onPress={onSave}
+              />
             </View>
           </Surface>
         </SafeAreaView>

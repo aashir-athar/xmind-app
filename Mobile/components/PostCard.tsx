@@ -48,10 +48,12 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
+import { useBookmarksStore } from "@/stores/useBookmarksStore";
 import { formatDate, formatNumber } from "@/utils/formatter";
 import type { Post, User } from "@/types";
 
 import ImageModal from "./ImageModal";
+import ShareToChatSheet from "./ShareToChatSheet";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import CustomAlert from "./CustomAlert";
 
@@ -80,6 +82,7 @@ function PostCardImpl({
     useCustomAlert();
 
   const [imageOpen, setImageOpen] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const isOwn = !!currentUser && post.user._id === currentUser._id;
   const commentCount = post.commentCount ?? post.comments?.length ?? 0;
   const likeCount = post.likes?.length ?? 0;
@@ -172,6 +175,24 @@ function PostCardImpl({
       onMore(post);
     }
   }, [onMore, post]);
+
+  // Share opens an in-app friend picker (the IG / Twitter pattern). The
+  // sheet itself has a "Share elsewhere" footer that fans out to the
+  // OS share sheet for users who want WhatsApp / Messages / AirDrop.
+  const handleShare = useCallback(() => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setShareSheetOpen(true);
+  }, []);
+
+  // Bookmarks — local-first via Zustand + AsyncStorage. The contract
+  // (toggle, isBookmarked) lets a future server-side bookmarks API drop
+  // in by replacing the store implementation, with no call-site changes.
+  const isBookmarked = useBookmarksStore((s) => s.postIds.has(post._id));
+  const toggleBookmark = useBookmarksStore((s) => s.toggle);
+  const handleBookmark = useCallback(async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    await toggleBookmark(post._id);
+  }, [post._id, toggleBookmark]);
 
   const navigateToProfile = useCallback(() => {
     if (isOwn) router.push("/(tabs)/profile");
@@ -394,17 +415,24 @@ function PostCardImpl({
           >
             <Feather name="message-circle" size={24} color={colors.text.primary} />
           </Action>
-          <Action onPress={() => undefined} accessibilityLabel="Share">
+          <Action onPress={handleShare} accessibilityLabel="Share">
             <Feather name="send" size={22} color={colors.text.primary} />
           </Action>
           <View style={{ flex: 1 }} />
           <Pressable
-            onPress={() => undefined}
+            onPress={handleBookmark}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Save"
+            accessibilityLabel={isBookmarked ? "Remove from saved" : "Save post"}
           >
-            <Feather name="bookmark" size={22} color={colors.text.primary} />
+            <Feather
+              name="bookmark"
+              size={22}
+              color={isBookmarked ? colors.tint.primary : colors.text.primary}
+              // Filled effect via tint colour swap — matches the heart
+              // pattern (single icon, colour flip on state change).
+              style={{ opacity: isBookmarked ? 1 : 0.95 }}
+            />
           </Pressable>
         </View>
 
@@ -440,6 +468,11 @@ function PostCardImpl({
         onClose={() => setImageOpen(false)}
         imageUrl={post.image || ""}
         imageTitle="Post image"
+      />
+
+      <ShareToChatSheet
+        post={shareSheetOpen ? post : null}
+        onClose={() => setShareSheetOpen(false)}
       />
 
       {alertConfig ? (

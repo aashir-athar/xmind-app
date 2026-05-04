@@ -21,7 +21,6 @@
  */
 import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
-import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -72,65 +71,75 @@ export default function HomeScreen() {
   }, []);
 
   const headerSlot = (
-    <Surface variant="glass" style={{ borderBottomWidth: 0.5, borderBottomColor: colors.border.subtle }}>
+    <Surface
+      variant="glass"
+      style={{
+        borderBottomWidth: 0.5,
+        borderBottomColor: colors.border.subtle,
+      }}
+    >
       <SafeAreaView edges={["top"]}>
+        {/* Belt-and-suspenders layout: justifyContent: 'space-between' on
+            the row PLUS a width:'100%' wrapper. This survives even if
+            NativeWind doesn't compile or Metro serves a stale bundle —
+            the wordmark sits left, the action group sits right, no flex
+            arithmetic required. */}
         <View
           style={{
+            width: "100%",
             flexDirection: "row",
             alignItems: "center",
+            justifyContent: "space-between",
             paddingHorizontal: 16,
-            paddingTop: 6,
+            paddingTop: 4,
             paddingBottom: 10,
-            gap: 12,
           }}
         >
           <Pressable
             onPress={onLogoPress}
             accessibilityRole="button"
             accessibilityLabel="Scroll feed to top"
-            hitSlop={6}
+            hitSlop={8}
             style={({ pressed }) => ({
-              opacity: pressed ? 0.7 : 1,
-              flexDirection: "row",
-              alignItems: "center",
-              flex: 1,
-              gap: 10,
+              opacity: pressed ? 0.6 : 1,
             })}
           >
-            <View
+            <Text
+              tone="primary"
+              weight="900"
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 11,
-                backgroundColor: colors.tint.primary,
-                alignItems: "center",
-                justifyContent: "center",
+                fontSize: 28,
+                lineHeight: 32,
+                letterSpacing: -1.2,
               }}
             >
-              <ExpoImage
-                source={require("@/assets/images/xMind-Logo1.png")}
-                style={{ width: 20, height: 20, tintColor: colors.text.onTint }}
-                contentFit="contain"
-              />
-            </View>
-            <Text variant="title" tone="primary" weight="800">
               xMind
             </Text>
           </Pressable>
 
-          <IconButton
-            accessibilityLabel="Open notifications"
-            onPress={() => router.push("/notifications")}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            }}
           >
-            <Feather name="heart" size={24} color={colors.text.primary} />
-          </IconButton>
-          <IconButton
-            accessibilityLabel="Open inbox"
-            onPress={() => router.push("/messages")}
-            badge={inboxUnread}
-          >
-            <Feather name="send" size={22} color={colors.text.primary} />
-          </IconButton>
+            <IconButton
+              accessibilityLabel="Open notifications"
+              variant="ghost"
+              onPress={() => router.push("/notifications")}
+            >
+              <Feather name="heart" size={24} color={colors.text.primary} />
+            </IconButton>
+            <IconButton
+              accessibilityLabel="Open inbox"
+              variant="ghost"
+              onPress={() => router.push("/messages")}
+              badge={inboxUnread}
+            >
+              <Feather name="send" size={22} color={colors.text.primary} />
+            </IconButton>
+          </View>
         </View>
       </SafeAreaView>
     </Surface>

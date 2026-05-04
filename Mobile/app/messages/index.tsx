@@ -30,11 +30,25 @@ export default function MessagesScreen() {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { conversations, isLoading, refetch, isRefetching } = useConversations();
+  const { conversations, isLoading, refetch } = useConversations();
   const { currentUser } = useCurrentUser();
 
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+
+  // Polling spinner discipline: the inbox refetches every 5s in the
+  // background, so binding RefreshControl to `isRefetching` made the
+  // spinner flash on every poll. Only show it on a deliberate
+  // pull-to-refresh; automatic polls stay invisible.
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const onManualRefresh = useCallback(async () => {
+    setIsManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  }, [refetch]);
 
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -168,8 +182,8 @@ export default function MessagesScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
+              refreshing={isManualRefreshing}
+              onRefresh={onManualRefresh}
               tintColor={colors.tint.primary}
               colors={[colors.tint.primary]}
             />
