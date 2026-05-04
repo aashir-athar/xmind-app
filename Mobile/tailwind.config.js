@@ -1,20 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 //
-// NativeWind 4 + Tailwind 3.
-//
-// Color tokens reference CSS variables defined in `global.css`. Each
-// variable swaps automatically under `@media (prefers-color-scheme: dark)`,
-// which NativeWind wires to `useColorScheme()`. The result: a single
-// class — e.g. `bg-canvas`, `text-primary`, `border-subtle` — resolves
-// to the right value in both schemes. No need to write `dark:` variants
-// across the codebase for ordinary colour usage.
-//
-// Brand and semantic accent colours stay literal — they don't flip
-// across schemes.
-//
-// The light / dark palette here mirrors `Mobile/constants/tokens.ts`,
-// so screens that style with `useTheme()` and screens that style with
-// `className` end up rendering the same pixels.
+// xMind 2026 — coral / magenta / sky palette mirrored from
+// `Mobile/constants/tokens.ts`. Color tokens resolve to CSS variables
+// declared in `global.css` so light/dark switches happen at the variable
+// layer without `dark:` prefixes scattered through screens.
 //
 module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],
@@ -25,17 +14,19 @@ module.exports = {
       colors: {
         // ── Brand (stable across themes) ────────────────────────────────
         brand: {
-          DEFAULT: "#5B3DF5",
-          strong: "#3F23D9",
-          soft: "#8A75FF",
+          DEFAULT: "#F0466A",
+          strong: "#E11D48",
+          soft: "#FB7185",
         },
-        accent: {
-          DEFAULT: "#22D3EE",
-          soft: "#67E8F9",
+        magenta: "#C026D3",
+        peach: "#FB923C",
+        sky: {
+          DEFAULT: "#1B7CE8",
+          soft: "#60A5FA",
         },
         success: "#10B981",
         warning: "#F59E0B",
-        danger: "#EF4444",
+        danger: "#DC2626",
 
         // ── Semantic surfaces (auto-flip via CSS variables) ─────────────
         canvas: "var(--color-bg-canvas)",
@@ -52,18 +43,13 @@ module.exports = {
         tertiary: "var(--color-text-tertiary)",
         inverse: "var(--color-text-inverse)",
 
-        // ── Mode-aware tint (used when the brand needs to lift on dark) ─
         tint: {
           DEFAULT: "var(--color-tint-primary)",
           strong: "var(--color-tint-primary-strong)",
           soft: "var(--color-tint-primary-soft)",
+          accent: "var(--color-tint-accent)",
         },
-
-        // ── Border tokens (translucent so they read on either scheme) ──
-        // Bound directly on `borderColor` via Tailwind's color resolver.
       },
-      // Border colours need to live under their own key so `border-subtle`
-      // and `border-strong` work as `borderColor` utilities.
       borderColor: {
         subtle: "var(--color-border-subtle)",
         strong: "var(--color-border-strong)",
@@ -90,20 +76,20 @@ module.exports = {
         bodySm: ["13px", { lineHeight: "18px" }],
         body: ["15px", { lineHeight: "22px" }],
         bodyLg: ["17px", { lineHeight: "24px" }],
-        subtitle: ["18px", { lineHeight: "24px", letterSpacing: "-0.1px" }],
-        title: ["22px", { lineHeight: "28px", letterSpacing: "-0.3px" }],
-        headline: ["28px", { lineHeight: "34px", letterSpacing: "-0.6px" }],
-        display: ["40px", { lineHeight: "46px", letterSpacing: "-1.2px" }],
+        subtitle: ["17px", { lineHeight: "22px", letterSpacing: "-0.1px" }],
+        title: ["22px", { lineHeight: "28px", letterSpacing: "-0.4px" }],
+        headline: ["30px", { lineHeight: "36px", letterSpacing: "-0.7px" }],
+        display: ["44px", { lineHeight: "50px", letterSpacing: "-1.4px" }],
       },
       // ── Radii (mirrors tokens.radii) ─────────────────────────────────
       borderRadius: {
         xs: "4px",
         sm: "8px",
         md: "12px",
-        base: "16px",
-        lg: "20px",
-        xl: "24px",
-        xxl: "32px",
+        base: "14px",
+        lg: "18px",
+        xl: "22px",
+        xxl: "28px",
         pill: "999px",
       },
     },

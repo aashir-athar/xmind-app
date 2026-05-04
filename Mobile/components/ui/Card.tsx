@@ -6,25 +6,21 @@ import { useTheme } from "@/hooks/useTheme";
 
 export interface CardProps {
   children: React.ReactNode;
-  /** Surface treatment used by this card. Defaults to `solid`. */
   variant?: SurfaceVariant;
-  /** Inner padding. Defaults to `base` (16). */
   padding?: number;
-  /** Border radius. Defaults to `radii.lg`. */
   radius?: number;
-  /** Stretch to parent width. */
   fullWidth?: boolean;
-  /** NativeWind utility classes. Merges with `style`. */
+  /** Render a hairline border. Defaults to true on solid; false on glass. */
+  bordered?: boolean;
   className?: string;
   style?: ViewStyle;
 }
 
 /**
- * Card composition. Wraps `Surface` and adds the standard padding
- * and outer border that the design system prescribes for cards.
- *
- * Accepts `className` so consumers can extend layout via NativeWind
- * utilities without having to touch internal styles.
+ * Card — composes Surface with the standard card padding and the new
+ * 18px radius. Cards on the new feed feel posted, not stamped. The
+ * border is opt-in: most full-bleed media cards skip it; profile and
+ * sidebar cards keep it.
  */
 function CardImpl({
   children,
@@ -32,12 +28,15 @@ function CardImpl({
   padding,
   radius,
   fullWidth = true,
+  bordered,
   className,
   style,
 }: CardProps) {
   const { spacing, radii, colors } = useTheme();
   const r = radius ?? radii.lg;
   const p = padding ?? spacing.base;
+
+  const wantsBorder = bordered ?? variant !== "glass";
 
   return (
     <Surface
@@ -47,7 +46,9 @@ function CardImpl({
       style={{
         padding: p,
         alignSelf: fullWidth ? "stretch" : "auto",
-        borderColor: colors.border.subtle,
+        ...(wantsBorder
+          ? { borderWidth: 1, borderColor: colors.border.subtle }
+          : null),
         ...style,
       }}
     >

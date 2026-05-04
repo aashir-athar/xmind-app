@@ -2,15 +2,15 @@ import React, { memo, useCallback } from "react";
 import {
   ActionSheetIOS,
   Alert,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   View,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Image as ExpoImage } from "expo-image";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import { Button } from "@/components/ui/Button";
@@ -68,7 +68,6 @@ function EditProfileModalImpl({
   usernameValidateErrors,
 }: EditProfileModalProps) {
   const { colors, spacing, radii } = useTheme();
-  const insets = useSafeAreaInsets();
 
   const showImageMenu = useCallback(
     (type: "profilePicture" | "bannerImage") => {
@@ -109,48 +108,74 @@ function EditProfileModalImpl({
       statusBarTranslucent
     >
       <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
-        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={insets.top + 8}
-            style={{ flex: 1, padding: spacing.base }}
+        <Pressable
+          accessibilityLabel="Dismiss editor"
+          onPress={onClose}
+          style={{ height: 64 }}
+        />
+        <KeyboardAvoidingView
+          // Platform-aware: iOS lifts via `padding`, Android via `height`.
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+          style={{ flex: 1 }}
+        >
+          <Surface
+            variant="solid"
+            style={{
+              flex: 1,
+              borderTopLeftRadius: radii.xxl,
+              borderTopRightRadius: radii.xxl,
+              overflow: "hidden",
+              borderTopWidth: 1,
+              borderLeftWidth: 1,
+              borderRightWidth: 1,
+              borderColor: colors.border.subtle,
+            }}
           >
-            <Surface
-              variant="solid"
-              radius={radii.xl}
+            {/* Handle bar — IG sheet aesthetic. */}
+            <View
               style={{
-                flex: 1,
-                overflow: "hidden",
-                borderWidth: 1,
-                borderColor: colors.border.subtle,
+                alignItems: "center",
+                paddingTop: spacing.sm,
+                paddingBottom: spacing.xs,
               }}
             >
-              {/* Header */}
               <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.border.subtle,
-                  gap: spacing.md,
+                  width: 36,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: colors.border.strong,
                 }}
-              >
-                <IconButton accessibilityLabel="Close" onPress={onClose}>
-                  <Feather name="x" size={20} color={colors.text.primary} />
-                </IconButton>
-                <Text variant="title" tone="primary" style={{ flex: 1 }}>
-                  Edit profile
-                </Text>
-                <Button label="Save" size="sm" loading={isUpdating} onPress={onSave} />
-              </View>
+              />
+            </View>
 
-              <ScrollView
-                contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.sm,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border.subtle,
+                gap: spacing.md,
+              }}
+            >
+              <IconButton accessibilityLabel="Close" onPress={onClose} variant="filled">
+                <Feather name="x" size={18} color={colors.text.primary} />
+              </IconButton>
+              <Text variant="title" tone="primary" style={{ flex: 1 }}>
+                Edit profile
+              </Text>
+              <Button label="Save" size="sm" loading={isUpdating} onPress={onSave} />
+            </View>
+
+            <ScrollView
+              contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
                 {/* Banner */}
                 <Pressable
                   onPress={() => showImageMenu("bannerImage")}
@@ -283,10 +308,10 @@ function EditProfileModalImpl({
                   onChangeText={(t) => updateFormField("location", t)}
                   placeholder="City, country (optional)"
                 />
-              </ScrollView>
-            </Surface>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
+            </ScrollView>
+            <SafeAreaView edges={["bottom"]} />
+          </Surface>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

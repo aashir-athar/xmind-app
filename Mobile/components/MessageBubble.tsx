@@ -1,0 +1,152 @@
+/**
+ * MessageBubble — single message in the chat thread.
+ *
+ * Style: iMessage / IG hybrid.
+ *  - Outgoing bubbles: coral fill, white text, right-aligned.
+ *  - Incoming bubbles: subtle surface fill, primary text, left-aligned.
+ *  - Grouped consecutive messages from the same sender within 3 minutes
+ *    have a tighter top margin and a tucked corner radius (the
+ *    "continuation" affordance every chat ships).
+ *  - Optimistic rows show a faint clock badge; failed rows show a
+ *    coral retry chip.
+ */
+import React, { memo, useCallback } from "react";
+import { Pressable, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+
+import { Text } from "@/components/ui/Text";
+import { useTheme } from "@/hooks/useTheme";
+import { formatDate } from "@/utils/formatter";
+import type { ChatMessage } from "@/types";
+
+export interface MessageBubbleProps {
+  message: ChatMessage;
+  isMine: boolean;
+  /** True when the previous message is from the same sender within 3 minutes. */
+  grouped?: boolean;
+  /** Show the timestamp beneath the bubble (i.e. last in a group). */
+  showTimestamp?: boolean;
+  /** Triggered when the user taps a failed message's retry pill. */
+  onRetry?: (message: ChatMessage) => void;
+}
+
+function MessageBubbleImpl({
+  message,
+  isMine,
+  grouped,
+  showTimestamp,
+  onRetry,
+}: MessageBubbleProps) {
+  const { colors, spacing, radii } = useTheme();
+  const handleRetry = useCallback(() => onRetry?.(message), [message, onRetry]);
+
+  const bubbleColor = isMine ? colors.chat.outgoingBg : colors.chat.incomingBg;
+  const textColor = isMine ? colors.chat.outgoingText : colors.chat.incomingText;
+
+  // Tighter "tucked" corner on the inner side for grouped continuations.
+  const innerRadius = grouped ? radii.md : radii.xl;
+  const outerRadius = radii.xl;
+
+  const radiusStyle = isMine
+    ? {
+        borderTopLeftRadius: outerRadius,
+        borderBottomLeftRadius: outerRadius,
+        borderTopRightRadius: grouped ? innerRadius : outerRadius,
+        borderBottomRightRadius: outerRadius,
+      }
+    : {
+        borderTopRightRadius: outerRadius,
+        borderBottomRightRadius: outerRadius,
+        borderTopLeftRadius: grouped ? innerRadius : outerRadius,
+        borderBottomLeftRadius: outerRadius,
+      };
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.base,
+        marginTop: grouped ? 2 : spacing.sm,
+        flexDirection: "row",
+        justifyContent: isMine ? "flex-end" : "flex-start",
+      }}
+    >
+      <View style={{ maxWidth: "80%" }}>
+        <View
+          style={[
+            {
+              backgroundColor: bubbleColor,
+              paddingHorizontal: spacing.base,
+              paddingVertical: spacing.sm + 2,
+              opacity: message.pending ? 0.65 : 1,
+            },
+            radiusStyle,
+          ]}
+        >
+          <Text variant="body" style={{ color: textColor }}>
+            {message.body}
+          </Text>
+        </View>
+
+        {showTimestamp ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              marginTop: 2,
+              paddingHorizontal: 4,
+              alignSelf: isMine ? "flex-end" : "flex-start",
+            }}
+          >
+            {message.pending ? (
+              <Feather name="clock" size={10} color={colors.chat.timestamp} />
+            ) : null}
+            <Text variant="caption" tone="tertiary">
+              {formatDate(message.createdAt)}
+            </Text>
+          </View>
+        ) : null}
+
+        {message.failed ? (
+          <Pressable
+            onPress={handleRetry}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Retry sending this message"
+            style={{
+              marginTop: 4,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              alignSelf: isMine ? "flex-end" : "flex-start",
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              borderRadius: 999,
+              backgroundColor: colors.tint.danger + "22",
+            }}
+          >
+            <Feather name="alert-circle" size={11} color={colors.tint.danger} />
+            <Text variant="caption" tone="danger" weight="700">
+              Tap to retry
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+export const MessageBubble = memo(
+  MessageBubbleImpl,
+  (prev, next) =>
+    prev.message._id === next.message._id &&
+    prev.message.body === next.message.body &&
+    prev.message.pending === next.message.pending &&
+    prev.message.failed === next.message.failed &&
+    prev.isMine === next.isMine &&
+    prev.grouped === next.grouped &&
+    prev.showTimestamp === next.showTimestamp
+);
+MessageBubble.displayName = "MessageBubble";
+
+export default MessageBubble;

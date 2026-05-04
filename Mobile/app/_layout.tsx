@@ -7,14 +7,22 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { useTheme } from "@/hooks/useTheme";
 
 /**
- * Inner layout — needs `useTheme()` so it must sit under the providers
- * that the rest of the app relies on. Splitting it out keeps StatusBar
- * style perfectly synced with the active colour scheme on every render.
+ * Inner stack — needs `useTheme()` so it sits under the providers.
+ * Splitting it keeps StatusBar style perfectly synced with the active
+ * colour scheme on every render.
+ *
+ * IA shifts:
+ *  - Notifications and Messages move OFF the bottom tab bar.
+ *  - Notifications opens as a stack screen from the home top bar.
+ *  - Messages inbox + thread are stack screens from the home top bar.
+ *  - Create is also a stack screen, presented as a fullscreen modal from
+ *    the centred tab-bar plus button.
  */
 function ThemedStack() {
   const { statusBarStyle, colors } = useTheme();
@@ -31,6 +39,13 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="user-profile" />
         <Stack.Screen name="hashtag-posts" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen
+          name="create"
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="messages/index" />
+        <Stack.Screen name="messages/[conversationId]" />
       </Stack>
       <StatusBar style={statusBarStyle} animated />
     </>
@@ -39,9 +54,12 @@ function ThemedStack() {
 
 /**
  * Root provider stack. Order matters:
- *   GestureHandlerRoot → SafeAreaProvider → Clerk → ReactQuery → app.
- * Gesture handler must wrap everything for swipe-back navigation, and
- * SafeAreaProvider must sit above any screen that reads insets.
+ *   GestureHandlerRoot → KeyboardProvider → SafeAreaProvider → Clerk
+ *   → ReactQuery → app.
+ *
+ * KeyboardProvider must wrap the navigators because chat composers use
+ * `react-native-keyboard-controller`'s primitives (KeyboardStickyView,
+ * KeyboardAvoidingView). The package's docs are explicit on this.
  */
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -49,8 +67,6 @@ export default function RootLayout() {
       new QueryClient({
         defaultOptions: {
           queries: {
-            // Conservative defaults for mobile: trust cached data while
-            // active, only refetch on focus when the data is stale.
             staleTime: 30_000,
             gcTime: 5 * 60_000,
             retry: 1,
@@ -62,13 +78,15 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ClerkProvider tokenCache={tokenCache}>
-          <QueryClientProvider client={queryClient}>
-            <ThemedStack />
-          </QueryClientProvider>
-        </ClerkProvider>
-      </SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <ClerkProvider tokenCache={tokenCache}>
+            <QueryClientProvider client={queryClient}>
+              <ThemedStack />
+            </QueryClientProvider>
+          </ClerkProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

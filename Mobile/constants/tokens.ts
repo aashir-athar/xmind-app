@@ -1,19 +1,28 @@
 /**
- * Design tokens — 2026 visual language.
+ * xMind 2026 — TOTAL visual rebuild.
+ *
+ * Visual identity rationale (FB + IG + Twitter hybrid):
+ *  - The signature accent is a warm Instagram-style sunset: a coral
+ *    primary (#F0466A) flanked by a softer peach and a deep magenta —
+ *    the same hot-orange-to-pink axis that signals "post energy" on IG
+ *    Stories rings, but tuned warmer than IG's literal gradient so it
+ *    reads as its own brand rather than a clone.
+ *  - The neutrals lean Twitter/X: tight ink-blacks on dark, near-white
+ *    canvas on light, hairline borders. Density matters.
+ *  - The communications blue (#1B7CE8) is a pragmatic Facebook nod —
+ *    used for hyperlinks, mentions, and message-thread accents.
+ *  - Old indigo (#5B3DF5) is gone entirely. This is a different app now.
  *
  * Token layers:
  *  1. Primitive scale  (raw values: spacing, radii, durations, type sizes)
  *  2. Semantic palette (light & dark — consumed via `useTheme`)
  *  3. Motion + elevation curves
- *
- * Tokens are exported as readonly literals so TypeScript can narrow on usage
- * (e.g. `keyof typeof spacing`) and so values cannot be mutated at runtime.
  */
 
-// ───────────────────────────────────────────────────────────────────────────
-// Spacing — 4px baseline grid (8px modular for layout).
-// Names map to a unified scale used across padding, margin, gap.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Spacing — 4px baseline grid, slightly tighter mid-scale than before so
+// dense feed rows breathe without becoming Twitter-cramped.
+// ─────────────────────────────────────────────────────────────────────────
 export const spacing = {
   none: 0,
   xxs: 2,
@@ -31,86 +40,96 @@ export const spacing = {
 
 export type SpacingToken = keyof typeof spacing;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Radii — generous, with a dedicated pill scale for 2026 capsule UI.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Radii — softer than before. Cards lean toward 18–22px, pills full,
+// media has a generous 16 so images on FB/IG-style cards feel posted, not
+// hard-cropped.
+// ─────────────────────────────────────────────────────────────────────────
 export const radii = {
   none: 0,
   xs: 4,
   sm: 8,
   md: 12,
-  base: 16,
-  lg: 20,
-  xl: 24,
-  xxl: 32,
+  base: 14,
+  lg: 18,
+  xl: 22,
+  xxl: 28,
   pill: 999,
 } as const;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Typography — fluid type scale aligned to a 1.18 ratio.
-// We expose sizes + line-heights as paired literals so consumers don't drift.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Typography — variable-weight system stack, tighter tracking on display
+// sizes (Instagram aesthetic), generous line-height on body for long
+// captions (Facebook aesthetic). Numeric weight strings stay consistent
+// with React Native's TextStyle contract.
+// ─────────────────────────────────────────────────────────────────────────
 export const typography = {
-  display: { size: 40, lineHeight: 46, letterSpacing: -1.2, weight: "700" },
-  headline: { size: 28, lineHeight: 34, letterSpacing: -0.6, weight: "700" },
-  title: { size: 22, lineHeight: 28, letterSpacing: -0.3, weight: "600" },
-  subtitle: { size: 18, lineHeight: 24, letterSpacing: -0.1, weight: "600" },
+  display: { size: 44, lineHeight: 50, letterSpacing: -1.4, weight: "800" },
+  headline: { size: 30, lineHeight: 36, letterSpacing: -0.7, weight: "800" },
+  title: { size: 22, lineHeight: 28, letterSpacing: -0.4, weight: "700" },
+  subtitle: { size: 17, lineHeight: 22, letterSpacing: -0.1, weight: "700" },
   bodyLg: { size: 17, lineHeight: 24, letterSpacing: 0, weight: "400" },
   body: { size: 15, lineHeight: 22, letterSpacing: 0, weight: "400" },
   bodySm: { size: 13, lineHeight: 18, letterSpacing: 0.1, weight: "400" },
-  label: { size: 13, lineHeight: 16, letterSpacing: 0.2, weight: "600" },
-  caption: { size: 11, lineHeight: 14, letterSpacing: 0.3, weight: "500" },
+  label: { size: 13, lineHeight: 16, letterSpacing: 0.2, weight: "700" },
+  caption: { size: 11, lineHeight: 14, letterSpacing: 0.3, weight: "600" },
 } as const;
 
 export type TypographyToken = keyof typeof typography;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Motion — calibrated curves for dopamine-positive micro-interactions
-// without excess. Spring presets feed Reanimated `withSpring`.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Motion — Instagram-style snappy spring on likes, iOS-native page slides,
+// minimal ambient motion. Same primitives as before; values retuned for
+// shorter durations.
+// ─────────────────────────────────────────────────────────────────────────
 export const motion = {
   duration: {
     instant: 80,
     fast: 140,
-    base: 220,
-    slow: 320,
-    deliberate: 480,
+    base: 200,
+    slow: 300,
+    deliberate: 460,
   },
   spring: {
-    /** Crisp tap feedback. */
-    snappy: { damping: 18, stiffness: 320, mass: 0.6 },
-    /** Default UI movement. */
+    /** Crisp tap feedback (button press, like bounce). */
+    snappy: { damping: 16, stiffness: 360, mass: 0.5 },
+    /** Default UI movement (page transitions, tab indicator). */
     gentle: { damping: 22, stiffness: 220, mass: 0.9 },
-    /** Bouncy emphasis (rare — use for delight moments only). */
-    bouncy: { damping: 12, stiffness: 180, mass: 0.8 },
+    /** Bouncy emphasis (heart pop on double-tap). */
+    bouncy: { damping: 10, stiffness: 200, mass: 0.7 },
   },
 } as const;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Brand palette — mapped from the existing brand identity. We keep brand
-// hues stable across themes; only neutrals and surfaces flip.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Brand palette — sunset coral + magenta + sky messenger.
+// ─────────────────────────────────────────────────────────────────────────
 const brand = {
-  primary: "#5B3DF5",
-  primaryStrong: "#3F23D9",
-  primarySoft: "#8A75FF",
-  accent: "#22D3EE",
-  accentSoft: "#67E8F9",
+  /** Primary action / heart fill / story ring start. */
+  coral: "#F0466A",
+  coralStrong: "#E11D48",
+  coralSoft: "#FB7185",
+  /** Story ring end / new-post pulse. */
+  magenta: "#C026D3",
+  /** Sunset accent for gradient stops between coral and magenta. */
+  peach: "#FB923C",
+  /** Communications blue — links, mentions, send button on chat. */
+  sky: "#1B7CE8",
+  skySoft: "#60A5FA",
   warning: "#F59E0B",
-  danger: "#EF4444",
+  danger: "#DC2626",
   success: "#10B981",
 } as const;
 
-// ───────────────────────────────────────────────────────────────────────────
-// Semantic palettes. Every screen consumes these via `useTheme()`.
-// Naming follows a predictable contract:
-//   bg.*       — page / surface backgrounds
-//   surface.*  — cards, sheets, inline panels
-//   text.*     — typographic foreground
-//   border.*   — separators
-//   tint.*     — interactive emphasis
-//   overlay.*  — modal scrims, glass tints
-// ───────────────────────────────────────────────────────────────────────────
+/**
+ * Story-ring gradient stops — Instagram-style three-color sweep, kept
+ * consistent across light/dark so the unviewed-story signal reads
+ * identically in both themes.
+ */
+export const storyRingGradient = [brand.peach, brand.coral, brand.magenta] as const;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Semantic palette contract.
+// ─────────────────────────────────────────────────────────────────────────
 export interface ColorPalette {
   bg: { canvas: string; elevated: string; muted: string };
   surface: { primary: string; secondary: string; raised: string; sunken: string };
@@ -127,99 +146,120 @@ export interface ColorPalette {
   };
   overlay: { scrim: string; glassTint: string; press: string };
   brand: typeof brand;
+  /** Bubble surfaces for chat — separated so we can match other-party bubbles to the platform's chat aesthetic. */
+  chat: {
+    incomingBg: string;
+    incomingText: string;
+    outgoingBg: string;
+    outgoingText: string;
+    timestamp: string;
+  };
 }
 
 export const lightPalette: ColorPalette = {
   bg: {
-    canvas: "#F7F7FB",
+    canvas: "#FFFFFF",
     elevated: "#FFFFFF",
-    muted: "#EEEEF4",
+    muted: "#F4F4F6",
   },
   surface: {
     primary: "#FFFFFF",
-    secondary: "#F3F3F8",
+    secondary: "#F6F6F8",
     raised: "#FFFFFF",
-    sunken: "#ECECF1",
+    sunken: "#EFEFF3",
   },
   text: {
-    primary: "#0E0E12",
-    secondary: "#48485A",
-    tertiary: "#8C8CA1",
+    primary: "#0F0F12",
+    secondary: "#5A5A66",
+    tertiary: "#94949F",
     inverse: "#FFFFFF",
     onTint: "#FFFFFF",
   },
   border: {
-    subtle: "rgba(15,15,22,0.08)",
-    strong: "rgba(15,15,22,0.16)",
-    focus: brand.primary,
+    subtle: "rgba(15,15,18,0.07)",
+    strong: "rgba(15,15,18,0.14)",
+    focus: brand.coral,
   },
   tint: {
-    primary: brand.primary,
-    primaryStrong: brand.primaryStrong,
-    primarySoft: brand.primarySoft,
-    accent: brand.accent,
+    primary: brand.coral,
+    primaryStrong: brand.coralStrong,
+    primarySoft: brand.coralSoft,
+    accent: brand.sky,
     success: brand.success,
     warning: brand.warning,
     danger: brand.danger,
   },
   overlay: {
-    scrim: "rgba(10,10,18,0.45)",
-    glassTint: "rgba(255,255,255,0.6)",
-    press: "rgba(15,15,22,0.06)",
+    scrim: "rgba(10,10,14,0.45)",
+    glassTint: "rgba(255,255,255,0.72)",
+    press: "rgba(15,15,18,0.06)",
   },
   brand,
+  chat: {
+    incomingBg: "#F1F1F5",
+    incomingText: "#0F0F12",
+    outgoingBg: brand.coral,
+    outgoingText: "#FFFFFF",
+    timestamp: "#94949F",
+  },
 };
 
 export const darkPalette: ColorPalette = {
   bg: {
-    canvas: "#08080C",
-    elevated: "#13131A",
-    muted: "#1A1A24",
+    canvas: "#000000",
+    elevated: "#0E0E12",
+    muted: "#15151B",
   },
   surface: {
-    primary: "#13131A",
-    secondary: "#1A1A24",
-    raised: "#1F1F2B",
-    sunken: "#0E0E14",
+    primary: "#0E0E12",
+    secondary: "#15151B",
+    raised: "#1B1B22",
+    sunken: "#08080B",
   },
   text: {
-    primary: "#F5F5FA",
-    secondary: "#B6B6C7",
-    tertiary: "#7A7A90",
-    inverse: "#0E0E12",
+    primary: "#F5F5F8",
+    secondary: "#B6B6C0",
+    tertiary: "#76767F",
+    inverse: "#0F0F12",
     onTint: "#FFFFFF",
   },
   border: {
     subtle: "rgba(255,255,255,0.08)",
     strong: "rgba(255,255,255,0.18)",
-    focus: brand.primarySoft,
+    focus: brand.coralSoft,
   },
   tint: {
-    primary: brand.primarySoft,
-    primaryStrong: brand.primary,
-    primarySoft: brand.primarySoft,
-    accent: brand.accentSoft,
+    primary: brand.coral,
+    primaryStrong: brand.coralStrong,
+    primarySoft: brand.coralSoft,
+    accent: brand.skySoft,
     success: brand.success,
     warning: brand.warning,
     danger: brand.danger,
   },
   overlay: {
-    scrim: "rgba(0,0,0,0.6)",
-    glassTint: "rgba(20,20,28,0.55)",
+    scrim: "rgba(0,0,0,0.7)",
+    glassTint: "rgba(20,20,26,0.6)",
     press: "rgba(255,255,255,0.06)",
   },
   brand,
+  chat: {
+    incomingBg: "#1B1B22",
+    incomingText: "#F5F5F8",
+    outgoingBg: brand.coral,
+    outgoingText: "#FFFFFF",
+    timestamp: "#76767F",
+  },
 };
 
-// ───────────────────────────────────────────────────────────────────────────
-// Elevation — Android uses native shadow values, iOS layers shadow + opacity.
-// Each level is a presentational hint; renderers translate to platform style.
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
+// Elevation — shadows are softer (FB/IG do not lean on heavy shadows).
+// ─────────────────────────────────────────────────────────────────────────
 export const elevation = {
   none: { shadowOpacity: 0, elevation: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 } },
-  sm: { shadowOpacity: 0.08, elevation: 2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-  md: { shadowOpacity: 0.12, elevation: 4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-  lg: { shadowOpacity: 0.18, elevation: 8, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+  sm: { shadowOpacity: 0.06, elevation: 2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  md: { shadowOpacity: 0.1, elevation: 4, shadowRadius: 14, shadowOffset: { width: 0, height: 6 } },
+  lg: { shadowOpacity: 0.16, elevation: 10, shadowRadius: 24, shadowOffset: { width: 0, height: 10 } },
 } as const;
 
 export type ElevationToken = keyof typeof elevation;

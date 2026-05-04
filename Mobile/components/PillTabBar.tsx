@@ -1,7 +1,27 @@
-import React, { memo, useCallback, useEffect, useMemo } from "react";
+/**
+ * 2026 Tab Bar — IG/FB hybrid bottom navigation.
+ *
+ * Lever: Fitts's Law + endowed-progress.
+ *  The centred Create button is raised, larger, and gradient-filled — a
+ *  thumb-sized target sitting where the dominant thumb naturally rests.
+ *  Surfacing the create action at the apex of the bar removes the
+ *  three-tap penalty social apps levy on posting and turns it into the
+ *  most obvious motion in the app.
+ *
+ * Visual contract:
+ *  - Five tabs: Home, Search, Create (centred + raised), Reels, Profile.
+ *  - The 4 satellite tabs read like Instagram: outline icon at rest,
+ *    filled black icon when active. Below the icon, no label at rest
+ *    (Twitter/X minimalism). Active tab gets a small dot underneath.
+ *  - The Create button is a 56px coral disc with a white plus, gently
+ *    shadowed. Tapping it opens the create sheet (composer).
+ *  - On Android the bar is opaque (no BlurView). On iOS the surface uses
+ *    the platform glass primitive (Liquid Glass on iOS 26+).
+ */
+import React, { memo, useCallback, useMemo } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useAnimatedStyle,
@@ -9,218 +29,298 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { Surface } from "@/components/ui/Surface";
 import { useTheme } from "@/hooks/useTheme";
+import { storyRingGradient } from "@/constants/tokens";
 
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+type FeatherGlyph = React.ComponentProps<typeof Feather>["name"];
+type IoniconsGlyph = React.ComponentProps<typeof Ionicons>["name"];
+type MciGlyph = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 interface RouteMeta {
   label: string;
-  icon: IoniconName;
-  iconActive: IoniconName;
+  family: "feather" | "ion" | "mci";
+  icon: FeatherGlyph | IoniconsGlyph | MciGlyph;
+  iconActive: FeatherGlyph | IoniconsGlyph | MciGlyph;
 }
 
 const ROUTE_META: Record<string, RouteMeta> = {
-  index: { label: "Home", icon: "home-outline", iconActive: "home" },
-  search: { label: "Search", icon: "search-outline", iconActive: "search" },
-  notifications: {
-    label: "Inbox",
-    icon: "notifications-outline",
-    iconActive: "notifications",
-  },
-  messages: {
-    label: "Messages",
-    icon: "chatbubble-outline",
-    iconActive: "chatbubble",
+  index: { label: "Home", family: "feather", icon: "home", iconActive: "home" },
+  search: { label: "Search", family: "feather", icon: "search", iconActive: "search" },
+  reels: {
+    label: "Reels",
+    family: "mci",
+    icon: "play-circle-outline",
+    iconActive: "play-circle",
   },
   profile: {
     label: "Profile",
-    icon: "person-outline",
-    iconActive: "person",
+    family: "feather",
+    icon: "user",
+    iconActive: "user",
   },
 };
 
-const TAB_ORDER = ["index", "search", "notifications", "messages", "profile"] as const;
+const TAB_ORDER = ["index", "search", "create", "reels", "profile"] as const;
 
-const TAB_SIZE = 56;
-const CONTAINER_PADDING = 6;
-const GAP = 4;
+const TAB_HEIGHT = 64;
+const CREATE_SIZE = 56;
 
-/**
- * 2026 Pill Tab Bar.
- *
- * Visual contract:
- *  - Capsule (pill) container floating above content with a translucent
- *    material on iOS (Liquid Glass on iOS 26+, BlurView on earlier),
- *    and a flat themed surface on Android (no BlurView on Android per
- *    project policy — BlurView forces software composition on most
- *    low-end Android GPUs and tanks scroll FPS).
- *  - A sliding pill indicator highlights the active tab. The indicator
- *    is animated entirely on the UI thread via Reanimated, so list
- *    scrolling never starves the indicator's spring.
- *  - Active state: filled icon + tinted indicator. Inactive: outline
- *    icon at lower contrast. Hierarchy is unmistakable at a glance.
- *
- * Performance:
- *  - One shared value drives the indicator's translateX. Each tap
- *    mutates a single signal — no JS bridge crossings during the spring.
- *  - The whole bar is `memo`'d, so screen content re-renders never
- *    re-render the bar.
- *  - All sizes precomputed; no per-render layout math.
- *
- * Accessibility:
- *  - Each tab is a tab role with `selected` state.
- *  - Hit slop expands the tap target so reaching the bar from a thumb
- *    on a 6.7" phone never misses (Fitts's Law).
- */
+interface IconProps {
+  meta: RouteMeta;
+  active: boolean;
+  color: string;
+}
+
+function TabIcon({ meta, active, color }: IconProps) {
+  if (meta.family === "feather") {
+    return (
+      <Feather
+        name={(active ? meta.iconActive : meta.icon) as FeatherGlyph}
+        size={26}
+        color={color}
+      />
+    );
+  }
+  if (meta.family === "ion") {
+    return (
+      <Ionicons
+        name={(active ? meta.iconActive : meta.icon) as IoniconsGlyph}
+        size={26}
+        color={color}
+      />
+    );
+  }
+  return (
+    <MaterialCommunityIcons
+      name={(active ? meta.iconActive : meta.icon) as MciGlyph}
+      size={28}
+      color={color}
+    />
+  );
+}
+
 function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
-  const { colors, radii, spacing, mode } = useTheme();
+  const { colors, spacing, mode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const tabsOrdered = useMemo(
-    () =>
-      state.routes
-        .filter((r) => ROUTE_META[r.name])
-        .sort(
-          (a, b) =>
-            TAB_ORDER.indexOf(a.name as (typeof TAB_ORDER)[number]) -
-            TAB_ORDER.indexOf(b.name as (typeof TAB_ORDER)[number])
-        ),
-    [state.routes]
+  // Order routes per TAB_ORDER. The "create" entry is virtual — it
+  // doesn't correspond to a real route; tapping it opens a modal.
+  const routes = useMemo(() => state.routes.filter((r) => ROUTE_META[r.name]), [
+    state.routes,
+  ]);
+
+  const isFocusedFor = useCallback(
+    (name: string) => {
+      const focused = state.routes[state.index];
+      return focused?.name === name;
+    },
+    [state.index, state.routes]
   );
 
-  const activeIndex = useMemo(() => {
-    const focused = state.routes[state.index];
-    const idx = tabsOrdered.findIndex((r) => r.key === focused?.key);
-    return idx < 0 ? 0 : idx;
-  }, [state.index, state.routes, tabsOrdered]);
-
-  const indicatorX = useSharedValue(activeIndex * (TAB_SIZE + GAP));
-
-  useEffect(() => {
-    indicatorX.value = withSpring(activeIndex * (TAB_SIZE + GAP), {
-      damping: 22,
-      stiffness: 220,
-      mass: 0.9,
-    });
-  }, [activeIndex, indicatorX]);
-
-  const indicatorAnimated = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.value }],
-  }));
-
   const onPressTab = useCallback(
-    (routeName: string, key: string, isFocused: boolean) => {
+    (routeName: string) => {
+      const target = state.routes.find((r) => r.name === routeName);
+      if (!target) return;
       const event = navigation.emit({
         type: "tabPress",
-        target: key,
+        target: target.key,
         canPreventDefault: true,
       });
-      if (!isFocused && !event.defaultPrevented) {
+      if (!isFocusedFor(routeName) && !event.defaultPrevented) {
         Haptics.selectionAsync().catch(() => undefined);
         navigation.navigate(routeName);
       }
     },
-    [navigation]
+    [isFocusedFor, navigation, state.routes]
   );
+
+  const onPressCreate = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() =>
+      undefined
+    );
+    // The create flow is rendered as a stack screen at app root.
+    navigation.navigate("create" as never);
+  }, [navigation]);
 
   return (
     <View
+      pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: insets.bottom + spacing.sm,
+        bottom: 0,
         left: 0,
         right: 0,
-        alignItems: "center",
-        // Allow taps to pass through outside the pill.
-        pointerEvents: "box-none",
       }}
     >
-      <View
-        style={{
-          // Shadow lives on the outer view; clipping lives on the
-          // Surface. Combining both on a single layer forces iOS to
-          // rasterise the view off-screen — that costs measurable FPS
-          // when the indicator springs over the tab.
-          shadowColor: "#000",
-          shadowOpacity: mode === "dark" ? 0.45 : 0.12,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
-          borderRadius: radii.pill,
-        }}
-      >
       <Surface
-        variant="glass"
-        radius={radii.pill}
-        intensity={Platform.OS === "ios" ? 50 : 0}
-        tintColor={mode === "dark" ? "#1A1A24" : "#FFFFFF"}
-        interactive
+        variant={Platform.OS === "ios" ? "glass" : "solid"}
+        intensity={60}
+        tintColor={mode === "dark" ? "#0E0E12" : "#FFFFFF"}
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          padding: CONTAINER_PADDING,
-          gap: GAP,
-          overflow: "hidden",
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: colors.border.subtle,
-          // Android opaque fallback — Surface tints translucently when
-          // liquid glass + BlurView are both unavailable.
+          paddingTop: spacing.sm,
+          paddingBottom: insets.bottom + spacing.xs,
+          paddingHorizontal: spacing.lg,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border.subtle,
           backgroundColor:
-            Platform.OS === "android" ? colors.surface.raised : undefined,
+            Platform.OS === "android" ? colors.bg.canvas : undefined,
         }}
       >
-        {/* Sliding pill indicator */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            {
-              position: "absolute",
-              left: CONTAINER_PADDING,
-              top: CONTAINER_PADDING,
-              width: TAB_SIZE,
-              height: TAB_SIZE,
-              borderRadius: TAB_SIZE / 2,
-              backgroundColor: colors.tint.primary,
-            },
-            indicatorAnimated,
-          ]}
-        />
-
-        {tabsOrdered.map((route, i) => {
-          const meta = ROUTE_META[route.name];
-          const isFocused = i === activeIndex;
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isFocused }}
-              accessibilityLabel={meta.label}
-              onPress={() => onPressTab(route.name, route.key, isFocused)}
-              hitSlop={6}
-              style={{
-                width: TAB_SIZE,
-                height: TAB_SIZE,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons
-                name={isFocused ? meta.iconActive : meta.icon}
-                size={24}
-                color={isFocused ? colors.text.onTint : colors.text.secondary}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            height: TAB_HEIGHT - spacing.sm * 2,
+          }}
+        >
+          {TAB_ORDER.map((slot) => {
+            if (slot === "create") {
+              return <CreateButton key="create" onPress={onPressCreate} />;
+            }
+            const meta = ROUTE_META[slot];
+            const route = routes.find((r) => r.name === slot);
+            if (!meta || !route) return <View key={slot} style={{ width: 56 }} />;
+            const active = isFocusedFor(slot);
+            return (
+              <TabSatellite
+                key={slot}
+                meta={meta}
+                active={active}
+                onPress={() => onPressTab(slot)}
+                color={active ? colors.text.primary : colors.text.secondary}
+                indicatorColor={colors.tint.primary}
               />
-              {/* Twitter-style: no visible labels at rest. The `accessibilityLabel`
-                  on the Pressable still announces the tab to screen readers. */}
-            </Pressable>
-          );
-        })}
+            );
+          })}
+        </View>
       </Surface>
-      </View>
     </View>
   );
 }
+
+interface SatelliteProps {
+  meta: RouteMeta;
+  active: boolean;
+  onPress: () => void;
+  color: string;
+  indicatorColor: string;
+}
+
+const SatelliteImpl = ({ meta, active, onPress, color, indicatorColor }: SatelliteProps) => {
+  const scale = useSharedValue(1);
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const onPressIn = useCallback(() => {
+    scale.value = withSpring(0.9, { damping: 16, stiffness: 360, mass: 0.5 });
+  }, [scale]);
+  const onPressOut = useCallback(() => {
+    scale.value = withSpring(1, { damping: 16, stiffness: 360, mass: 0.5 });
+  }, [scale]);
+
+  return (
+    <Animated.View style={animated}>
+      <Pressable
+        accessibilityRole="tab"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={meta.label}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        hitSlop={8}
+        style={{
+          width: 56,
+          height: 48,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <TabIcon meta={meta} active={active} color={color} />
+        <View
+          style={{
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            marginTop: 4,
+            backgroundColor: active ? indicatorColor : "transparent",
+          }}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+};
+
+const TabSatellite = memo(SatelliteImpl);
+TabSatellite.displayName = "TabSatellite";
+
+function CreateButtonImpl({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+  const animated = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  const onPressIn = useCallback(() => {
+    scale.value = withSpring(0.92, { damping: 14, stiffness: 360, mass: 0.5 });
+  }, [scale]);
+  const onPressOut = useCallback(() => {
+    scale.value = withSpring(1, { damping: 14, stiffness: 360, mass: 0.5 });
+  }, [scale]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: CREATE_SIZE,
+          height: CREATE_SIZE,
+          borderRadius: CREATE_SIZE / 2,
+          shadowColor: colors.tint.primary,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.4,
+          shadowRadius: 14,
+          elevation: 10,
+        },
+        animated,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Create new post"
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        hitSlop={6}
+        style={{
+          width: CREATE_SIZE,
+          height: CREATE_SIZE,
+          borderRadius: CREATE_SIZE / 2,
+          overflow: "hidden",
+        }}
+      >
+        <LinearGradient
+          colors={storyRingGradient as unknown as [string, string, string]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            width: CREATE_SIZE,
+            height: CREATE_SIZE,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Feather name="plus" size={28} color="#FFFFFF" />
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+const CreateButton = memo(CreateButtonImpl);
+CreateButton.displayName = "CreateButton";
 
 export const PillTabBar = memo(PillTabBarImpl);
 PillTabBar.displayName = "PillTabBar";

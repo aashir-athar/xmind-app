@@ -18,21 +18,24 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface IconButtonProps
   extends Omit<PressableProps, "style" | "children" | "onPress"> {
-  /** The icon node to render. Provided as `children` for flexibility. */
   children: React.ReactNode;
   size?: number;
-  variant?: "ghost" | "tinted" | "filled";
+  variant?: "ghost" | "tinted" | "filled" | "primary";
   onPress?: (event: GestureResponderEvent) => void;
   haptics?: boolean;
   accessibilityLabel: string;
-  /** NativeWind utility classes. */
+  /** Optional badge count rendered top-right (e.g. unread inbox). */
+  badge?: number;
   className?: string;
   style?: ViewStyle;
 }
 
 /**
- * Compact circular pressable used for header actions, modal dismiss,
- * and inline controls. Always at least 44x44 hit area for accessibility.
+ * IconButton.
+ *
+ * Adds a `primary` variant (coral fill) and a discrete badge slot for
+ * the home top-bar inbox/notifications icons. Always at least 44x44
+ * effective tap area via hitSlop.
  */
 function IconButtonImpl({
   children,
@@ -41,6 +44,7 @@ function IconButtonImpl({
   onPress,
   haptics = true,
   accessibilityLabel,
+  badge,
   className,
   style,
   disabled,
@@ -74,6 +78,8 @@ function IconButtonImpl({
       ? colors.surface.secondary
       : variant === "tinted"
       ? colors.overlay.press
+      : variant === "primary"
+      ? colors.tint.primary
       : "transparent";
 
   return (
@@ -103,7 +109,46 @@ function IconButtonImpl({
       {...rest}
     >
       {children}
+      {badge !== undefined && badge > 0 ? (
+        <Badge count={badge} />
+      ) : null}
     </AnimatedPressable>
+  );
+}
+
+function Badge({ count }: { count: number }) {
+  const { colors } = useTheme();
+  const display = count > 99 ? "99+" : String(count);
+  const wide = display.length > 1;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: -2,
+        right: -2,
+        minWidth: 18,
+        height: 18,
+        paddingHorizontal: wide ? 5 : 0,
+        borderRadius: 9,
+        backgroundColor: colors.tint.primary,
+        borderWidth: 2,
+        borderColor: colors.bg.canvas,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Animated.Text
+        style={{
+          color: colors.text.onTint,
+          fontSize: 10,
+          lineHeight: 12,
+          fontWeight: "800",
+        }}
+      >
+        {display}
+      </Animated.Text>
+    </Animated.View>
   );
 }
 

@@ -1,3 +1,20 @@
+/**
+ * Profile (current user) — FB-style header + IG-style media grid.
+ *
+ * Lever: peak-end + identity reinforcement.
+ *  Cover image up top, avatar overlapped below — the FB pattern of
+ *  treating the profile as a personal stage. The 3-column media grid
+ *  is the IG move that turns the profile into a portfolio at a glance.
+ *  Twitter-style "Posts" tab is preserved for the verbal feed.
+ *
+ * Hierarchy (top → bottom):
+ *  1. Top bar (display name + sign out).
+ *  2. Cover photo (3:1).
+ *  3. Avatar overlap + identity card (name, handle, bio, meta, stats).
+ *  4. Verification progress (kept as-is — strong existing affordance).
+ *  5. Profile tabs (Posts / Media / Replies / Likes).
+ *  6. Tab content. Media tab swaps the timeline for a 3-col grid.
+ */
 import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
@@ -17,6 +34,7 @@ import PostsList from "@/components/PostsList";
 import ProfileTabs, { type ProfileTab } from "@/components/ProfileTabs";
 import SignOutButton from "@/components/SignOutButton";
 import VerificationProgress from "@/components/VerificationProgress";
+import ImageModal from "@/components/ImageModal";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -25,33 +43,14 @@ import { usePosts } from "@/hooks/usePosts";
 import { useProfile } from "@/hooks/useProfile";
 import { formatNumber } from "@/utils/formatter";
 
-/**
- * Profile (current user).
- *
- * Hierarchy reads top-to-bottom:
- *   banner → identity → bio → meta → stats → tabs → content.
- *
- * Psychology lever — Progressive disclosure + Locus of control:
- *  Tabs let the user pick the slice they care about (Posts / Replies /
- *  Media / Likes) without committing to a full second screen. Replies,
- *  Media, and Likes carry honest copy explaining they're coming —
- *  never a stub or "TODO". Edit-profile is pinned next to the avatar
- *  (Fitts's Law — close to existing focus, easy to reach).
- *
- * Performance:
- *  - Posts list is delegated to PostsList (FlashList recycler).
- *  - Banner image uses native cover scaling at a fixed aspect ratio so
- *    we don't trigger image decoding on layout changes.
- */
 export default function ProfileScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, radii } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { currentUser, isLoading } = useCurrentUser();
-  const {
-    posts: userPosts,
-    refetch: refetchPosts,
-  } = usePosts(currentUser?.username);
+  const { posts: userPosts, refetch: refetchPosts } = usePosts(
+    currentUser?.username
+  );
 
   const {
     isEditModalVisible,
@@ -82,6 +81,7 @@ export default function ProfileScreen() {
 
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -115,23 +115,53 @@ export default function ProfileScreen() {
     verificationResult,
   ]);
 
+  const mediaPosts = useMemo(
+    () => (userPosts ?? []).filter((p) => !!p.image),
+    [userPosts]
+  );
+
   const tabContent = useMemo(() => {
     if (!currentUser) return null;
     if (activeTab === "posts") {
       return <PostsList username={currentUser.username} />;
     }
     if (activeTab === "media") {
-      const mediaPosts = (userPosts ?? []).filter((p) => !!p.image);
       if (mediaPosts.length === 0) {
         return (
           <EmptyState
             icon={<Feather name="image" size={26} color={colors.tint.primary} />}
             title="No media yet"
-            description="Post a photo and it'll show up here. Image-only filtering arrives next."
+            description="Post a photo and it'll show up here in a clean grid."
           />
         );
       }
-      return <PostsList posts={mediaPosts} />;
+      return (
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            paddingHorizontal: 1,
+          }}
+        >
+          {mediaPosts.map((p) => (
+            <Pressable
+              key={p._id}
+              onPress={() => p.image && setPreviewUrl(p.image)}
+              style={{ width: "33.3%", aspectRatio: 1, padding: 1 }}
+              accessibilityRole="button"
+              accessibilityLabel="Open photo"
+            >
+              <ExpoImage
+                source={{ uri: p.image! }}
+                style={{ width: "100%", height: "100%" }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={120}
+              />
+            </Pressable>
+          ))}
+        </View>
+      );
     }
     if (activeTab === "replies") {
       return (
@@ -149,13 +179,19 @@ export default function ProfileScreen() {
         description="Your liked posts will land here in a future update with a privacy toggle."
       />
     );
-  }, [activeTab, colors.tint.primary, currentUser, userPosts]);
+  }, [activeTab, colors.tint.primary, currentUser, mediaPosts]);
 
   if (isLoading || !currentUser?._id) {
     return (
-      <View className="flex-1 bg-canvas">
+      <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
         <SafeAreaView edges={["top"]}>
-          <View className="px-lg pt-md gap-md">
+          <View
+            style={{
+              paddingHorizontal: spacing.lg,
+              paddingTop: spacing.md,
+              gap: spacing.md,
+            }}
+          >
             <Skeleton width="100%" height={200} radius={16} />
             <Skeleton width="50%" height={20} />
             <Skeleton width="40%" height={14} />
@@ -171,15 +207,25 @@ export default function ProfileScreen() {
     : null;
 
   return (
-    <View className="flex-1 bg-canvas">
-      <SafeAreaView edges={["top"]} className="bg-canvas">
-        <View className="flex-row items-center justify-between px-lg py-md border-b border-subtle">
-          <View className="flex-1">
+    <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
+      <SafeAreaView edges={["top"]} style={{ backgroundColor: colors.bg.canvas }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: spacing.lg,
+            paddingVertical: spacing.md,
+            borderBottomWidth: 0.5,
+            borderBottomColor: colors.border.subtle,
+          }}
+        >
+          <View style={{ flex: 1 }}>
             <Text variant="title" tone="primary" numberOfLines={1}>
               {currentUser.firstName} {currentUser.lastName}
             </Text>
             <Text variant="bodySm" tone="secondary">
-              {userPosts?.length === 1 ? "1 post" : `${userPosts?.length || 0} posts`}
+              @{currentUser.username}
             </Text>
           </View>
           <SignOutButton />
@@ -198,75 +244,99 @@ export default function ProfileScreen() {
           />
         }
       >
-        {/* Banner — 3:1 ratio mirrors Twitter/X header proportions, leaving
-            generous room for the avatar overlap below without dominating
-            the screen. expo-image keeps decode off the JS thread. */}
-        <ExpoImage
-          source={
-            currentUser.bannerImage
-              ? { uri: currentUser.bannerImage }
-              : require("../../assets/images/default-banner.jpeg")
-          }
-          style={{ width: "100%", aspectRatio: 3 / 1 }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={200}
-        />
-
-        {/* Identity card */}
-        <Card
-          variant="solid"
-          radius={24}
-          className="mx-base -mt-xl pt-lg border border-subtle"
+        {/* FB-style cover */}
+        <Pressable
+          onPress={() => setPreviewUrl(currentUser.bannerImage ?? null)}
+          disabled={!currentUser.bannerImage}
         >
-          <View className="flex-row items-end justify-between -mt-[64px] mb-md">
-            <Avatar
-              source={currentUser.profilePicture}
-              name={`${currentUser.firstName} ${currentUser.lastName}`}
-              size={88}
-              ringColor={colors.surface.primary}
-              style={{ borderWidth: 4, borderColor: colors.surface.primary }}
-            />
-            <Button label="Edit profile" variant="secondary" size="sm" onPress={openEditModal} />
+          <ExpoImage
+            source={
+              currentUser.bannerImage
+                ? { uri: currentUser.bannerImage }
+                : require("../../assets/images/default-banner.jpeg")
+            }
+            style={{ width: "100%", aspectRatio: 3 / 1 }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
+          />
+        </Pressable>
+
+        {/* Identity block — avatar overlaps the bottom of the cover. */}
+        <View
+          style={{
+            paddingHorizontal: spacing.lg,
+            marginTop: -56,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              marginBottom: spacing.md,
+            }}
+          >
+            <View
+              style={{
+                borderWidth: 4,
+                borderColor: colors.bg.canvas,
+                borderRadius: 56,
+              }}
+            >
+              <Avatar
+                source={currentUser.profilePicture}
+                name={`${currentUser.firstName} ${currentUser.lastName}`}
+                size={104}
+              />
+            </View>
+            <View style={{ flexDirection: "row", gap: spacing.sm, paddingBottom: spacing.sm }}>
+              <Button
+                label="Edit profile"
+                variant="secondary"
+                size="sm"
+                onPress={openEditModal}
+              />
+            </View>
           </View>
 
-          <View className="flex-row items-center gap-sm">
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
             <Text variant="title" tone="primary" numberOfLines={1}>
               {currentUser.firstName} {currentUser.lastName}
             </Text>
             {currentUser.verified ? <VerifiedBadge size={18} /> : null}
           </View>
-          <Text variant="bodySm" tone="secondary" className="mt-[2px]">
+          <Text variant="bodySm" tone="secondary" style={{ marginTop: 2 }}>
             @{currentUser.username}
           </Text>
 
           {currentUser.bio ? (
-            <Text variant="body" tone="primary" className="mt-md">
+            <Text variant="body" tone="primary" style={{ marginTop: spacing.md }}>
               {currentUser.bio}
             </Text>
           ) : (
             <Text
               variant="body"
               tone="tertiary"
-              className="mt-md italic"
+              style={{ marginTop: spacing.md, fontStyle: "italic" }}
             >
               Add a one-line bio so people know who they're following.
             </Text>
           )}
 
-          <View className="mt-md gap-xs">
+          <View style={{ marginTop: spacing.md, gap: spacing.xs }}>
             {currentUser.location ? (
               <MetaRow icon="map-pin" label={currentUser.location} />
             ) : null}
             {joined ? <MetaRow icon="calendar" label={`Joined ${joined}`} /> : null}
           </View>
 
-          {/* Stats row — generous separators, bold numbers, consistent column widths. */}
+          {/* Stats */}
           <View
             style={{
               flexDirection: "row",
               marginTop: spacing.lg,
-              borderRadius: 16,
+              borderRadius: radii.lg,
               backgroundColor: colors.surface.secondary,
               borderWidth: 1,
               borderColor: colors.border.subtle,
@@ -285,21 +355,23 @@ export default function ProfileScreen() {
             <Divider />
             <Stat label="Posts" value={formatNumber(userPosts?.length || 0)} />
           </View>
-        </Card>
-
-        <View className="px-base mt-md">
-          <VerificationProgress
-            isVerified={currentUser.verified}
-            progress={getVerificationProgressValue()}
-            statusMessage={getVerificationStatusMessageValue()}
-            isEligible={verificationResult?.isEligible || false}
-            onVerificationRequest={handleVerificationRequest}
-            isChecking={isCheckingVerification}
-            missingRequirements={getVerificationRequirementsValue()}
-          />
         </View>
 
-        <View className="mt-md">
+        <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.md }}>
+          <Card variant="solid">
+            <VerificationProgress
+              isVerified={currentUser.verified}
+              progress={getVerificationProgressValue()}
+              statusMessage={getVerificationStatusMessageValue()}
+              isEligible={verificationResult?.isEligible || false}
+              onVerificationRequest={handleVerificationRequest}
+              isChecking={isCheckingVerification}
+              missingRequirements={getVerificationRequirementsValue()}
+            />
+          </Card>
+        </View>
+
+        <View style={{ marginTop: spacing.md }}>
           <ProfileTabs active={activeTab} onChange={setActiveTab} />
           <View style={{ minHeight: 240 }}>{tabContent}</View>
         </View>
@@ -321,14 +393,27 @@ export default function ProfileScreen() {
         usernameValidate={usernameValidate}
         usernameValidateErrors={usernameValidateErrors}
       />
+
+      <ImageModal
+        isVisible={!!previewUrl}
+        onClose={() => setPreviewUrl(null)}
+        imageUrl={previewUrl ?? ""}
+        imageTitle="Photo"
+      />
     </View>
   );
 }
 
-function MetaRow({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: string }) {
-  const { colors } = useTheme();
+function MetaRow({
+  icon,
+  label,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+}) {
+  const { colors, spacing } = useTheme();
   return (
-    <View className="flex-row items-center gap-sm">
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
       <Feather name={icon} size={14} color={colors.text.tertiary} />
       <Text variant="bodySm" tone="secondary">
         {label}
@@ -339,8 +424,11 @@ function MetaRow({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: 
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Pressable accessibilityRole="button" className="flex-1 items-center">
-      <Text variant="title" tone="primary" weight="700">
+    <Pressable
+      accessibilityRole="button"
+      style={{ flex: 1, alignItems: "center" }}
+    >
+      <Text variant="title" tone="primary" weight="800">
         {value}
       </Text>
       <Text variant="caption" tone="tertiary">
@@ -354,8 +442,7 @@ function Divider() {
   const { colors } = useTheme();
   return (
     <View
-      className="w-[1px] self-stretch my-xs"
-      style={{ backgroundColor: colors.border.subtle }}
+      style={{ width: 1, alignSelf: "stretch", marginVertical: 4, backgroundColor: colors.border.subtle }}
     />
   );
 }

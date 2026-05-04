@@ -15,7 +15,7 @@ import { useMemo } from "react";
  */
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  "https://x-clone-react-native-seven.vercel.app/api";
+  "https://xmind-app-five.vercel.app/api";
 
 /**
  * Augment Axios's request config with our retry flag without leaking
@@ -277,4 +277,68 @@ export const notificationApi = {
     notificationId: string
   ): ApiResponse<{ message: string }> =>
     api.delete(`/notifications/${encodeURIComponent(notificationId)}`),
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// Conversations / messages — option A backend (Express + Mongo + polling).
+// Endpoints are mounted at `/api/conversations` server-side. Clients send
+// `clientId` on every message create so retries don't duplicate; the
+// server treats the (conversation, clientId) pair as a unique key and
+// returns the existing row if the same key is replayed.
+// ─────────────────────────────────────────────────────────────────────────
+
+export interface ConversationsPayload<C> {
+  conversations: C[];
+}
+export interface ConversationPayload<C> {
+  conversation: C;
+}
+export interface MessagesPayload<M> {
+  messages: M[];
+  /** ISO timestamp of the oldest message in this page; used as the next cursor. */
+  nextCursor?: string | null;
+}
+export interface MessagePayload<M> {
+  message: M;
+}
+
+export interface ListMessagesOptions {
+  /** ISO timestamp of the oldest message already loaded. Server returns messages older than this. */
+  cursor?: string | null;
+  /** Page size (server clamps 1–50). */
+  limit?: number;
+}
+
+export const conversationApi = {
+  list: <C>(api: AxiosInstance): ApiResponse<ConversationsPayload<C>> =>
+    api.get("/conversations"),
+
+  /** Idempotent: returns the existing 1:1 conversation with `targetUserId`, or creates one. */
+  createOrGet: <C>(
+    api: AxiosInstance,
+    targetUserId: string
+  ): ApiResponse<ConversationPayload<C>> =>
+    api.post("/conversations", { targetUserId }),
+
+  listMessages: <M>(
+    api: AxiosInstance,
+    conversationId: string,
+    opts: ListMessagesOptions = {}
+  ): ApiResponse<MessagesPayload<M>> =>
+    api.get(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      params: { cursor: opts.cursor ?? undefined, limit: opts.limit ?? undefined },
+    }),
+
+  sendMessage: <M>(
+    api: AxiosInstance,
+    conversationId: string,
+    payload: { body: string; clientId: string }
+  ): ApiResponse<MessagePayload<M>> =>
+    api.post(`/conversations/${encodeURIComponent(conversationId)}/messages`, payload),
+
+  markRead: (
+    api: AxiosInstance,
+    conversationId: string
+  ): ApiResponse<{ updated: number }> =>
+    api.post(`/conversations/${encodeURIComponent(conversationId)}/read`),
 };

@@ -9,24 +9,30 @@ import {
 import { useTheme } from "@/hooks/useTheme";
 import type { TypographyToken } from "@/constants/tokens";
 
-type TextTone = "primary" | "secondary" | "tertiary" | "inverse" | "tint" | "danger" | "success";
+type TextTone =
+  | "primary"
+  | "secondary"
+  | "tertiary"
+  | "inverse"
+  | "tint"
+  | "accent"
+  | "danger"
+  | "success";
 
 export interface TextProps extends RNTextProps {
-  /** Type-scale token (display, headline, title, body, …). */
   variant?: TypographyToken;
-  /** Semantic colour role. Mapped through the active palette. */
   tone?: TextTone;
-  /** Center / left / right shortcut. */
   align?: TextStyle["textAlign"];
-  /** Override weight while keeping the variant scale. */
   weight?: TextStyle["fontWeight"];
-  /** NativeWind utility classes. */
   className?: string;
 }
 
 /**
- * Themed Text primitive. Every label in the app routes through this so
- * the type ramp + colour palette stay coherent across light and dark.
+ * Themed Text primitive. Routes every label in the app through one
+ * type ramp + palette so the visual language stays coherent in both
+ * schemes. The `accent` tone maps to the communications blue (Facebook
+ * link colour) so mentions and hyperlinks read as actionable rather
+ * than as headings.
  */
 function ThemedTextImpl({
   variant = "body",
@@ -50,6 +56,8 @@ function ThemedTextImpl({
       ? colors.text.inverse
       : tone === "tint"
       ? colors.tint.primary
+      : tone === "accent"
+      ? colors.tint.accent
       : tone === "danger"
       ? colors.tint.danger
       : colors.tint.success;

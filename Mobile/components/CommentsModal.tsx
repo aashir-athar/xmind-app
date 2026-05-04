@@ -1,6 +1,7 @@
 import React, { memo, useCallback } from "react";
-import { KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Modal, Platform, Pressable, TextInput, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
 import { Feather } from "@expo/vector-icons";
 
@@ -35,7 +36,6 @@ export interface CommentsModalProps {
  */
 function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
   const { colors, spacing, radii } = useTheme();
-  const insets = useSafeAreaInsets();
   const { currentUser } = useCurrentUser();
 
   const {
@@ -78,32 +78,61 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
       statusBarTranslucent
     >
       <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
-        <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1 }}>
-          <View style={{ flex: 1, padding: spacing.base }}>
+        <Pressable
+          accessibilityLabel="Dismiss replies"
+          onPress={handleClose}
+          style={{ flex: 1 }}
+        />
+        <KeyboardAvoidingView
+          // Platform-aware: iOS lifts via `padding`, Android via `height`.
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+          style={{ flex: 1 }}
+        >
+          <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
             <Surface
               variant="solid"
-              radius={radii.xl}
               style={{
                 flex: 1,
+                borderTopLeftRadius: radii.xxl,
+                borderTopRightRadius: radii.xxl,
                 overflow: "hidden",
-                borderWidth: 1,
+                borderTopWidth: 1,
+                borderLeftWidth: 1,
+                borderRightWidth: 1,
                 borderColor: colors.border.subtle,
               }}
             >
+              {/* IG-style handle bar — reads as draggable even though the
+                  sheet uses a tap-scrim dismissal model in V1. */}
+              <View
+                style={{
+                  alignItems: "center",
+                  paddingTop: spacing.sm,
+                  paddingBottom: spacing.xs,
+                }}
+              >
+                <View
+                  style={{
+                    width: 36,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: colors.border.strong,
+                  }}
+                />
+              </View>
+
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
                   paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.md,
+                  paddingVertical: spacing.sm,
                   borderBottomWidth: 1,
                   borderBottomColor: colors.border.subtle,
                   gap: spacing.md,
                 }}
               >
-                <IconButton accessibilityLabel="Close" onPress={handleClose}>
-                  <Feather name="x" size={20} color={colors.text.primary} />
-                </IconButton>
                 <View style={{ flex: 1 }}>
                   <Text variant="title" tone="primary">
                     Replies
@@ -125,6 +154,9 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     </View>
                   ) : null}
                 </View>
+                <IconButton accessibilityLabel="Close" onPress={handleClose} variant="filled">
+                  <Feather name="x" size={18} color={colors.text.primary} />
+                </IconButton>
               </View>
 
               {selectedPost ? (
@@ -132,7 +164,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                   style={{
                     paddingHorizontal: spacing.lg,
                     paddingTop: spacing.md,
-                    paddingBottom: spacing.sm,
+                    paddingBottom: spacing.md,
                     flexDirection: "row",
                     gap: spacing.md,
                     borderBottomWidth: 1,
@@ -158,11 +190,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 </View>
               ) : null}
 
-              <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={insets.top + 24}
-                style={{ flex: 1 }}
-              >
+              <View style={{ flex: 1 }}>
                 {selectedPost && selectedPost.comments && selectedPost.comments.length > 0 ? (
                   <FlashList<Comment>
                     data={selectedPost.comments}
@@ -182,17 +210,20 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     description="A short, kind reply goes further than a clever one."
                   />
                 )}
+              </View>
 
+              <SafeAreaView edges={["bottom"]}>
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "center",
+                    alignItems: "flex-end",
                     gap: spacing.sm,
                     paddingHorizontal: spacing.base,
                     paddingTop: spacing.sm,
-                    paddingBottom: spacing.md,
+                    paddingBottom: spacing.sm,
                     borderTopWidth: 1,
                     borderTopColor: colors.border.subtle,
+                    backgroundColor: colors.bg.canvas,
                   }}
                 >
                   <Avatar
@@ -203,13 +234,15 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                   <View
                     style={{
                       flex: 1,
-                      borderRadius: radii.lg,
+                      borderRadius: radii.xl,
                       backgroundColor: colors.surface.secondary,
-                      paddingHorizontal: spacing.md,
+                      paddingHorizontal: spacing.base,
                       paddingVertical: 8,
                       minHeight: 44,
                       maxHeight: 120,
                       justifyContent: "center",
+                      borderWidth: 1,
+                      borderColor: colors.border.subtle,
                     }}
                   >
                     <TextInput
@@ -253,10 +286,10 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     />
                   </Pressable>
                 </View>
-              </KeyboardAvoidingView>
+              </SafeAreaView>
             </Surface>
-          </View>
-        </SafeAreaView>
+          </Pressable>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
