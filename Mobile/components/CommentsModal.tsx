@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { Surface } from "@/components/ui/Surface";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useComments } from "@/hooks/useComments";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -25,6 +26,12 @@ export interface CommentsModalProps {
  * Shows the parent post for context, then a FlashList of comments and
  * a sticky composer at the bottom. KeyboardAvoidingView keeps the
  * composer above the keyboard on both platforms.
+ *
+ * Psychology lever:
+ *  Anchored social context. Showing "Replying to @username" right
+ *  above the composer reduces the cognitive jump from "what was that
+ *  post about?" to "what should I write?" — small but measurable lift
+ *  in reply-rate.
  */
 function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
   const { colors, spacing, radii } = useTheme();
@@ -57,7 +64,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
         onDelete={() => deleteComment(item._id)}
       />
     ),
-    [currentUser, deleteComment, selectedPost?._id]
+    [currentUser, deleteComment]
   );
 
   const keyExtractor = useCallback((c: Comment) => c._id, []);
@@ -97,9 +104,27 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 <IconButton accessibilityLabel="Close" onPress={handleClose}>
                   <Feather name="x" size={20} color={colors.text.primary} />
                 </IconButton>
-                <Text variant="title" tone="primary" style={{ flex: 1 }}>
-                  Comments
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text variant="title" tone="primary">
+                    Replies
+                  </Text>
+                  {selectedPost ? (
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <Text variant="caption" tone="tertiary">
+                        Replying to
+                      </Text>
+                      <Text variant="caption" tone="tint" weight="700">
+                        @{selectedPost.user.username}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
 
               {selectedPost ? (
@@ -120,9 +145,12 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     size={36}
                   />
                   <View style={{ flex: 1 }}>
-                    <Text variant="subtitle" tone="primary" numberOfLines={1}>
-                      {selectedPost.user.firstName} {selectedPost.user.lastName}
-                    </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Text variant="subtitle" tone="primary" numberOfLines={1}>
+                        {selectedPost.user.firstName} {selectedPost.user.lastName}
+                      </Text>
+                      {selectedPost.user.verified ? <VerifiedBadge size={14} /> : null}
+                    </View>
                     <Text variant="bodySm" tone="secondary" numberOfLines={4}>
                       {selectedPost.content}
                     </Text>
@@ -158,7 +186,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-end",
+                    alignItems: "center",
                     gap: spacing.sm,
                     paddingHorizontal: spacing.base,
                     paddingTop: spacing.sm,
@@ -167,6 +195,11 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     borderTopColor: colors.border.subtle,
                   }}
                 >
+                  <Avatar
+                    source={currentUser?.profilePicture}
+                    name={`${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`}
+                    size={32}
+                  />
                   <View
                     style={{
                       flex: 1,
@@ -182,7 +215,11 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     <TextInput
                       value={commentText}
                       onChangeText={setCommentText}
-                      placeholder="Add a thoughtful reply"
+                      placeholder={
+                        selectedPost
+                          ? `Reply to @${selectedPost.user.username}`
+                          : "Add a thoughtful reply"
+                      }
                       placeholderTextColor={colors.text.tertiary}
                       multiline
                       style={{
@@ -197,7 +234,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     onPress={handleSubmit}
                     disabled={!commentText.trim() || isCreatingComment}
                     accessibilityRole="button"
-                    accessibilityLabel="Send comment"
+                    accessibilityLabel="Send reply"
                     style={{
                       width: 44,
                       height: 44,
@@ -245,6 +282,7 @@ function CommentRowImpl({ comment, canDelete, onDelete }: CommentRowProps) {
           <Text variant="label" tone="primary" numberOfLines={1}>
             {comment.user.firstName} {comment.user.lastName}
           </Text>
+          {comment.user.verified ? <VerifiedBadge size={12} /> : null}
           <Text variant="caption" tone="tertiary">
             · {formatDate(comment.createdAt)}
           </Text>

@@ -1,82 +1,157 @@
+/**
+ * Client-side search hook.
+ *
+ * Architectural role:
+ *  Derives trending hashtags, suggested users, and a name/handle search
+ *  function from the cached feed data — no extra network calls. Cheap
+ *  on-device math means the search screen feels instant on every
+ *  keystroke even on a 2 GB Android device.
+ *
+ * Why Fuse.js instead of a plain `String.includes`:
+ *  Twitter / Facebook / Instagram all tolerate typos and mid-word
+ *  matches on handle search. The previous `includes()` filter was
+ *  unforgiving — typing "amir" would never match "@aamir". Fuse builds
+ *  a Bitap-based fuzzy index, supports weighted keys, and stays under
+ *  one millisecond for the few-hundred-user payloads this screen sees.
+ *  The reference recommendation comes from
+ *  `expo-algorithms-skill/references/04-data.md`.
+ */
 import { useMemo } from "react";
+import Fuse, { type IFuseOptions } from "fuse.js";
+
 import { usePosts } from "./usePosts";
-import { Post, User } from "../types";
 import { useCurrentUser } from "./useCurrentUser";
+import type { Post, User } from "../types";
+
+const MAX_HASHTAGS = 20;
+const MAX_SUGGESTED_USERS = 8;
+const MAX_RESULTS = 50;
+
+const USER_FUSE_OPTIONS: IFuseOptions<User> = {
+  // 0.0 = exact match, 1.0 = match anything. 0.4 lets through 1-2
+  // character typos without exploding into noise.
+  threshold: 0.4,
+  ignoreLocation: true,
+  // Limit cost on long bios — names are short anyway.
+  distance: 60,
+  minMatchCharLength: 2,
+  keys: [
+    { name: "username", weight: 0.6 },
+    { name: "firstName", weight: 0.25 },
+    { name: "lastName", weight: 0.15 },
+  ],
+};
+
+const POST_FUSE_OPTIONS: IFuseOptions<Post> = {
+  threshold: 0.45,
+  ignoreLocation: true,
+  // Posts cap at 280 chars; default distance is fine but tighter saves cycles.
+  distance: 200,
+  minMatchCharLength: 2,
+  keys: [
+    { name: "content", weight: 0.7 },
+    { name: "user.username", weight: 0.2 },
+    { name: "user.firstName", weight: 0.05 },
+    { name: "user.lastName", weight: 0.05 },
+  ],
+};
 
 export const useSearch = () => {
   const { posts } = usePosts();
   const { currentUser } = useCurrentUser();
 
-  // Extract hashtags from all posts and count their occurrences
   const trendingHashtags = useMemo(() => {
-    const hashtagCounts: { [key: string]: number } = {};
-
-    posts.forEach((post: Post) => {
-      const hashtags = post.content.match(/#\w+/g) || [];
-      hashtags.forEach((hashtag) => {
-        hashtagCounts[hashtag] = (hashtagCounts[hashtag] || 0) + 1;
-      });
-    });
-
-    // Convert to array and sort by count
+    const hashtagCounts: Record<string, number> = {};
+    for (const post of posts) {
+      const hashtags = post.content?.match(/#\w+/g) ?? [];
+      for (const hashtag of hashtags) {
+        const tag = hashtag.toLowerCase();
+        hashtagCounts[tag] = (hashtagCounts[tag] ?? 0) + 1;
+      }
+    }
     return Object.entries(hashtagCounts)
       .map(([hashtag, count]) => ({ hashtag, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 20); // Top 20 trending hashtags
+      .slice(0, MAX_HASHTAGS);
   }, [posts]);
 
-  // Extract all unique usernames from posts
-  const allUsernames = useMemo(() => {
-    const uniqueUsernames = new Set<string>();
-    
-    posts.forEach((post: Post) => {
-      if (post.user?.username) {
-        uniqueUsernames.add(post.user.username.toLowerCase());
-      }
-    });
-    
-    return Array.from(uniqueUsernames);
-  }, [posts]);
+  const uniqueUsers = useMemo(() => {
+    const users = new Map<string, User>();
+    for (const post of posts) {
+      if (!post.user?._id) continue;
+      if (post.user._id === currentUser?._id) continue;
+      if (!users.has(post.user._id)) users.set(post.user._id, post.user);
+    }
+    return Array.from(users.values());
+  }, [posts, currentUser?._id]);
 
-  // Search users by username, firstName, or lastName
+  /**
+   * Suggested users — verified first, then by follower count, then by
+   * post count in the visible feed. Capped to keep the resting state
+   * scannable in one glance (Hick's Law).
+   */
+  const suggestedUsers = useMemo(() => {
+    const followingSet = new Set(currentUser?.following ?? []);
+    const postCount = new Map<string, number>();
+    for (const post of posts) {
+      if (!post.user?._id) continue;
+      postCount.set(post.user._id, (postCount.get(post.user._id) ?? 0) + 1);
+    }
+    return [...uniqueUsers]
+      .filter((u) => !followingSet.has(u._id))
+      .sort((a, b) => {
+        const av = a.verified ? 1 : 0;
+        const bv = b.verified ? 1 : 0;
+        if (av !== bv) return bv - av;
+        const af = a.followers?.length ?? 0;
+        const bf = b.followers?.length ?? 0;
+        if (af !== bf) return bf - af;
+        return (postCount.get(b._id) ?? 0) - (postCount.get(a._id) ?? 0);
+      })
+      .slice(0, MAX_SUGGESTED_USERS);
+  }, [uniqueUsers, currentUser?.following, posts]);
+
+  // Build the Fuse indices once per data change. Index construction is
+  // the one-time cost; queries against the index are sub-millisecond.
+  const userFuse = useMemo(() => new Fuse(uniqueUsers, USER_FUSE_OPTIONS), [uniqueUsers]);
+  const postFuse = useMemo(() => new Fuse(posts, POST_FUSE_OPTIONS), [posts]);
+
   const searchUsers = (searchQuery: string): User[] => {
-    if (!searchQuery.trim()) return [];
-
-    const query = searchQuery.toLowerCase().trim();
-
-    // Get unique users from posts
-    const uniqueUsers = new Map<string, User>();
-    posts.forEach((post: Post) => {
-      if (!uniqueUsers.has(post.user._id)) {
-        uniqueUsers.set(post.user._id, post.user);
-      }
-    });
-
-    // Filter users based on search query
-    return Array.from(uniqueUsers.values()).filter((user: User) => {
-      return (
-        user.username.toLowerCase().includes(query) ||
-        user.firstName.toLowerCase().includes(query) ||
-        user.lastName.toLowerCase().includes(query)
-      );
-    });
+    const q = searchQuery.trim();
+    if (!q) return [];
+    // Strip a leading @ so users can search "@aamir" or "aamir" both.
+    const normalised = q.startsWith("@") ? q.slice(1) : q;
+    return userFuse.search(normalised, { limit: MAX_RESULTS }).map((r) => r.item);
   };
 
-  // Get posts by hashtag
+  const searchPosts = (searchQuery: string): Post[] => {
+    const q = searchQuery.trim();
+    if (!q) return [];
+    return postFuse.search(q, { limit: MAX_RESULTS }).map((r) => r.item);
+  };
+
   const getPostsByHashtag = (hashtag: string): Post[] => {
-    return posts.filter((post: Post) => {
-      const hashtags = post.content.match(/#\w+/g) || [];
-      return hashtags.some(
-        (tag) => tag.toLowerCase() === hashtag.toLowerCase()
-      );
+    const target = hashtag.toLowerCase();
+    return posts.filter((post) => {
+      const hashtags = post.content?.match(/#\w+/g) ?? [];
+      return hashtags.some((tag) => tag.toLowerCase() === target);
     });
   };
+
+  // Used by `useExistingUsernames` for client-side username collision
+  // checks while the user is editing their profile.
+  const allUsernames = useMemo(
+    () => uniqueUsers.map((u) => u.username.toLowerCase()),
+    [uniqueUsers]
+  );
 
   return {
     trendingHashtags,
+    suggestedUsers,
     searchUsers,
+    searchPosts,
     getPostsByHashtag,
     posts,
-    allUsernames, // New: All usernames from posts
+    allUsernames,
   };
 };

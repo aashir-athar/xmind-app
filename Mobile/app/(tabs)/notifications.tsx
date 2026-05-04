@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { RefreshControl, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
@@ -8,41 +8,44 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
-import NotificationCard from "@/components/NotificationCard";
+import GroupedNotificationCard, {
+  type NotificationGroup,
+} from "@/components/GroupedNotificationCard";
 import { useTheme } from "@/hooks/useTheme";
 import { useNotifications } from "@/hooks/useNotifications";
-import type { Notification } from "@/types";
+import { groupNotifications } from "@/utils/notificationGrouping";
 
 /**
  * Notifications.
  *
- * Psychology:
- *  - Empty state names what the user can do next ("post something to get
- *    your first reaction") rather than the absence ("no notifications").
- *    Naming the next action lifts D1 retention measurably.
- *  - Skeleton states reserve real estate so the layout never reflows
- *    when data arrives — visual stability builds perceived speed.
+ * Psychology lever — Cognitive economy + Peak-end rule:
+ *  Same-day groups compress the visual stack so the user feels
+ *  progress at a glance instead of being buried in repeats. The empty
+ *  state names the next action ("post something to get your first
+ *  reaction") rather than the absence — naming the next step lifts
+ *  D1 retention measurably.
+ *  Skeleton states reserve real estate so the layout never reflows
+ *  when data arrives — visual stability builds perceived speed.
  */
 export default function NotificationsScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
-  const {
-    notifications,
-    isLoading,
-    error,
-    refetch,
-    isRefetching,
-    deleteNotification,
-  } = useNotifications();
+  const { notifications, isLoading, error, refetch, isRefetching } =
+    useNotifications();
 
-  const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Notification>) => (
-      <NotificationCard notification={item} onDelete={deleteNotification} />
-    ),
-    [deleteNotification]
+  const groups = useMemo(
+    () => groupNotifications(notifications),
+    [notifications]
   );
 
-  const keyExtractor = useCallback((item: Notification) => item._id, []);
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<NotificationGroup>) => (
+      <GroupedNotificationCard group={item} />
+    ),
+    []
+  );
+
+  const keyExtractor = useCallback((item: NotificationGroup) => item.id, []);
 
   if (error) {
     return (
@@ -62,15 +65,23 @@ export default function NotificationsScreen() {
     return (
       <View className="flex-1 bg-canvas">
         <Header />
-        <View className="px-base gap-md mt-md">
+        <View style={{ paddingHorizontal: spacing.base, gap: spacing.md, marginTop: spacing.md }}>
           {[0, 1, 2, 3].map((i) => (
             <View
               key={i}
-              className="flex-row gap-md p-base rounded-lg bg-surface border border-subtle"
+              style={{
+                flexDirection: "row",
+                gap: spacing.md,
+                padding: spacing.base,
+                borderRadius: 20,
+                backgroundColor: colors.surface.primary,
+                borderWidth: 1,
+                borderColor: colors.border.subtle,
+              }}
             >
-              <Skeleton width={40} height={40} radius={20} />
-              <View className="flex-1 gap-sm">
-                <Skeleton width="70%" height={12} />
+              <Skeleton width={44} height={44} radius={22} />
+              <View style={{ flex: 1, gap: spacing.sm }}>
+                <Skeleton width="60%" height={12} />
                 <Skeleton width="40%" height={10} />
               </View>
             </View>
@@ -80,14 +91,14 @@ export default function NotificationsScreen() {
     );
   }
 
-  if (notifications.length === 0) {
+  if (groups.length === 0) {
     return (
       <View className="flex-1 bg-canvas">
         <Header />
         <EmptyState
           icon={<Feather name="bell" size={28} color={colors.tint.primary} />}
-          title="It's quiet in here"
-          description="Reactions, replies, and follows land here. Posting is the fastest way to start one."
+          title="No replies yet — that's about to change"
+          description="Post one short thought. The first reaction usually lands within an hour."
         />
       </View>
     );
@@ -95,14 +106,14 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-canvas">
-      <Header />
-      <FlashList<Notification>
-        data={notifications}
+      <Header subtitle={`${groups.length} ${groups.length === 1 ? "update" : "updates"}`} />
+      <FlashList<NotificationGroup>
+        data={groups}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: 8,
+          paddingTop: spacing.sm,
           paddingBottom: 140 + insets.bottom,
         }}
         refreshControl={
@@ -118,7 +129,7 @@ export default function NotificationsScreen() {
   );
 }
 
-function Header() {
+function Header({ subtitle }: { subtitle?: string }) {
   return (
     <SafeAreaView edges={["top"]} className="bg-canvas">
       <View className="px-lg py-md border-b border-subtle">
@@ -126,7 +137,7 @@ function Header() {
           Inbox
         </Text>
         <Text variant="bodySm" tone="secondary">
-          Replies and follows, all in one place.
+          {subtitle ?? "Replies and follows, all in one place."}
         </Text>
       </View>
     </SafeAreaView>

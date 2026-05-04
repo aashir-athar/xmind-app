@@ -6,6 +6,7 @@ import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { CharCounterRing } from "@/components/ui/CharCounterRing";
 import { IconButton } from "@/components/ui/IconButton";
 import { Surface } from "@/components/ui/Surface";
 import { Text } from "@/components/ui/Text";
@@ -20,10 +21,16 @@ const MAX_LEN = 300;
  * Psychology:
  *  - Progressive disclosure — collapsed when idle, expands only on focus.
  *    Reduces blank-canvas anxiety on the home screen.
- *  - Counter turns warning amber at 90% and red at 100% — pre-emptive
- *    feedback. The user knows the cliff is coming before they fall off.
+ *  - Char counter ring telegraphs the cliff visually before the user
+ *    runs into the digit. Twitter shipped this pattern in 2017 and the
+ *    industry adopted it because it works — ambient feedback in the
+ *    user's peripheral vision is faster than parsing a number.
  *  - Single primary CTA. No "Save draft / Schedule / Cancel" — those
  *    add friction without serving the dominant action.
+ *
+ * Removed the redundant camera button — the gallery picker exposes a
+ * camera tab on every supported platform, so two affordances did the
+ * same job and added 36px of horizontal noise.
  */
 function PostComposerImpl() {
   const { colors } = useTheme();
@@ -34,7 +41,6 @@ function PostComposerImpl() {
     selectedImage,
     isCreating,
     pickImageFromGallery,
-    takePhoto,
     removeImage,
     createPost,
   } = useCreatePost();
@@ -44,9 +50,6 @@ function PostComposerImpl() {
   const length = content.length;
   const remaining = MAX_LEN - length;
   const overrun = remaining < 0;
-  const warn = remaining <= 30 && remaining >= 0;
-
-  const counterTone = overrun ? "danger" : warn ? "tint" : "tertiary";
 
   const onCreate = useCallback(() => {
     if (!content.trim() && !selectedImage) return;
@@ -127,21 +130,10 @@ function PostComposerImpl() {
                 >
                   <Feather name="image" size={18} color={colors.tint.primary} />
                 </IconButton>
-                <IconButton
-                  accessibilityLabel="Take photo"
-                  onPress={takePhoto}
-                  disabled={isCreating}
-                  variant="tinted"
-                  size={36}
-                >
-                  <Feather name="camera" size={18} color={colors.tint.primary} />
-                </IconButton>
               </View>
 
               <View className="flex-row items-center gap-md">
-                <Text variant="caption" tone={counterTone}>
-                  {overrun ? `${-remaining} over` : `${remaining}`}
-                </Text>
+                <CharCounterRing current={length} max={MAX_LEN} />
                 <Button
                   label="Post"
                   size="sm"
@@ -154,6 +146,20 @@ function PostComposerImpl() {
           ) : null}
         </View>
       </View>
+
+      {/* Hidden screen-reader status — the ring shows up visually for
+          sighted users, but we still want a numeric remaining count
+          announced when the user is near the limit. */}
+      {expanded && remaining <= 30 ? (
+        <Text
+          variant="caption"
+          tone={overrun ? "danger" : "tertiary"}
+          accessibilityLiveRegion="polite"
+          style={{ position: "absolute", left: -10000, top: -10000 }}
+        >
+          {overrun ? `${-remaining} characters over` : `${remaining} characters remaining`}
+        </Text>
+      ) : null}
     </Surface>
   );
 }

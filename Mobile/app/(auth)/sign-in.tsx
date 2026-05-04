@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
-import { ActivityIndicator, Image, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
@@ -20,10 +21,13 @@ import { useSocialAuth } from "@/hooks/useSocialAuth";
  *  - Two equally-weighted CTAs because both options are first-class
  *    auth providers; we don't lie about preference (no fake "recommended"
  *    badge — that's a dark pattern under the 2026 ethics rubric).
+ *  - Visible "Continue with" label clarifies that these are sign-in
+ *    options, not third-party share buttons (a small but real source
+ *    of confusion for first-time users).
  *  - Logo, headline, providers, terms — four stops, scannable.
  */
 export default function SignInScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const { handleSocialAuth, isLoading } = useSocialAuth();
 
   const press = useCallback(
@@ -43,10 +47,10 @@ export default function SignInScreen() {
               className="w-[96px] h-[96px] rounded-xl items-center justify-center mb-xl"
               style={{ backgroundColor: colors.tint.primary }}
             >
-              <Image
+              <ExpoImage
                 source={require("../../assets/images/xMind-Logo1.png")}
                 style={{ width: 56, height: 56, tintColor: colors.text.onTint }}
-                resizeMode="contain"
+                contentFit="contain"
               />
             </View>
 
@@ -64,19 +68,38 @@ export default function SignInScreen() {
             </Text>
           </View>
 
-          <View className="gap-md mb-lg">
-            <ProviderButton
-              label="Continue with Apple"
-              icon={require("../../assets/images/apple.png")}
-              loading={isLoading}
-              onPress={() => press("oauth_apple")}
-            />
-            <ProviderButton
-              label="Continue with Google"
-              icon={require("../../assets/images/google.png")}
-              loading={isLoading}
-              onPress={() => press("oauth_google")}
-            />
+          <View style={{ marginBottom: spacing.lg }}>
+            {/* Section label so the buttons read as auth providers,
+                not generic share buttons. */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+                marginBottom: spacing.md,
+              }}
+            >
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border.subtle }} />
+              <Text variant="caption" tone="tertiary" weight="600">
+                Continue with
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.border.subtle }} />
+            </View>
+
+            <View style={{ gap: spacing.md }}>
+              <ProviderButton
+                label="Continue with Apple"
+                icon={require("../../assets/images/apple.png")}
+                loading={isLoading}
+                onPress={() => press("oauth_apple")}
+              />
+              <ProviderButton
+                label="Continue with Google"
+                icon={require("../../assets/images/google.png")}
+                loading={isLoading}
+                onPress={() => press("oauth_google")}
+              />
+            </View>
           </View>
 
           <Text
@@ -122,7 +145,11 @@ function ProviderButton({ label, icon, loading, onPress }: ProviderButtonProps) 
           <ActivityIndicator color={colors.tint.primary} />
         ) : (
           <>
-            <Image source={icon} style={{ width: 22, height: 22 }} resizeMode="contain" />
+            <ExpoImage
+              source={icon}
+              style={{ width: 22, height: 22 }}
+              contentFit="contain"
+            />
             <Text variant="subtitle" tone="primary">
               {label}
             </Text>

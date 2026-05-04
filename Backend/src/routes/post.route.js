@@ -4,6 +4,7 @@ import {
   deletePost,
   getPost,
   getPosts,
+  getTrending,
   getUserPosts,
   likePost,
 } from "../controllers/post.controller.js";
@@ -14,8 +15,9 @@ const router = express.Router();
 
 // public routes
 router.get("/", getPosts);
-router.get("/:postId", getPost);
+router.get("/trending", getTrending);
 router.get("/user/:username", getUserPosts);
+router.get("/:postId", getPost);
 
 // protected proteced
 router.post("/", protectRoute, upload.single("image"), createPost);
