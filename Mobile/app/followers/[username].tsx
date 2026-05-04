@@ -9,16 +9,20 @@ import React, { useCallback } from "react";
 import { Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
 import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { useTheme } from "@/hooks/useTheme";
 import { useApiClient, userApi } from "@/utils/api";
 import type { User } from "@/types";
@@ -33,7 +37,16 @@ export default function FollowersScreen() {
     mode?: Mode;
   }>();
   const api = useApiClient();
+  const queryClient = useQueryClient();
+  const { currentUser } = useCurrentUser();
+  const { showError } = useCustomAlert();
   const resolvedMode: Mode = mode === "following" ? "following" : "followers";
+
+  // The Remove / Unfollow buttons only make sense on the *current* user's
+  // own list. Viewing someone else's followers shouldn't expose these
+  // actions — that's a different feature (Follow back / Block).
+  const isOwnList =
+    !!currentUser?.username && currentUser.username === username;
 
   const {
     data: users,
@@ -53,44 +66,142 @@ export default function FollowersScreen() {
     staleTime: 30_000,
   });
 
+  // Shared optimistic-removal helper: pulls the targeted user out of the
+  // cached list immediately so the row disappears with no perceptible
+  // network latency. Both mutations roll back via the snapshot on error.
+  const optimisticRemove = useCallback(
+    (targetUserId: string) => {
+      const key = ["user-list", username, resolvedMode] as const;
+      queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<User[]>(key);
+      queryClient.setQueryData<User[]>(key, (old) =>
+        (old ?? []).filter((u) => u._id !== targetUserId)
+      );
+      return { previous };
+    },
+    [queryClient, resolvedMode, username]
+  );
+
+  const removeFollowerMutation = useMutation({
+    mutationFn: (targetUserId: string) => userApi.removeFollower(api, targetUserId),
+    onMutate: optimisticRemove,
+    onError: (_e, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(
+          ["user-list", username, resolvedMode],
+          ctx.previous
+        );
+      }
+      showError(
+        "Couldn't remove",
+        "We couldn't remove that follower. Try again in a moment."
+      );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["userProfile", username] });
+    },
+  });
+
+  const unfollowMutation = useMutation({
+    mutationFn: (targetUserId: string) => userApi.followUser(api, targetUserId),
+    onMutate: optimisticRemove,
+    onError: (_e, _id, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(
+          ["user-list", username, resolvedMode],
+          ctx.previous
+        );
+      }
+      showError(
+        "Couldn't unfollow",
+        "We couldn't unfollow that user. Try again in a moment."
+      );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+      queryClient.invalidateQueries({ queryKey: ["userProfile", username] });
+    },
+  });
+
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<User>) => (
-      <Pressable
-        onPress={() =>
-          router.push({
-            pathname: "/user-profile",
-            params: { userId: item._id, username: item.username },
-          })
+    ({ item }: ListRenderItemInfo<User>) => {
+      const onActionPress = () => {
+        if (resolvedMode === "followers") {
+          removeFollowerMutation.mutate(item._id);
+        } else {
+          unfollowMutation.mutate(item._id);
         }
-        android_ripple={{ color: colors.overlay.press }}
-        style={({ pressed }) => ({
-          flexDirection: "row",
-          alignItems: "center",
-          gap: spacing.base,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
-          backgroundColor: pressed ? colors.surface.secondary : "transparent",
-        })}
-      >
-        <Avatar
-          source={item.profilePicture}
-          name={`${item.firstName} ${item.lastName}`}
-          size={48}
-        />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Text variant="subtitle" tone="primary" weight="700" numberOfLines={1}>
-              {item.firstName} {item.lastName}
-            </Text>
-            {item.verified ? <VerifiedBadge size={14} /> : null}
-          </View>
-          <Text variant="bodySm" tone="secondary" numberOfLines={1}>
-            @{item.username}
-          </Text>
-        </View>
-      </Pressable>
-    ),
-    [colors.overlay.press, colors.surface.secondary, router, spacing.base, spacing.lg, spacing.md]
+      };
+      const actionLabel = resolvedMode === "followers" ? "Remove" : "Unfollow";
+
+      return (
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/user-profile",
+              params: { userId: item._id, username: item.username },
+            })
+          }
+          android_ripple={{ color: colors.overlay.press }}
+          accessibilityRole="button"
+          accessibilityLabel={`Open profile of ${item.firstName} ${item.lastName}`}
+        >
+          <Card
+            variant="solid"
+            className="mx-base mb-sm p-base border border-subtle"
+          >
+            <View className="flex-row items-center gap-md">
+              <Avatar
+                source={item.profilePicture}
+                name={`${item.firstName} ${item.lastName}`}
+                size={44}
+              />
+              <View className="flex-1 min-w-0">
+                <View className="flex-row items-center">
+                  <Text
+                    variant="subtitle"
+                    tone="primary"
+                    weight="700"
+                    numberOfLines={1}
+                    className="shrink mr-xs"
+                  >
+                    {item.firstName} {item.lastName}
+                  </Text>
+                  {item.verified ? <VerifiedBadge size={14} /> : null}
+                </View>
+                <Text variant="bodySm" tone="secondary" numberOfLines={1}>
+                  @{item.username}
+                </Text>
+              </View>
+              {isOwnList ? (
+                <Button
+                  label={actionLabel}
+                  size="sm"
+                  variant="secondary"
+                  onPress={onActionPress}
+                />
+              ) : (
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={colors.text.tertiary}
+                />
+              )}
+            </View>
+          </Card>
+        </Pressable>
+      );
+    },
+    [
+      colors.overlay.press,
+      colors.text.tertiary,
+      isOwnList,
+      removeFollowerMutation,
+      resolvedMode,
+      router,
+      unfollowMutation,
+    ]
   );
 
   const keyExtractor = useCallback((u: User) => u._id, []);
@@ -98,23 +209,13 @@ export default function FollowersScreen() {
   const title = resolvedMode === "followers" ? "Followers" : "Following";
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
+    <View className="flex-1 bg-canvas">
       <SafeAreaView edges={["top"]}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.md,
-            gap: spacing.md,
-            borderBottomWidth: 0.5,
-            borderBottomColor: colors.border.subtle,
-          }}
-        >
+        <View className="w-full flex-row items-center px-lg py-md gap-md border-b-[0.5px] border-subtle">
           <IconButton accessibilityLabel="Back" onPress={() => router.back()} variant="filled">
             <Feather name="arrow-left" size={18} color={colors.text.primary} />
           </IconButton>
-          <View style={{ flex: 1 }}>
+          <View className="flex-1">
             <Text variant="title" tone="primary">
               {title}
             </Text>
@@ -126,14 +227,11 @@ export default function FollowersScreen() {
       </SafeAreaView>
 
       {isLoading ? (
-        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md }}>
+        <View className="px-lg pt-md gap-md">
           {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing.base }}
-            >
+            <View key={i} className="flex-row items-center gap-base">
               <Skeleton width={48} height={48} radius={24} />
-              <View style={{ flex: 1, gap: 6 }}>
+              <View className="flex-1 gap-[6px]">
                 <Skeleton width="40%" height={14} />
                 <Skeleton width="60%" height={12} />
               </View>
@@ -166,7 +264,10 @@ export default function FollowersScreen() {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: 80 }}
+          contentContainerStyle={{
+            paddingTop: spacing.md,
+            paddingBottom: 80,
+          }}
         />
       )}
     </View>

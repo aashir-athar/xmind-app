@@ -350,7 +350,7 @@ export default function ProfileScreen() {
               width: "100%",
               flexDirection: "row",
               alignItems: "stretch",
-              justifyContent: "space-between",
+              justifyContent: "space-around",
               marginTop: spacing.lg,
               borderRadius: radii.lg,
               backgroundColor: colors.surface.secondary,

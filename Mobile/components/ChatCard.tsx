@@ -17,6 +17,7 @@ import React, { memo, useCallback } from "react";
 import { Pressable, View } from "react-native";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
@@ -49,7 +50,7 @@ function ChatCardImpl({
   onPress,
   onLongPress,
 }: ChatCardProps) {
-  const { colors, spacing } = useTheme();
+  const { colors } = useTheme();
   const other = pickOther(conversation, currentUserId);
   const last = conversation.lastMessage;
   const unread = conversation.unreadCount ?? 0;
@@ -76,119 +77,79 @@ function ChatCardImpl({
       android_ripple={{ color: colors.overlay.press }}
       accessibilityRole="button"
       accessibilityLabel={`Open conversation with ${other.firstName} ${other.lastName}`}
-      style={({ pressed }) => ({
-        width: "100%",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md + 2,
-        backgroundColor: pressed ? colors.surface.secondary : "transparent",
-      })}
     >
-      {/* Left column: avatar with optional unread dot. Fixed width. */}
-      <View style={{ width: 56, height: 56, position: "relative" }}>
-        <Avatar
-          source={other.profilePicture}
-          name={`${other.firstName} ${other.lastName}`}
-          size={56}
-        />
-        {unread > 0 ? (
-          <View
-            style={{
-              position: "absolute",
-              right: 0,
-              bottom: 0,
-              width: 14,
-              height: 14,
-              borderRadius: 7,
-              backgroundColor: colors.tint.primary,
-              borderWidth: 2,
-              borderColor: colors.bg.canvas,
-            }}
-          />
-        ) : null}
-      </View>
-
-      {/* Middle column: name + preview, stacked. Takes the remaining
-          width. minWidth: 0 lets the inner Texts truncate. */}
-      <View
-        style={{
-          flex: 1,
-          minWidth: 0,
-          marginLeft: spacing.base,
-          marginRight: spacing.sm,
-          justifyContent: "center",
-        }}
+      <Card
+        variant="solid"
+        className="mx-base mb-sm p-base border border-subtle"
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <Text
-            variant="subtitle"
-            tone="primary"
-            weight={unread > 0 ? "800" : "700"}
-            numberOfLines={1}
-            style={{ flexShrink: 1 }}
-          >
-            {other.firstName} {other.lastName}
-          </Text>
-          {other.verified ? <VerifiedBadge size={14} /> : null}
-        </View>
+        <View className="flex-row items-center gap-md">
+          {/* Left column: avatar with optional unread dot. Fixed width. */}
+          <View className="relative w-14 h-14">
+            <Avatar
+              source={other.profilePicture}
+              name={`${other.firstName} ${other.lastName}`}
+              size={56}
+            />
+            {unread > 0 ? (
+              <View
+                // borderColor sticks in style — `bg-canvas` is a fill class,
+                // there's no canvas border-color in the tailwind config.
+                className="absolute right-0 bottom-0 w-[14px] h-[14px] rounded-full border-2 bg-tint"
+                style={{ borderColor: colors.bg.canvas }}
+              />
+            ) : null}
+          </View>
 
-        <Text
-          variant="bodySm"
-          tone={unread > 0 ? "primary" : "secondary"}
-          weight={unread > 0 ? "700" : "400"}
-          numberOfLines={1}
-          style={{ marginTop: 2 }}
-        >
-          {isMine ? "You: " : ""}
-          {lastBody}
-        </Text>
-      </View>
+          {/* Middle column: name + preview, stacked. min-w-0 lets the
+              inner Texts truncate without overflowing the card. */}
+          <View className="flex-1 min-w-0 justify-center">
+            <View className="flex-row items-center">
+              <Text
+                variant="subtitle"
+                tone="primary"
+                weight={unread > 0 ? "800" : "700"}
+                numberOfLines={1}
+                className="shrink mr-xs"
+              >
+                {other.firstName} {other.lastName}
+              </Text>
+              {other.verified ? <VerifiedBadge size={14} /> : null}
+            </View>
 
-      {/* Right column: timestamp on top, unread badge below. Fixed
-          alignment so multiple rows visually line up regardless of
-          name length. */}
-      <View
-        style={{
-          alignItems: "flex-end",
-          justifyContent: "center",
-          minWidth: 56,
-          gap: 6,
-        }}
-      >
-        {last?.createdAt ? (
-          <Text
-            variant="caption"
-            tone={unread > 0 ? "tint" : "tertiary"}
-            weight={unread > 0 ? "700" : "500"}
-          >
-            {formatDate(last.createdAt)}
-          </Text>
-        ) : null}
-        {unread > 0 ? (
-          <View
-            style={{
-              minWidth: 22,
-              height: 22,
-              paddingHorizontal: 7,
-              borderRadius: 11,
-              backgroundColor: colors.tint.primary,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text variant="caption" tone="inverse" weight="800">
-              {unread > 99 ? "99+" : unread}
+            <Text
+              variant="bodySm"
+              tone={unread > 0 ? "primary" : "secondary"}
+              weight={unread > 0 ? "700" : "400"}
+              numberOfLines={1}
+              className="mt-[2px]"
+            >
+              {isMine ? "You: " : ""}
+              {lastBody}
             </Text>
           </View>
-        ) : null}
-      </View>
+
+          {/* Right column: timestamp on top, unread badge below. Margin
+              instead of gap, so the badge collapses cleanly when absent. */}
+          <View className="items-end justify-center min-w-14">
+            {last?.createdAt ? (
+              <Text
+                variant="caption"
+                tone={unread > 0 ? "tint" : "tertiary"}
+                weight={unread > 0 ? "700" : "500"}
+              >
+                {formatDate(last.createdAt)}
+              </Text>
+            ) : null}
+            {unread > 0 ? (
+              <View className="mt-[6px] min-w-[22px] h-[22px] px-[7px] rounded-[11px] items-center justify-center bg-tint">
+                <Text variant="caption" tone="inverse" weight="800">
+                  {unread > 99 ? "99+" : unread}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Card>
     </Pressable>
   );
 }

@@ -1,6 +1,7 @@
 import express from "express";
 import {
   followUser,
+  removeFollower,
   getCurrentUser,
   getUserProfile,
   syncUser,
@@ -54,6 +55,9 @@ router.get(
 
 // Follow user
 router.post("/follow/:targetUserId", protectRoute, followUser);
+
+// Remove a follower (mirror of follow but invoked by the receiver).
+router.post("/follower/:targetUserId/remove", protectRoute, removeFollower);
 
 // Verification routes
 router.post("/verify/:targetUserId", protectRoute, toggleVerification);

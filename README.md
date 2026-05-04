@@ -67,14 +67,19 @@ Most social-media tutorials stop at "list of posts". xMind starts where they end
 ## Highlights
 
 - **Personalised feed in pure TypeScript.** Layered scorer with TF-IDF cosine relevance, exposure decay, MMR diversity rerank, cold-start fallback, per-author cap, and a chronological-blend filler. Deterministic, memoisable, sub-millisecond per page.
-- **Cursor-paginated infinite scroll.** Server returns a tight projection plus a `commentCount` (no N+1 populate). Client uses TanStack `useInfiniteQuery` with `onEndReached`, native `RefreshControl` pull-to-refresh, and an optimistic like / delete pipeline that never invalidates the whole list.
-- **Real-time-feeling chat.** Inbox + thread screens with `react-native-keyboard-controller`, FlashList v2 `maintainVisibleContentPosition`, idempotent message sends keyed on a `clientId`, and AppState-aware polling that pauses when the app is backgrounded. Ready to swap polling for WebSockets in a single line.
-- **Fuzzy search.** `Fuse.js` indices over users and posts with weighted keys, leading-`@` tolerance, and forgiving thresholds. The search screen feels instant on every keystroke.
-- **Design system.** Primitive → semantic → CSS-variable token chain that flips the entire UI on `prefers-color-scheme`. Every padding, radius, type-size, and colour value is a token.
+- **Cursor-paginated infinite scroll.** Server returns a tight projection plus a `commentCount` and `repostCount` (no N+1 populate). Client uses TanStack `useInfiniteQuery` with `onEndReached`, native `RefreshControl` pull-to-refresh, and an optimistic like / reshare / delete pipeline that never invalidates the whole list.
+- **Reshare graph.** First-class repost model: every reshare creates a new `Post` row with `originalPost` set, the canonical original tracks `reposts: [userId]`, and the feed `$lookup` hydrates the source so reshares render as a coral "@user reshared" banner over the original card. Toggle is atomic, idempotent, and notifies the original author. You can't reshare your own post (matches every social network's UX). Deleted originals automatically purge their reshare entries so feeds never render dangling cards.
+- **Graceful 404s on user-generated references.** Shared-post previews in chat and bookmarks pointing at since-deleted posts render a quiet "no longer available" card and are silently dropped from lists. The Axios layer carries an opt-in `silent404` flag so expected-deletion 404s never spam the dev console while real errors still surface.
+- **Real-time-feeling chat with rich shares.** Inbox + thread screens with `react-native-keyboard-controller`, FlashList v2 `maintainVisibleContentPosition`, idempotent message sends keyed on a `clientId`, and AppState-aware polling that pauses when the app is backgrounded. When a user shares a post into a DM, the recipient sees a tappable preview card (image + author + content) — never a raw URL. Ready to swap polling for WebSockets in a single line.
+- **Followers / Following management.** Lists ship with optimistic Remove-follower and Unfollow buttons (own list only), each rolling back from a snapshot on error and never blocking the row's tap-through to the profile.
+- **Fuzzy search.** `Fuse.js` indices over users and posts with weighted keys, leading-`@` tolerance, and forgiving thresholds, merged with a debounced server-side search so users who haven't posted recently are still findable. Feels instant on every keystroke.
+- **Design system + signature identity.** Primitive → semantic → CSS-variable token chain that flips the entire UI on `prefers-color-scheme`. Every padding, radius, type-size, and colour value is a token. The PostCard carries a 3&nbsp;px peach→coral→magenta gradient ribbon at the top — xMind's hallmark, present on every card and consistent with the StoriesRail palette so the brand reads as one continuous system.
+- **Card design consistency.** Followers, ChatCard, ShareToChatSheet, GroupedNotificationCard, and PostCard all share the same `Pressable` + `Card variant="solid" mx-base mb-sm p-base border border-subtle` shell with `gap-md` between avatar and content. One designer's hand across every list in the app.
+- **Pure NativeWind layout.** Layout, spacing, and theme colours flow through Tailwind classes (`w-full flex-row items-center gap-md px-base py-md`, `bg-surface border border-subtle rounded-lg`, `active:bg-surface-secondary`). Inline `style` is reserved for runtime-dynamic values (alpha overlays, theme bg colours not exposed in the Tailwind config) — never mixed with className for the same property.
 - **Platform-aware translucency.** A single `<Surface variant="glass">` resolves to Liquid Glass on iOS 26, BlurView on older iOS, and a tinted flat View on Android. Android never blurs (it tanks scroll FPS on low-end GPUs).
-- **120&nbsp;fps animations.** Reanimated v4 worklets on the UI thread for every press, like, tab indicator, and screen transition.
-- **Image pipeline.** `expo-image` everywhere — disk + memory caching, off-thread decode, automatic priority on viewport.
-- **Backend that scales.** Compression, JSON limits, cached MongoDB connection across Vercel cold starts, atomic like-toggle (`$pull` then `$addToSet`), Mongo indexes on every hot query, Arcjet bot/rate-limit shield.
+- **120&nbsp;fps animations.** Reanimated v4 worklets on the UI thread for every press, like burst, reshare scale, tab indicator, and screen transition. No JS-thread animations anywhere in the codebase.
+- **Image pipeline.** `expo-image` everywhere — disk + memory caching, off-thread decode, automatic priority on viewport, `recyclingKey` for FlashList cell reuse.
+- **Backend that scales.** Compression, JSON limits, cached MongoDB connection across Vercel cold starts, atomic like / reshare / follow toggles (`$pull` then `$addToSet`), Mongo indexes on every hot query (`{createdAt: -1, _id: -1}`, `{user: 1, originalPost: 1}`, …), Arcjet bot/rate-limit shield.
 - **Clerk authentication** with social sign-in and a server-side bridge endpoint that syncs the local profile.
 - **Cloudinary uploads** for posts, profile pictures, and banners — with on-the-fly transforms.
 
@@ -312,11 +317,18 @@ xMind is engineered to a measurable budget, not a vibe.
 
 ## Roadmap
 
+- [x] Reshares (with `originalPost` graph + reshare notifications)
+- [x] Tappable @mentions and #hashtags in posts and comments
+- [x] Reply-to-comment threading
+- [x] Followers / Following management (Remove + Unfollow)
+- [x] Shared post preview cards in chat (no raw links)
+- [x] Pure-NativeWind layout pass + design consistency lock-in
+- [ ] Quote-reshare (carry resharer commentary above the source post)
+- [ ] @mentions autocomplete dropdown in the composer
 - [ ] Reactions beyond like (love, laugh, support)
-- [ ] Mentions parsing + notifications
 - [ ] Server-side ranker variant for very large account graphs
 - [ ] WebSocket transport for chat (Pusher / Ably swap)
-- [ ] Stories backend
+- [ ] Stories backend (currently UI-only on the home rail)
 - [ ] Web build (already supported by Expo Router; needs a layout pass)
 - [ ] Push notifications (EAS Build + APNs / FCM)
 - [ ] Accessibility audit pass
@@ -392,7 +404,19 @@ Vercel's standard plan doesn't host persistent WebSockets, so adding chat withou
 <details>
 <summary><b>Does it work on a 2&nbsp;GB-RAM Android device?</b></summary>
 
-Yes — that's the reference device. FlashList v2, Reanimated worklets on the UI thread, `expo-image` off-thread decoding, and aggressive memoisation in the data layer keep the JS thread idle during scroll.
+Yes — that's the reference device. FlashList v2, Reanimated worklets on the UI thread, `expo-image` off-thread decoding, `cachePolicy="memory-disk"` + `recyclingKey` on every image, tight `memo` comparators on every row component, and `useCallback` on every render handler keep the JS thread idle during scroll. There are no inline objects in `renderItem`, no animations on the JS thread, and no `removeClippedSubviews` (FlashList already manages recycling).
+</details>
+
+<details>
+<summary><b>How does the reshare model work?</b></summary>
+
+Each reshare creates a new `Post` document with `originalPost` set to the canonical source's `_id`. The source's `reposts: [userId]` array tracks who has reshared it, indexed for O(1) toggle lookups. The feed `$lookup` on `originalPost` hydrates the source so a reshare row renders as a "@user reshared" coral banner above the original. Toggling a reshare deletes the entry doc and pulls the user from `reposts` atomically. You can't reshare your own post — Twitter/X UX (the post is already on your timeline). Reshares of reshares fold up to the canonical original.
+</details>
+
+<details>
+<summary><b>Why className-only for layout instead of inline style?</b></summary>
+
+Layout drift caused by mixing `className` and `style` on the same property is a real bug class — sometimes Metro caches one, sometimes the other; sometimes NativeWind doesn't compile; the result is "everything collapses to the left." xMind locks layout to NativeWind classes (`w-full flex-row items-center gap-md`) so spacing and alignment can't drift between rebuilds. Inline `style` is reserved for runtime-dynamic values (alpha overlays, theme colours not exposed in the Tailwind config) — never mixed with className for the same property.
 </details>
 
 <details>

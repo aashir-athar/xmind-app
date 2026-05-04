@@ -389,6 +389,42 @@ export const followUser = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Remove a follower from the current user's followers list.
+ *
+ * Architectural mirror of `followUser` but invoked by the *receiver* of
+ * the follow rather than the actor. The current user (me) chooses to
+ * drop someone (target) from their followers — so we pull `target` from
+ * `me.followers` and pull `me` from `target.following`. No notification
+ * is sent: removed followers are not informed, matching the expectation
+ * users carry over from Instagram.
+ */
+export const removeFollower = asyncHandler(async (req, res) => {
+  const { userId } = getAuth(req);
+  const { targetUserId } = req.params;
+
+  const currentUser = await User.findOne({ clerkId: userId });
+  if (!currentUser) return res.status(404).json({ error: "User not found" });
+
+  if (currentUser._id.toString() === String(targetUserId)) {
+    return res.status(400).json({ error: "Invalid action" });
+  }
+
+  const targetUser = await User.findById(targetUserId);
+  if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+  await Promise.all([
+    User.findByIdAndUpdate(currentUser._id, {
+      $pull: { followers: targetUserId },
+    }),
+    User.findByIdAndUpdate(targetUserId, {
+      $pull: { following: currentUser._id },
+    }),
+  ]);
+
+  res.status(200).json({ message: "Follower removed successfully" });
+});
+
 export const toggleVerification = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
   const { targetUserId } = req.params;

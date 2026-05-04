@@ -16,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQueries } from "@tanstack/react-query";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { Surface } from "@/components/ui/Surface";
@@ -39,7 +40,7 @@ interface ShareTarget extends User {
 
 function ShareToChatSheetImpl({ post, onClose }: ShareToChatSheetProps) {
   const router = useRouter();
-  const { colors, spacing, radii } = useTheme();
+  const { colors, radii } = useTheme();
   const api = useApiClient();
   const { currentUser } = useCurrentUser();
   // Native alert because this component is itself a Modal — nested
@@ -159,55 +160,34 @@ function ShareToChatSheetImpl({ post, onClose }: ShareToChatSheetProps) {
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
+      <View
+        className="flex-1"
+        // overlay.scrim is a translucent black — not in tailwind config.
+        style={{ backgroundColor: colors.overlay.scrim }}
+      >
         <Pressable
           accessibilityLabel="Dismiss share sheet"
           onPress={onClose}
-          style={{ flex: 1 }}
+          className="flex-1"
         />
 
         <SafeAreaView edges={["bottom"]}>
-          <View style={{ paddingHorizontal: spacing.base, paddingBottom: spacing.sm }}>
+          <View className="px-base pb-sm">
             <Surface
               variant="solid"
               radius={radii.xxl}
-              style={{
-                overflow: "hidden",
-                borderWidth: 1,
-                borderColor: colors.border.subtle,
-                maxHeight: 520,
-              }}
+              className="overflow-hidden border border-subtle max-h-[520px]"
             >
               {/* Handle bar */}
-              <View
-                style={{
-                  alignItems: "center",
-                  paddingTop: spacing.sm,
-                  paddingBottom: spacing.xs,
-                }}
-              >
+              <View className="items-center pt-sm pb-xs">
                 <View
-                  style={{
-                    width: 40,
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: colors.border.strong,
-                  }}
+                  className="w-10 h-1 rounded-[2px]"
+                  style={{ backgroundColor: colors.border.strong }}
                 />
               </View>
 
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingHorizontal: spacing.lg,
-                  paddingVertical: spacing.sm,
-                  borderBottomWidth: 0.5,
-                  borderBottomColor: colors.border.subtle,
-                  gap: spacing.md,
-                }}
-              >
-                <View style={{ flex: 1 }}>
+              <View className="w-full flex-row items-center px-lg py-sm gap-md border-b-[0.5px] border-subtle">
+                <View className="flex-1">
                   <Text variant="title" tone="primary">
                     Send to a friend
                   </Text>
@@ -221,7 +201,7 @@ function ShareToChatSheetImpl({ post, onClose }: ShareToChatSheetProps) {
               </View>
 
               {isLoading ? (
-                <View style={{ paddingVertical: spacing.xl, alignItems: "center" }}>
+                <View className="py-xl items-center">
                   <ActivityIndicator color={colors.tint.primary} />
                 </View>
               ) : targets.length === 0 ? (
@@ -231,83 +211,76 @@ function ShareToChatSheetImpl({ post, onClose }: ShareToChatSheetProps) {
                   description="Follow some people, and the option to send a post to them lands here."
                 />
               ) : (
-                <View>
+                <View className="pt-sm">
                   {targets.map((t) => (
                     <Pressable
                       key={t._id}
                       onPress={() => handleSendTo(t)}
                       disabled={!!sendingTo}
                       android_ripple={{ color: colors.overlay.press }}
-                      style={({ pressed }) => ({
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing.base,
-                        paddingHorizontal: spacing.lg,
-                        paddingVertical: spacing.md,
-                        opacity: pressed || sendingTo === t._id ? 0.7 : 1,
-                        backgroundColor:
-                          pressed ? colors.surface.secondary : "transparent",
-                      })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Send to ${t.firstName} ${t.lastName}`}
+                      className={sendingTo === t._id ? "opacity-70" : ""}
                     >
-                      <Avatar
-                        source={t.profilePicture}
-                        name={`${t.firstName} ${t.lastName}`}
-                        size={44}
-                      />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <Text
-                            variant="subtitle"
-                            tone="primary"
-                            weight="700"
-                            numberOfLines={1}
-                          >
-                            {t.firstName} {t.lastName}
-                          </Text>
-                          {t.verified ? <VerifiedBadge size={13} /> : null}
-                          {t.isFriend ? (
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                gap: 3,
-                                paddingHorizontal: 6,
-                                paddingVertical: 1,
-                                borderRadius: 999,
-                                backgroundColor: colors.tint.primary + "1A",
-                                marginLeft: 4,
-                              }}
-                            >
-                              <Feather
-                                name="users"
-                                size={9}
-                                color={colors.tint.primary}
-                              />
-                              <Text variant="caption" tone="tint" weight="700">
-                                Friend
+                      <Card
+                        variant="solid"
+                        className="mx-base mb-sm p-base border border-subtle"
+                      >
+                        <View className="flex-row items-center gap-md">
+                          <Avatar
+                            source={t.profilePicture}
+                            name={`${t.firstName} ${t.lastName}`}
+                            size={44}
+                          />
+                          <View className="flex-1 min-w-0">
+                            <View className="flex-row items-center">
+                              <Text
+                                variant="subtitle"
+                                tone="primary"
+                                weight="700"
+                                numberOfLines={1}
+                                className="shrink mr-xs"
+                              >
+                                {t.firstName} {t.lastName}
                               </Text>
+                              {t.verified ? <VerifiedBadge size={13} /> : null}
+                              {t.isFriend ? (
+                                <View className="flex-row items-center px-[6px] py-[1px] rounded-pill ml-xs bg-tint/10">
+                                  <Feather
+                                    name="users"
+                                    size={9}
+                                    color={colors.tint.primary}
+                                  />
+                                  <Text
+                                    variant="caption"
+                                    tone="tint"
+                                    weight="700"
+                                    className="ml-[3px]"
+                                  >
+                                    Friend
+                                  </Text>
+                                </View>
+                              ) : null}
                             </View>
-                          ) : null}
+                            <Text
+                              variant="caption"
+                              tone="tertiary"
+                              numberOfLines={1}
+                            >
+                              @{t.username}
+                            </Text>
+                          </View>
+                          {sendingTo === t._id ? (
+                            <ActivityIndicator color={colors.tint.primary} />
+                          ) : (
+                            <Feather
+                              name="send"
+                              size={18}
+                              color={colors.tint.primary}
+                            />
+                          )}
                         </View>
-                        <Text variant="caption" tone="tertiary" numberOfLines={1}>
-                          @{t.username}
-                        </Text>
-                      </View>
-                      {sendingTo === t._id ? (
-                        <ActivityIndicator color={colors.tint.primary} />
-                      ) : (
-                        <Feather
-                          name="send"
-                          size={18}
-                          color={colors.tint.primary}
-                        />
-                      )}
+                      </Card>
                     </Pressable>
                   ))}
                 </View>

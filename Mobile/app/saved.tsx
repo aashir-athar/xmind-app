@@ -16,6 +16,7 @@ import { useRouter } from "expo-router";
 import { useQueries } from "@tanstack/react-query";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
 import { Feather } from "@expo/vector-icons";
+import type { AxiosError } from "axios";
 
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -36,7 +37,13 @@ export default function SavedScreen() {
   const { colors, spacing } = useTheme();
   const api = useApiClient();
   const { currentUser } = useCurrentUser();
-  const { toggleLike, deletePost, checkIsLiked } = usePosts();
+  const {
+    toggleLike,
+    toggleReshare,
+    deletePost,
+    checkIsLiked,
+    checkIsReshared,
+  } = usePosts();
 
   // Select the Set directly — Zustand uses Object.is to detect changes,
   // and `Array.from(set)` returns a fresh array every call, which makes
@@ -55,13 +62,22 @@ export default function SavedScreen() {
   const queries = useQueries({
     queries: postIds.map((id) => ({
       queryKey: ["post", id],
-      queryFn: async () => {
-        const response = await postApi.getPost<Post>(api, id);
-        return response.data.post;
+      queryFn: async (): Promise<Post | null> => {
+        try {
+          const response = await postApi.getPost<Post>(api, id, {
+            silent404: true,
+          });
+          return response.data.post;
+        } catch (e) {
+          // A bookmarked post that's since been deleted is "drop from
+          // list", not a screen error. silent404 suppresses the
+          // [api] error log line for that 404 specifically.
+          const status = (e as AxiosError | undefined)?.response?.status;
+          if (status === 404) return null;
+          throw e;
+        }
       },
       staleTime: 60_000,
-      // A post the user bookmarked then later deleted will 404 — treat
-      // that as "drop from list" rather than a screen-level error.
       retry: false,
     })),
   });
@@ -76,20 +92,34 @@ export default function SavedScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Post>) => (
-      <PostCard
-        post={item}
-        currentUser={currentUser}
-        isLiked={checkIsLiked(item.likes, currentUser)}
-        onLike={(id) => toggleLike(id)}
-        onComment={() =>
-          router.push({ pathname: "/post/[postId]", params: { postId: item._id } })
-        }
-        onDelete={(id) => deletePost(id)}
-        onMore={() => removeBookmark(item._id)}
-      />
-    ),
-    [checkIsLiked, currentUser, deletePost, removeBookmark, router, toggleLike]
+    ({ item }: ListRenderItemInfo<Post>) => {
+      const source = item.originalPost ?? item;
+      return (
+        <PostCard
+          post={item}
+          currentUser={currentUser}
+          isLiked={checkIsLiked(source.likes, currentUser)}
+          isReshared={checkIsReshared(item, currentUser)}
+          onLike={(id) => toggleLike(id)}
+          onReshare={(id) => toggleReshare(id)}
+          onComment={() =>
+            router.push({ pathname: "/post/[postId]", params: { postId: source._id } })
+          }
+          onDelete={(id) => deletePost(id)}
+          onMore={() => removeBookmark(source._id)}
+        />
+      );
+    },
+    [
+      checkIsLiked,
+      checkIsReshared,
+      currentUser,
+      deletePost,
+      removeBookmark,
+      router,
+      toggleLike,
+      toggleReshare,
+    ]
   );
 
   const keyExtractor = useCallback((p: Post) => p._id, []);

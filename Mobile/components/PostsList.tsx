@@ -91,8 +91,10 @@ function PostsListImpl({
     hasNextPage,
     isFetchingNextPage,
     toggleLike,
+    toggleReshare,
     deletePost,
     checkIsLiked,
+    checkIsReshared,
   } = usePosts(username);
 
   const posts = customPosts ?? fetchedPosts;
@@ -122,6 +124,10 @@ function PostsListImpl({
   }, [scrollToTopKey]);
 
   const handleLike = useCallback((postId: string) => toggleLike(postId), [toggleLike]);
+  const handleReshare = useCallback(
+    (postId: string) => toggleReshare(postId),
+    [toggleReshare]
+  );
   const handleDelete = useCallback((postId: string) => deletePost(postId), [deletePost]);
   const handleComment = useCallback((post: Post) => setSelectedPostId(post._id), []);
   const handleCloseComments = useCallback(() => setSelectedPostId(null), []);
@@ -129,24 +135,33 @@ function PostsListImpl({
   const handleCloseMenu = useCallback(() => setMenuPostId(null), []);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Post>) => (
-      <PostCard
-        post={item}
-        currentUser={currentUser}
-        isLiked={checkIsLiked(item.likes, currentUser)}
-        onLike={handleLike}
-        onComment={handleComment}
-        onDelete={handleDelete}
-        onMore={handleMore}
-      />
-    ),
+    ({ item }: ListRenderItemInfo<Post>) => {
+      // Source post for state — reshare entries route their visible
+      // state (likes, reposts) through the populated original.
+      const source = item.originalPost ?? item;
+      return (
+        <PostCard
+          post={item}
+          currentUser={currentUser}
+          isLiked={checkIsLiked(source.likes, currentUser)}
+          isReshared={checkIsReshared(item, currentUser)}
+          onLike={handleLike}
+          onReshare={handleReshare}
+          onComment={handleComment}
+          onDelete={handleDelete}
+          onMore={handleMore}
+        />
+      );
+    },
     [
       checkIsLiked,
+      checkIsReshared,
       currentUser,
       handleComment,
       handleDelete,
       handleLike,
       handleMore,
+      handleReshare,
     ]
   );
 

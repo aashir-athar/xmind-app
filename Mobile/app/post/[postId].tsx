@@ -58,7 +58,13 @@ export default function PostDetailScreen() {
   const queryClient = useQueryClient();
 
   const { currentUser } = useCurrentUser();
-  const { toggleLike, deletePost, checkIsLiked } = usePosts();
+  const {
+    toggleLike,
+    toggleReshare,
+    deletePost,
+    checkIsLiked,
+    checkIsReshared,
+  } = usePosts();
 
   const {
     data: post,
@@ -96,6 +102,11 @@ export default function PostDetailScreen() {
     toggleLike(post._id);
   }, [post, toggleLike]);
 
+  const handleReshare = useCallback(() => {
+    if (!post) return;
+    toggleReshare(post._id);
+  }, [post, toggleReshare]);
+
   const handleComment = useCallback(() => {
     // We're already on the post detail screen — focus is on the inline
     // composer. No navigation needed; the user is here to type.
@@ -117,9 +128,15 @@ export default function PostDetailScreen() {
     queryClient.invalidateQueries({ queryKey: ["post", post._id] });
   }, [commentText, createComment, post, queryClient]);
 
-  const isLiked = useMemo(
-    () => (post ? checkIsLiked(post.likes, currentUser) : false),
-    [checkIsLiked, currentUser, post]
+  const isLiked = useMemo(() => {
+    if (!post) return false;
+    const source = post.originalPost ?? post;
+    return checkIsLiked(source.likes, currentUser);
+  }, [checkIsLiked, currentUser, post]);
+
+  const isReshared = useMemo(
+    () => (post ? checkIsReshared(post, currentUser) : false),
+    [checkIsReshared, currentUser, post]
   );
 
   return (
@@ -190,7 +207,9 @@ export default function PostDetailScreen() {
               post={post}
               currentUser={currentUser}
               isLiked={isLiked}
+              isReshared={isReshared}
               onLike={handleLike}
+              onReshare={handleReshare}
               onComment={handleComment}
               onDelete={handleDelete}
             />

@@ -89,7 +89,7 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
         width: "100%",
         flexDirection: "row",
         alignItems: "stretch",
-        justifyContent: "space-between",
+        justifyContent: "space-around",
         borderTopWidth: 0.5,
         borderTopColor: colors.border.subtle,
         backgroundColor: colors.bg.canvas,
@@ -107,6 +107,7 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
               width: tabWidth,
               height: 2,
               backgroundColor: colors.tint.primary,
+              
             },
             indicatorStyle,
           ]}
@@ -127,7 +128,7 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
               flex: 1,
               alignItems: "center",
               justifyContent: "center",
-              paddingVertical: spacing.md,
+              paddingVertical: spacing.lg,
               opacity: pressed ? 0.6 : 1,
             })}
           >
@@ -135,6 +136,7 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
               name={tab.icon}
               size={22}
               color={focused ? colors.text.primary : colors.text.tertiary}
+              style={{ paddingTop: spacing.md }}
             />
           </Pressable>
         );

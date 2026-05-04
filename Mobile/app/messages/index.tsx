@@ -88,19 +88,9 @@ export default function MessagesScreen() {
   const keyExtractor = useCallback((c: Conversation) => c._id, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
+    <View className="flex-1 bg-canvas">
       <SafeAreaView edges={["top"]}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.md,
-            gap: spacing.md,
-            borderBottomWidth: 0.5,
-            borderBottomColor: colors.border.subtle,
-          }}
-        >
+        <View className="w-full flex-row items-center px-lg py-md gap-md border-b-[0.5px] border-subtle">
           <IconButton
             accessibilityLabel="Back"
             onPress={() => router.back()}
@@ -108,7 +98,7 @@ export default function MessagesScreen() {
           >
             <Feather name="arrow-left" size={18} color={colors.text.primary} />
           </IconButton>
-          <View style={{ flex: 1 }}>
+          <View className="flex-1">
             <Text variant="title" tone="primary">
               Messages
             </Text>
@@ -119,7 +109,7 @@ export default function MessagesScreen() {
           </View>
         </View>
 
-        <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}>
+        <View className="px-lg py-sm">
           <TextField
             shape="pill"
             value={query}
@@ -143,20 +133,11 @@ export default function MessagesScreen() {
       </SafeAreaView>
 
       {isLoading ? (
-        <View
-          style={{
-            paddingHorizontal: spacing.lg,
-            paddingVertical: spacing.md,
-            gap: spacing.md,
-          }}
-        >
+        <View className="px-lg py-md gap-md">
           {[0, 1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={{ flexDirection: "row", gap: spacing.md, alignItems: "center" }}
-            >
+            <View key={i} className="flex-row gap-md items-center">
               <Skeleton width={56} height={56} radius={28} />
-              <View style={{ flex: 1, gap: spacing.sm }}>
+              <View className="flex-1 gap-sm">
                 <Skeleton width="40%" height={14} />
                 <Skeleton width="80%" height={12} />
               </View>
@@ -178,7 +159,10 @@ export default function MessagesScreen() {
           data={filtered}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
+          contentContainerStyle={{
+            paddingTop: spacing.md,
+            paddingBottom: 80 + insets.bottom,
+          }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
