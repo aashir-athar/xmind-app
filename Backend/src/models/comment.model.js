@@ -27,6 +27,9 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Comment list per post is the only read pattern outside admin tools.
+commentSchema.index({ post: 1, createdAt: -1 });
+
 const Comment = mongoose.model("Comment", commentSchema);
 
 export default Comment;

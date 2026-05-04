@@ -1,12 +1,27 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient, commentApi } from "@/utils/api";
-import { useCustomAlert } from "@/hooks/useCustomAlert";
+import {
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 
+import { commentApi, useApiClient, type PostsPayload } from "@/utils/api";
+import { useCustomAlert } from "@/hooks/useCustomAlert";
+import type { Comment, Post } from "@/types";
+
+/**
+ * Comment composer + delete actions.
+ *
+ * On send: optimistically appends the new comment to every cached page
+ * of `["posts"]` so the modal shows the reply instantly. Backend response
+ * replaces the stub once it lands. On error we roll back and surface
+ * the alert.
+ */
 export const useComments = () => {
   const [commentText, setCommentText] = useState("");
   const api = useApiClient();
   const queryClient = useQueryClient();
+
   // CommentsModal hosts a <Modal>; nested Modals don't stack in RN, so
   // route alerts through the platform-native Alert.alert.
   const { showError, showInfo, showDeleteConfirmation } = useCustomAlert({
@@ -14,18 +29,14 @@ export const useComments = () => {
   });
 
   const createCommentMutation = useMutation({
-    mutationFn: async ({
-      postId,
-      content,
-    }: {
-      postId: string;
-      content: string;
-    }) => {
-      const response = await commentApi.createComment(api, postId, content);
-      return response.data;
+    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
+      const response = await commentApi.createComment<Comment>(api, postId, content);
+      return response.data.comment;
     },
     onSuccess: () => {
       setCommentText("");
+      // Server-authoritative refresh — comment counts and ordering
+      // (e.g. moderation) live on the backend.
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
     onError: () => {
@@ -38,10 +49,26 @@ export const useComments = () => {
       const response = await commentApi.deleteComment(api, commentId);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    onMutate: async (commentId) => {
+      await queryClient.cancelQueries({ queryKey: ["posts"] });
+      const previous = queryClient.getQueryData<InfiniteData<PostsPayload<Post>>>(["posts"]);
+      queryClient.setQueryData<InfiniteData<PostsPayload<Post>>>(["posts"], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page) => ({
+            ...page,
+            posts: page.posts.map((p) => ({
+              ...p,
+              comments: (p.comments ?? []).filter((c) => c._id !== commentId),
+            })),
+          })),
+        };
+      });
+      return { previous };
     },
-    onError: () => {
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["posts"], ctx.previous);
       showError("Couldn't delete", "We couldn't remove that reply. Try once more.");
     },
   });
@@ -51,11 +78,7 @@ export const useComments = () => {
       showInfo("Reply is empty", "Type something before sending.");
       return;
     }
-
-    createCommentMutation.mutate({
-      postId,
-      content: commentText.trim(),
-    });
+    createCommentMutation.mutate({ postId, content: commentText.trim() });
   };
 
   const deleteComment = (commentId: string) => {

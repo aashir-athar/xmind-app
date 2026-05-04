@@ -1,5 +1,6 @@
 import React, { memo } from "react";
-import { Image, Modal, Pressable, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -51,10 +52,12 @@ function ImageModalImpl({ isVisible, onClose, imageUrl, imageTitle }: ImageModal
           </View>
 
           <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Dismiss">
-            <Image
+            <ExpoImage
               source={{ uri: imageUrl }}
               style={{ flex: 1, width: "100%" }}
-              resizeMode="contain"
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={200}
             />
           </Pressable>
         </SafeAreaView>

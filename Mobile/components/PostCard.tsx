@@ -1,10 +1,10 @@
 import React, { memo, useCallback, useMemo, useState } from "react";
 import {
-  Image,
   Pressable,
   type GestureResponderEvent,
   View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Animated, {
@@ -61,13 +61,14 @@ function PostCardImpl({
   onComment,
   onDelete,
 }: PostCardProps) {
-  const { colors, spacing, radii } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const { showDeleteConfirmation, alertConfig, isVisible, hideAlert } =
     useCustomAlert();
 
   const [imageOpen, setImageOpen] = useState(false);
   const isOwn = !!currentUser && post.user._id === currentUser._id;
+  const commentCount = post.commentCount ?? post.comments?.length ?? 0;
 
   // Heart pulse — single shared value, lightweight, UI-thread only.
   const heartScale = useSharedValue(1);
@@ -201,16 +202,21 @@ function PostCardImpl({
               </Text>
             ) : null}
 
-            {/* Media */}
+            {/* Media — expo-image decodes off the JS thread and caches
+                across cells, so scrolling a feed of mixed-image posts
+                stays smooth even on a low-end Android device. */}
             {post.image ? (
               <Pressable
                 onPress={() => setImageOpen(true)}
                 className="mt-md rounded-base overflow-hidden bg-surface-secondary"
               >
-                <Image
+                <ExpoImage
                   source={{ uri: post.image }}
                   style={{ width: "100%", aspectRatio: 16 / 10 }}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={140}
+                  recyclingKey={post._id}
                 />
               </Pressable>
             ) : null}
@@ -219,24 +225,33 @@ function PostCardImpl({
             <View className="mt-md flex-row justify-between pr-lg">
               <ActionPill
                 icon={<Feather name="message-circle" size={18} color={colors.text.tertiary} />}
-                label={formatNumber(post.comments?.length || 0)}
+                label={formatNumber(commentCount)}
                 onPress={handleComment}
                 accessibilityLabel="Open comments"
               />
               <ActionPill
                 icon={
                   <Animated.View style={heartStyle}>
-                    {isLiked ? (
-                      <AntDesign name="heart" size={18} color={colors.tint.primary} />
-                    ) : (
-                      <Feather name="heart" size={18} color={colors.text.tertiary} />
-                    )}
+                    <AntDesign
+                      name="heart"
+                      size={18}
+                      // Single icon, only the colour flips. Same node identity
+                      // means React Native doesn't re-mount the icon on each
+                      // like — the heart morphs in place.
+                      color={isLiked ? colors.tint.danger : colors.text.tertiary}
+                      style={{ opacity: isLiked ? 1 : 0.85 }}
+                    />
                   </Animated.View>
                 }
                 label={formatNumber(post.likes?.length || 0)}
                 onPress={handleLike}
                 emphasised={isLiked}
                 accessibilityLabel={isLiked ? "Unlike" : "Like"}
+              />
+              <ActionPill
+                icon={<Feather name="repeat" size={18} color={colors.text.tertiary} />}
+                onPress={() => undefined}
+                accessibilityLabel="Repost"
               />
               <ActionPill
                 icon={<Feather name="share" size={18} color={colors.text.tertiary} />}
@@ -300,10 +315,12 @@ ActionPill.displayName = "ActionPill";
 
 /** Memo with custom equality on the slim set of fields that change. */
 export const PostCard = memo(PostCardImpl, (prev, next) => {
+  const prevComments = prev.post.commentCount ?? prev.post.comments?.length ?? 0;
+  const nextComments = next.post.commentCount ?? next.post.comments?.length ?? 0;
   return (
     prev.post._id === next.post._id &&
     prev.post.likes?.length === next.post.likes?.length &&
-    prev.post.comments?.length === next.post.comments?.length &&
+    prevComments === nextComments &&
     prev.post.image === next.post.image &&
     prev.post.content === next.post.content &&
     prev.isLiked === next.isLiked &&

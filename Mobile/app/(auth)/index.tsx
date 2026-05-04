@@ -20,15 +20,13 @@ import { useTheme } from "@/hooks/useTheme";
 /**
  * Welcome screen.
  *
- * Copy strategy (BAB framework — Before, After, Bridge):
- *  - Before: implicit, the user already feels social media is loud.
- *  - After: "A quieter place to think out loud."
- *  - Bridge: a single primary CTA. No "or sign up with X" noise here —
- *    that lives one tap away on the sign-in screen so the welcome can
- *    breathe (Hick's Law: fewer choices, faster decisions).
+ * Copy strategy (PAS — Problem, Agitate, Solution):
+ *  - Problem: feeds are noisy and forgettable.
+ *  - Agitate: implicit — every other social app already does this.
+ *  - Solution: a fast, clean place to share what's actually happening.
  *
  * Layout uses NativeWind classes; only Reanimated-driven transforms
- * stay inline.
+ * stay inline. A single primary CTA reduces decision time (Hick's Law).
  */
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -82,7 +80,7 @@ export default function WelcomeScreen() {
               xMind
             </Text>
             <Text variant="title" tone="secondary" align="center" weight="500">
-              A quieter place to think out loud.
+              Share what's happening. Right now.
             </Text>
             <Text
               variant="body"
@@ -91,7 +89,7 @@ export default function WelcomeScreen() {
               className="mt-base"
               style={{ maxWidth: 320 }}
             >
-              Slow social, on purpose. Say what you actually think — and find the people who think too.
+              Post in a tap. Follow people who get it. Catch the conversation while it's still hot.
             </Text>
           </Animated.View>
         </View>

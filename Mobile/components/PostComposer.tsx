@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useState } from "react";
-import { Image, Pressable, TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useUser } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 
@@ -78,7 +79,7 @@ function PostComposerImpl() {
             onChangeText={setContent}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            placeholder="Say something true."
+            placeholder="What's happening?"
             placeholderTextColor={colors.text.tertiary}
             multiline
             maxLength={MAX_LEN + 50}
@@ -95,10 +96,11 @@ function PostComposerImpl() {
 
           {selectedImage ? (
             <View className="rounded-base overflow-hidden relative">
-              <Image
+              <ExpoImage
                 source={{ uri: selectedImage }}
                 style={{ width: "100%", aspectRatio: 16 / 10 }}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={120}
               />
               <Pressable
                 onPress={removeImage}

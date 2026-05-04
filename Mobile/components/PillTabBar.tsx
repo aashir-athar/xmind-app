@@ -11,7 +11,6 @@ import Animated, {
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 import { Surface } from "@/components/ui/Surface";
-import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -138,6 +137,20 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
         pointerEvents: "box-none",
       }}
     >
+      <View
+        style={{
+          // Shadow lives on the outer view; clipping lives on the
+          // Surface. Combining both on a single layer forces iOS to
+          // rasterise the view off-screen — that costs measurable FPS
+          // when the indicator springs over the tab.
+          shadowColor: "#000",
+          shadowOpacity: mode === "dark" ? 0.45 : 0.12,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 12,
+          borderRadius: radii.pill,
+        }}
+      >
       <Surface
         variant="glass"
         radius={radii.pill}
@@ -152,11 +165,6 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
           overflow: "hidden",
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.border.subtle,
-          shadowColor: "#000",
-          shadowOpacity: mode === "dark" ? 0.45 : 0.12,
-          shadowRadius: 24,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
           // Android opaque fallback — Surface tints translucently when
           // liquid glass + BlurView are both unavailable.
           backgroundColor:
@@ -200,26 +208,16 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
             >
               <Ionicons
                 name={isFocused ? meta.iconActive : meta.icon}
-                size={22}
+                size={24}
                 color={isFocused ? colors.text.onTint : colors.text.secondary}
               />
-              {/* Visually hidden label keeps the bar accessible without
-                  cluttering the icon-only resting state. */}
-              <Text
-                variant="caption"
-                tone={isFocused ? "inverse" : "tertiary"}
-                style={{
-                  marginTop: 2,
-                  fontSize: 10,
-                  color: isFocused ? colors.text.onTint : colors.text.tertiary,
-                }}
-              >
-                {meta.label}
-              </Text>
+              {/* Twitter-style: no visible labels at rest. The `accessibilityLabel`
+                  on the Pressable still announces the tab to screen readers. */}
             </Pressable>
           );
         })}
       </Surface>
+      </View>
     </View>
   );
 }

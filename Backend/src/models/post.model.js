@@ -31,6 +31,11 @@ const postSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Feed paging — `{ createdAt: -1, _id: -1 }` is the hot read path.
+postSchema.index({ createdAt: -1, _id: -1 });
+// Profile feed — every "posts by this user" page issues this query.
+postSchema.index({ user: 1, createdAt: -1 });
+
 const Post = mongoose.model("Post", postSchema);
 
 export default Post;

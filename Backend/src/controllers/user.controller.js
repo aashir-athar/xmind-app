@@ -7,18 +7,15 @@ import { getAuth } from "@clerk/express";
 import { clerkClient } from "@clerk/express";
 
 export const getUserProfile = asyncHandler(async (req, res) => {
-  const { username } = req.params;
-
+  const username = String(req.params.username ?? "").trim().toLowerCase();
   if (!username) {
     return res.status(400).json({ error: "Username is required" });
   }
 
-  // Convert username to lowercase for consistent lookup
-  const lowercaseUsername = username.toLowerCase();
-  const user = await User.findOne({ username: lowercaseUsername });
-
+  // `username` is stored lowercase via the model's pre-save hook, so this
+  // is a plain index lookup (no regex / no collation walk).
+  const user = await User.findOne({ username }).lean();
   if (!user) return res.status(404).json({ error: "User not found" });
-
   res.status(200).json({ user });
 });
 
@@ -270,10 +267,8 @@ export const syncUser = asyncHandler(async (req, res) => {
 
 export const getCurrentUser = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
-  const user = await User.findOne({ clerkId: userId });
-
+  const user = await User.findOne({ clerkId: userId }).lean();
   if (!user) return res.status(404).json({ error: "User not found" });
-
   res.status(200).json({ user });
 });
 

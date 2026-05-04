@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { useApiClient } from "../utils/api";
+
+import { useApiClient, userApi } from "@/utils/api";
 import { useCurrentUser } from "./useCurrentUser";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import { useExistingUsernames } from "./useExistingUsernames";
@@ -13,10 +14,28 @@ import {
   VerificationResult,
 } from "@/utils/verification";
 import { usePosts } from "./usePosts";
-import {
-  validateUsername,
-  ValidationConfig,
-} from "../utils/usernameValidation";
+import { validateUsername } from "../utils/usernameValidation";
+import type { User } from "@/types";
+
+const MIME_FOR_EXT: Record<string, string> = {
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+function buildImagePart(uri: string, fieldName: string) {
+  const parts = uri.split(".");
+  const ext = (parts[parts.length - 1] ?? "jpg").toLowerCase();
+  const mimeType = MIME_FOR_EXT[ext] ?? "image/jpeg";
+  const normalizedExt = mimeType.split("/")[1] ?? "jpeg";
+  return {
+    uri,
+    name: `${fieldName}.${normalizedExt}`,
+    type: mimeType,
+  } as unknown as Blob;
+}
 
 export interface ProfileFormData {
   firstName: string;
@@ -71,12 +90,11 @@ export const useProfile = () => {
   const [verificationResult, setVerificationResult] =
     useState<VerificationResult | null>(null);
 
-  // Profile update mutation (handles text fields + images)
+  // Profile update mutation (text fields + images, single multipart request).
   const updateProfileMutation = useMutation({
     mutationFn: async (profileData: ProfileFormData) => {
       const formDataToSend = new FormData();
 
-      // Add text fields if they have values
       if (profileData.firstName?.trim())
         formDataToSend.append("firstName", profileData.firstName.trim());
       if (profileData.lastName?.trim())
@@ -86,120 +104,71 @@ export const useProfile = () => {
       if (profileData.location?.trim())
         formDataToSend.append("location", profileData.location.trim());
 
-      // Handle profile picture upload (same logic as useCreatePost)
       if (selectedProfileImage) {
-        const uriParts = selectedProfileImage.split(".");
-        const fileType = uriParts[uriParts.length - 1].toLowerCase();
-
-        const mimeTypeMap: Record<string, string> = {
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-        };
-        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
-        const normalizedExt = mimeType.split("/")[1];
-
-        formDataToSend.append("profilePicture", {
-          uri: selectedProfileImage,
-          name: `profile-image.${normalizedExt}`,
-          type: mimeType,
-        } as any);
+        formDataToSend.append("profilePicture", buildImagePart(selectedProfileImage, "profile-image"));
       }
-
-      // Handle banner image upload (same logic as useCreatePost)
       if (selectedBannerImage) {
-        const uriParts = selectedBannerImage.split(".");
-        const fileType = uriParts[uriParts.length - 1].toLowerCase();
-
-        const mimeTypeMap: Record<string, string> = {
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-        };
-        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
-        const normalizedExt = mimeType.split("/")[1];
-
-        formDataToSend.append("bannerImage", {
-          uri: selectedBannerImage,
-          name: `banner-image.${normalizedExt}`,
-          type: mimeType,
-        } as any);
+        formDataToSend.append("bannerImage", buildImagePart(selectedBannerImage, "banner-image"));
       }
 
-      return api.post("/users/profile", formDataToSend, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await userApi.updateProfile<User>(api, formDataToSend);
+      return response.data.user;
     },
-    onSuccess: async () => {
-      console.log("Profile update successful, refreshing data...");
-
-      // Clear selected images
+    onSuccess: async (user) => {
       setSelectedProfileImage(null);
       setSelectedBannerImage(null);
-
-      // Invalidate and refetch user data
-      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      await queryClient.refetchQueries({ queryKey: ["authUser"] });
-      await refetchCurrentUser();
-
-      // Close modal and show success
+      // Seed the cache directly so the UI updates without a re-fetch round-trip.
+      queryClient.setQueryData<User>(["authUser"], user);
+      await queryClient.invalidateQueries({ queryKey: ["userPosts", user.username] });
       setIsEditModalVisible(false);
       showSuccess("Profile saved", "Your changes are live across the app.");
     },
     onError: (error: any) => {
-      console.error("Profile update error:", error);
+      if (__DEV__) console.error("[profile] update error:", error);
       showError(
         "Couldn't save",
-        error.response?.data?.error ||
+        error?.response?.data?.error ||
           "We couldn't save those changes. Try once more."
       );
     },
   });
 
-  // Username update mutation (separate endpoint)
+  // Username update mutation (separate endpoint).
   const updateUsernameMutation = useMutation({
     mutationFn: async (username: string) => {
-      const lowercaseUsername = username.toLowerCase();
-      return api.put("/users/username", { username: lowercaseUsername });
+      const response = await userApi.updateUsername<User>(api, username.toLowerCase());
+      return response.data.user;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      await queryClient.refetchQueries({ queryKey: ["authUser"] });
+    onSuccess: async (user) => {
+      queryClient.setQueryData<User>(["authUser"], user);
       await refetchCurrentUser();
-      showSuccess(
-        "Username updated",
-        "Your handle is live everywhere now."
-      );
+      showSuccess("Username updated", "Your handle is live everywhere now.");
     },
     onError: (error: any) => {
-      console.error("Username update error:", error);
+      if (__DEV__) console.error("[profile] username update error:", error);
       showError(
         "Couldn't update username",
-        error.response?.data?.error || "Try a different one in a moment."
+        error?.response?.data?.error || "Try a different one in a moment."
       );
     },
   });
 
-  // Auto-verification mutation
+  // Auto-verification mutation.
   const autoVerificationMutation = useMutation({
     mutationFn: async () => {
-      // This would call your verification endpoint
-      return api.post("/users/verify");
+      const response = await userApi.autoVerifyUser<User>(api);
+      return response.data.user;
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["authUser"] });
-      await refetchCurrentUser();
+    onSuccess: (user) => {
+      queryClient.setQueryData<User>(["authUser"], user);
       showSuccess(
         "Account verified",
         "Your account is now verified — the badge appears on your profile."
       );
     },
     onError: (error: any) => {
-      console.error("Auto-verification failed:", error);
-      showInfo(
-        "Almost there",
-        "Your verification status will sync in a moment."
-      );
+      if (__DEV__) console.error("[profile] auto-verification failed:", error);
+      showInfo("Almost there", "Your verification status will sync in a moment.");
     },
   });
 
@@ -256,7 +225,12 @@ export const useProfile = () => {
   const usernameValidation = async (username: string): Promise<boolean> => {
     const candidate = (username ?? "").trim();
 
-    const result = await validateUsername(currentUser?.username, candidate, undefined, existingUsernames);
+    const result = await validateUsername(
+      currentUser?.username ?? "",
+      candidate,
+      undefined,
+      existingUsernames
+    );
     if (result.valid) {
       setusernameValidate(true);
       setusernameValidateErrors([]);
@@ -377,7 +351,7 @@ export const useProfile = () => {
         showSuccess("Username updated", "Your handle is live everywhere now.");
       }
     } catch (error) {
-      console.error("Error saving profile:", error);
+      if (__DEV__) console.error("[profile] save error:", error);
     }
   };
 

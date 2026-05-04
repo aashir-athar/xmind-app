@@ -105,7 +105,6 @@ export default function NotificationsScreen() {
           paddingTop: 8,
           paddingBottom: 140 + insets.bottom,
         }}
-        removeClippedSubviews
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}

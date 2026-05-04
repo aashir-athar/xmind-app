@@ -1,12 +1,13 @@
 import React, { memo, useMemo } from "react";
-import { Image, type ImageSourcePropType, type ImageStyle, View, type ViewStyle } from "react-native";
+import { type ImageStyle, View, type ViewStyle } from "react-native";
+import { Image, type ImageSource } from "expo-image";
 
 import { Text } from "./Text";
 import { useTheme } from "@/hooks/useTheme";
 
 export interface AvatarProps {
-  /** Remote image URL or local source. */
-  source?: ImageSourcePropType | string | null;
+  /** Remote image URL, an expo-image source, or a numeric require(). */
+  source?: ImageSource | string | number | null;
   /** Used to generate fallback initials when no image is available. */
   name?: string;
   /** Avatar diameter. */
@@ -36,9 +37,12 @@ function initialsFor(name?: string): string {
 function AvatarImpl({ source, name, size = 44, ringColor, className, style }: AvatarProps) {
   const { colors } = useTheme();
 
-  const resolvedSource = useMemo(() => {
-    if (!source) return null;
-    if (typeof source === "string") return { uri: source };
+  const resolvedSource = useMemo<ImageSource | number | null>(() => {
+    if (source == null) return null;
+    if (typeof source === "string") {
+      const trimmed = source.trim();
+      return trimmed ? { uri: trimmed } : null;
+    }
     return source;
   }, [source]);
 
@@ -66,7 +70,15 @@ function AvatarImpl({ source, name, size = 44, ringColor, className, style }: Av
   return (
     <View className={className} style={[containerStyle, style]}>
       {resolvedSource ? (
-        <Image source={resolvedSource} style={imageStyle} resizeMode="cover" />
+        <Image
+          source={resolvedSource}
+          style={imageStyle}
+          contentFit="cover"
+          // Cache the avatar across screen mounts; same uri renders instantly.
+          cachePolicy="memory-disk"
+          // Tiny placeholder fade keeps the avatar from flashing in.
+          transition={120}
+        />
       ) : (
         <Text
           variant={size >= 56 ? "title" : "label"}
