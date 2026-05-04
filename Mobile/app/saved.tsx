@@ -38,10 +38,15 @@ export default function SavedScreen() {
   const { currentUser } = useCurrentUser();
   const { toggleLike, deletePost, checkIsLiked } = usePosts();
 
-  const postIds = useBookmarksStore((s) => Array.from(s.postIds));
+  // Select the Set directly — Zustand uses Object.is to detect changes,
+  // and `Array.from(set)` returns a fresh array every call, which makes
+  // every render look like a state change and triggers an infinite loop.
+  const postIdsSet = useBookmarksStore((s) => s.postIds);
   const isHydrated = useBookmarksStore((s) => s.isHydrated);
   const hydrate = useBookmarksStore((s) => s.hydrate);
   const removeBookmark = useBookmarksStore((s) => s.toggle);
+
+  const postIds = useMemo(() => Array.from(postIdsSet), [postIdsSet]);
 
   useEffect(() => {
     if (!isHydrated) hydrate().catch(() => undefined);
