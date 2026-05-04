@@ -2,6 +2,7 @@
 .claude/
 .vscode/
 .idea/
+./expo/
 
 # Logs
 **/npm-install.log

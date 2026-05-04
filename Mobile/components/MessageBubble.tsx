@@ -14,10 +14,18 @@ import React, { memo, useCallback } from "react";
 import { Pressable, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
+import { SharedPostCard } from "@/components/SharedPostCard";
 import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 import { formatDate } from "@/utils/formatter";
 import type { ChatMessage } from "@/types";
+
+/**
+ * Parses a `#xmind/post/<id>` marker out of a message body. Sent by
+ * `ShareToChatSheet` when a user shares a post into a DM. When present,
+ * the bubble swaps the raw text for a `<SharedPostCard>` preview.
+ */
+const SHARED_POST_MARKER = /#xmind\/post\/([a-f0-9]{24})/i;
 
 export interface MessageBubbleProps {
   message: ChatMessage;
@@ -64,6 +72,9 @@ function MessageBubbleImpl({
   const bubbleColor = isMine ? colors.chat.outgoingBg : colors.chat.incomingBg;
   const textColor = isMine ? colors.chat.outgoingText : colors.chat.incomingText;
 
+  const sharedPostMatch = message.body.match(SHARED_POST_MARKER);
+  const sharedPostId = sharedPostMatch?.[1] ?? null;
+
   // Tighter "tucked" corner on the inner side for grouped continuations.
   const innerRadius = grouped ? radii.md : radii.xl;
   const outerRadius = radii.xl;
@@ -92,21 +103,35 @@ function MessageBubbleImpl({
       }}
     >
       <View style={{ maxWidth: "80%" }}>
-        <View
-          style={[
-            {
-              backgroundColor: bubbleColor,
-              paddingHorizontal: spacing.base,
-              paddingVertical: spacing.sm + 2,
+        {sharedPostId ? (
+          // Shared-post preview: skip the coloured bubble entirely so the
+          // card stands as its own surface. The bubble bg would clash with
+          // the card's own border + radius.
+          <View
+            style={{
+              minWidth: 240,
               opacity: message.pending ? 0.65 : 1,
-            },
-            radiusStyle,
-          ]}
-        >
-          <Text variant="body" style={{ color: textColor }}>
-            {message.body}
-          </Text>
-        </View>
+            }}
+          >
+            <SharedPostCard postId={sharedPostId} />
+          </View>
+        ) : (
+          <View
+            style={[
+              {
+                backgroundColor: bubbleColor,
+                paddingHorizontal: spacing.base,
+                paddingVertical: spacing.sm + 2,
+                opacity: message.pending ? 0.65 : 1,
+              },
+              radiusStyle,
+            ]}
+          >
+            <Text variant="body" style={{ color: textColor }}>
+              {message.body}
+            </Text>
+          </View>
+        )}
 
         {showTimestamp ? (
           <View

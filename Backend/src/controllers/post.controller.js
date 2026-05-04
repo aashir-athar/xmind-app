@@ -22,6 +22,22 @@ const FEED_USER_FIELDS = "username firstName lastName profilePicture verified";
  * Vercel response without needing compression. Likes ship as a string
  * array because the mobile app uses them to decide the heart state.
  */
+/**
+ * Reusable user-projection sub-pipeline. Used both for the resharer and
+ * the original author when populating an `originalPost`.
+ */
+const USER_PROJECTION_PIPELINE = [
+  {
+    $project: {
+      username: 1,
+      firstName: 1,
+      lastName: 1,
+      profilePicture: 1,
+      verified: 1,
+    },
+  },
+];
+
 function buildFeedAggregation(matchStage, limit) {
   return [
     { $match: matchStage },
@@ -33,20 +49,50 @@ function buildFeedAggregation(matchStage, limit) {
         localField: "user",
         foreignField: "_id",
         as: "user",
+        pipeline: USER_PROJECTION_PIPELINE,
+      },
+    },
+    { $unwind: "$user" },
+    // When this row is a reshare, hydrate the original post (one extra
+    // lookup per reshare row — the index on `originalPost` keeps it cheap).
+    {
+      $lookup: {
+        from: "posts",
+        localField: "originalPost",
+        foreignField: "_id",
+        as: "originalPost",
         pipeline: [
           {
+            $lookup: {
+              from: "users",
+              localField: "user",
+              foreignField: "_id",
+              as: "user",
+              pipeline: USER_PROJECTION_PIPELINE,
+            },
+          },
+          { $unwind: "$user" },
+          {
             $project: {
-              username: 1,
-              firstName: 1,
-              lastName: 1,
-              profilePicture: 1,
-              verified: 1,
+              content: 1,
+              image: 1,
+              createdAt: 1,
+              user: 1,
+              likes: 1,
+              reposts: 1,
+              repostCount: { $size: { $ifNull: ["$reposts", []] } },
+              commentCount: { $size: { $ifNull: ["$comments", []] } },
             },
           },
         ],
       },
     },
-    { $unwind: "$user" },
+    {
+      $unwind: {
+        path: "$originalPost",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
     {
       $project: {
         content: 1,
@@ -55,7 +101,10 @@ function buildFeedAggregation(matchStage, limit) {
         updatedAt: 1,
         likes: 1,
         user: 1,
+        reposts: 1,
+        repostCount: { $size: { $ifNull: ["$reposts", []] } },
         commentCount: { $size: { $ifNull: ["$comments", []] } },
+        originalPost: 1,
       },
     },
   ];
@@ -209,10 +258,28 @@ export const getPost = asyncHandler(async (req, res) => {
       options: { sort: { createdAt: -1 } },
       populate: { path: "user", select: FEED_USER_FIELDS },
     })
+    .populate({
+      path: "originalPost",
+      populate: { path: "user", select: FEED_USER_FIELDS },
+    })
     .lean();
 
   if (!post) return res.status(404).json({ error: "Post not found" });
-  res.status(200).json({ post });
+
+  // Mirror the feed shape: derive repostCount on both the row and any
+  // populated original so the client never has to inspect raw arrays.
+  const shaped = {
+    ...post,
+    repostCount: post.reposts?.length ?? 0,
+    originalPost: post.originalPost
+      ? {
+          ...post.originalPost,
+          repostCount: post.originalPost.reposts?.length ?? 0,
+        }
+      : null,
+  };
+
+  res.status(200).json({ post: shaped });
 });
 
 export const getUserPosts = asyncHandler(async (req, res) => {
@@ -372,7 +439,101 @@ export const deletePost = asyncHandler(async (req, res) => {
     Comment.deleteMany({ post: postId }),
     Notification.deleteMany({ post: postId }),
     Post.findByIdAndDelete(postId),
+    // When the canonical post goes, its reshare entries are dangling
+    // pointers — drop them too so feeds don't render broken cards.
+    Post.deleteMany({ originalPost: postId }),
   ]);
 
   res.status(200).json({ message: "Post deleted successfully" });
+});
+
+/**
+ * Toggle a reshare (repost).
+ *
+ * Mirror of `likePost` semantics: idempotent on a single tap, atomic
+ * across the canonical original and the resharer's reshare-entry doc.
+ *
+ *  - If `postId` is itself a reshare, we resolve to its source — you
+ *    can't reshare a reshare; you reshare its origin.
+ *  - The reshare entry is a *new* Post doc with `originalPost` set and
+ *    empty content/image. The feed's $lookup hydrates the original.
+ *  - The original's `reposts` array tracks who has reshared it.
+ *  - The original author gets a `reshare` notification (skip self).
+ */
+export const resharePost = asyncHandler(async (req, res) => {
+  const { userId } = getAuth(req);
+  const { postId } = req.params;
+  if (!mongoose.isValidObjectId(postId)) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  const user = await User.findOne({ clerkId: userId }).select("_id").lean();
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const target = await Post.findById(postId)
+    .select("user originalPost")
+    .lean();
+  if (!target) return res.status(404).json({ error: "Post not found" });
+
+  // Resolve to the canonical original — reshares of reshares fold up.
+  const trueOriginalId = target.originalPost ?? target._id;
+
+  // Block self-reshares of your own post (matches Twitter's UX — you
+  // can't repost yourself; the post is already on your timeline).
+  const original = await Post.findById(trueOriginalId).select("user").lean();
+  if (!original) return res.status(404).json({ error: "Post not found" });
+  if (original.user.toString() === user._id.toString()) {
+    return res.status(400).json({ error: "You can't reshare your own post" });
+  }
+
+  const existing = await Post.findOne({
+    user: user._id,
+    originalPost: trueOriginalId,
+  })
+    .select("_id")
+    .lean();
+
+  if (existing) {
+    // Toggle off.
+    await Promise.all([
+      Post.updateOne(
+        { _id: trueOriginalId },
+        { $pull: { reposts: user._id } }
+      ),
+      Post.deleteOne({ _id: existing._id }),
+    ]);
+    const fresh = await Post.findById(trueOriginalId).select("reposts").lean();
+    return res.status(200).json({
+      reshared: false,
+      repostCount: fresh?.reposts?.length ?? 0,
+    });
+  }
+
+  // Toggle on: add to reposts and create the reshare entry doc.
+  await Promise.all([
+    Post.updateOne(
+      { _id: trueOriginalId },
+      { $addToSet: { reposts: user._id } }
+    ),
+    Post.create({
+      user: user._id,
+      originalPost: trueOriginalId,
+      content: "",
+      image: "",
+    }),
+  ]);
+
+  // Fire-and-forget notification — never block the toggle.
+  Notification.create({
+    from: user._id,
+    to: original.user,
+    type: "reshare",
+    post: trueOriginalId,
+  }).catch((err) => console.error("[reshare] notification error:", err));
+
+  const fresh = await Post.findById(trueOriginalId).select("reposts").lean();
+  res.status(200).json({
+    reshared: true,
+    repostCount: fresh?.reposts?.length ?? 0,
+  });
 });

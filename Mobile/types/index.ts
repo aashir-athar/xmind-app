@@ -45,9 +45,19 @@ export interface Post {
   comments?: Comment[];
   /** Server-side count, used by the feed list when `comments` is absent. */
   commentCount?: number;
+  /** User ids that have reshared this post. Maintained on the canonical
+   *  original; reshare entries (with `originalPost` set) carry an empty
+   *  array of their own. */
+  reposts?: string[];
+  /** Server-derived count from `reposts.length`. */
+  repostCount?: number;
+  /** When set, this row is a reshare entry and the populated payload is
+   *  the source post. The PostCard renderer sees this and prepends a
+   *  "@username reshared" banner above the source content. */
+  originalPost?: Post | null;
 }
 
-export type NotificationType = "like" | "comment" | "follow";
+export type NotificationType = "like" | "comment" | "follow" | "reshare";
 
 export interface Notification {
   _id: string;

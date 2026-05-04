@@ -7,6 +7,7 @@ import {
   getTrending,
   getUserPosts,
   likePost,
+  resharePost,
 } from "../controllers/post.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import upload from "../middleware/upload.middleware.js";
@@ -22,6 +23,7 @@ router.get("/:postId", getPost);
 // protected proteced
 router.post("/", protectRoute, upload.single("image"), createPost);
 router.post("/:postId/like", protectRoute, likePost);
+router.post("/:postId/reshare", protectRoute, resharePost);
 router.delete("/:postId", protectRoute, deletePost);
 
 export default router;

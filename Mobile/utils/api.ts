@@ -18,10 +18,18 @@ const API_BASE_URL =
   "https://xmind-app-five.vercel.app/api";
 
 /**
- * Augment Axios's request config with our retry flag without leaking
- * `any` into the call sites.
+ * Augment Axios's request config with our retry flag and an opt-in
+ * "silent on 404" flag without leaking `any` into the call sites.
+ *
+ * `silent404` lets a single call site (e.g. fetching a post that may
+ * have been deleted by the time a chat-share preview tries to render)
+ * tell the interceptor to skip the `[api] error` log line. Other 4xx /
+ * 5xx still log normally — this is *not* a global silencer.
  */
-type RetryableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
+type RetryableRequestConfig = AxiosRequestConfig & {
+  _retry?: boolean;
+  silent404?: boolean;
+};
 
 /**
  * Builds a configured Axios instance bound to a Clerk token getter.
@@ -103,7 +111,15 @@ export const createApiClient = (
         return api(originalRequest);
       }
 
-      if (__DEV__) {
+      // Skip the log when the call site explicitly opted out for an
+      // expected 404 (e.g. a shared post the recipient is viewing was
+      // deleted by the author after the share).
+      const isSilentExpected404 =
+        error.response?.status === 404 &&
+        (originalRequest as RetryableRequestConfig | undefined)?.silent404 ===
+          true;
+
+      if (__DEV__ && !isSilentExpected404) {
         console.error("[api] error", {
           status: error.response?.status,
           url: error.config?.url,
@@ -191,6 +207,15 @@ export const userApi = {
   followUser: (api: AxiosInstance, targetUserId: string): ApiResponse<{ message: string }> =>
     api.post(`/users/follow/${encodeURIComponent(targetUserId)}`),
 
+  /** Drop someone from MY followers list. Mirror of `followUser` but
+   *  invoked by the receiver — pulls the target from `me.followers` and
+   *  pulls me from `target.following`. No notification is sent. */
+  removeFollower: (
+    api: AxiosInstance,
+    targetUserId: string
+  ): ApiResponse<{ message: string }> =>
+    api.post(`/users/follower/${encodeURIComponent(targetUserId)}/remove`),
+
   autoVerifyUser: <U>(api: AxiosInstance): ApiResponse<UserPayload<U>> =>
     api.post("/users/verify"),
 
@@ -228,8 +253,23 @@ export const postApi = {
       params: { cursor: opts.cursor ?? undefined, limit: opts.limit ?? undefined },
     }),
 
-  getPost: <P>(api: AxiosInstance, postId: string): ApiResponse<PostPayload<P>> =>
-    api.get(`/posts/${encodeURIComponent(postId)}`),
+  /**
+   * Fetch a single post.
+   *
+   * Pass `{ silent404: true }` when calling from a context where the
+   * post may legitimately not exist (e.g. a shared-post preview in chat
+   * where the author has since deleted, or a bookmarked post that's
+   * been removed). The interceptor will skip the `[api] error` log line
+   * for that 404 specifically; other failures still surface normally.
+   */
+  getPost: <P>(
+    api: AxiosInstance,
+    postId: string,
+    opts?: { silent404?: boolean }
+  ): ApiResponse<PostPayload<P>> =>
+    api.get(`/posts/${encodeURIComponent(postId)}`, {
+      silent404: opts?.silent404,
+    } as AxiosRequestConfig),
 
   getUserPosts: <P>(
     api: AxiosInstance,
@@ -250,6 +290,14 @@ export const postApi = {
     postId: string
   ): ApiResponse<{ liked: boolean; likeCount: number }> =>
     api.post(`/posts/${encodeURIComponent(postId)}/like`),
+
+  /** Toggle reshare. Server resolves to the canonical original when
+   *  given a reshare entry id, so callers can pass either. */
+  resharePost: (
+    api: AxiosInstance,
+    postId: string
+  ): ApiResponse<{ reshared: boolean; repostCount: number }> =>
+    api.post(`/posts/${encodeURIComponent(postId)}/reshare`),
 
   deletePost: (api: AxiosInstance, postId: string): ApiResponse<{ message: string }> =>
     api.delete(`/posts/${encodeURIComponent(postId)}`),

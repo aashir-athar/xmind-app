@@ -49,7 +49,7 @@ interface MenuOption {
 }
 
 function PostMenuImpl({ post, onClose, isOwn, onDelete }: PostMenuProps) {
-  const { colors, spacing, radii } = useTheme();
+  const { colors, radii } = useTheme();
   const open = useSharedValue(0);
   const visible = !!post;
 
@@ -155,59 +155,37 @@ function PostMenuImpl({ post, onClose, isOwn, onDelete }: PostMenuProps) {
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={{ flex: 1, backgroundColor: colors.overlay.scrim }}>
+      <View
+        className="flex-1"
+        style={{ backgroundColor: colors.overlay.scrim }}
+      >
         {/* Scrim — separate Pressable so the sheet itself doesn't have to
             wrap children in a Pressable that swallows scroll gestures. */}
         <Pressable
           accessibilityLabel="Dismiss menu"
           onPress={onClose}
-          style={{ flex: 1 }}
+          className="flex-1"
         />
 
         <Animated.View style={sheetStyle}>
-          <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "transparent" }}>
-            <View style={{ paddingHorizontal: spacing.base, paddingBottom: spacing.sm }}>
+          <SafeAreaView edges={["bottom"]} className="bg-transparent">
+            <View className="px-base pb-sm">
               <Surface
                 variant="solid"
                 radius={radii.xxl}
-                style={{
-                  overflow: "hidden",
-                  borderWidth: 1,
-                  borderColor: colors.border.subtle,
-                }}
+                className="overflow-hidden border border-subtle"
               >
-                {/* IG-style handle bar — telegraphs "this is a sheet". */}
-                <View
-                  style={{
-                    alignItems: "center",
-                    paddingTop: spacing.sm,
-                    paddingBottom: spacing.xs,
-                  }}
-                >
+                {/* Handle bar — telegraphs "this is a sheet". */}
+                <View className="items-center pt-sm pb-xs">
                   <View
-                    style={{
-                      width: 40,
-                      height: 4,
-                      borderRadius: 2,
-                      backgroundColor: colors.border.strong,
-                    }}
+                    className="w-10 h-1 rounded-[2px]"
+                    style={{ backgroundColor: colors.border.strong }}
                   />
                 </View>
 
                 {/* Post preview header */}
-                <View
-                  style={{
-                    paddingHorizontal: spacing.lg,
-                    paddingTop: spacing.sm,
-                    paddingBottom: spacing.md,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing.md,
-                    borderBottomWidth: 0.5,
-                    borderBottomColor: colors.border.subtle,
-                  }}
-                >
-                  <View style={{ flex: 1 }}>
+                <View className="w-full flex-row items-center px-lg pt-sm pb-md gap-md border-b-[0.5px] border-subtle">
+                  <View className="flex-1">
                     <Text variant="caption" tone="tertiary" weight="700">
                       POST BY @{post.user.username.toUpperCase()}
                     </Text>
@@ -215,68 +193,64 @@ function PostMenuImpl({ post, onClose, isOwn, onDelete }: PostMenuProps) {
                       variant="bodySm"
                       tone="secondary"
                       numberOfLines={2}
-                      style={{ marginTop: 4 }}
+                      className="mt-xs"
                     >
                       {post.content || "Image post"}
                     </Text>
                   </View>
                 </View>
 
-                {options.map((opt, i) => (
-                  <Pressable
-                    key={opt.label}
-                    onPress={opt.onPress}
-                    android_ripple={{ color: colors.overlay.press }}
-                    accessibilityRole="button"
-                    accessibilityLabel={opt.label}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: spacing.lg,
-                      paddingVertical: spacing.base,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing.md,
-                      opacity: pressed ? 0.85 : 1,
-                      borderTopWidth: i === 0 ? 0 : 0.5,
-                      borderTopColor: colors.border.subtle,
-                    })}
-                  >
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: opt.destructive
-                          ? colors.tint.danger + "1A"
-                          : colors.surface.secondary,
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
+                {/* Options group — generous container padding plus per-row
+                    padding gives every action room to breathe. Press
+                    feedback via active:bg-surface-secondary, no dividers. */}
+                <View className="p-base gap-sm">
+                  {options.map((opt) => (
+                    <Pressable
+                      key={opt.label}
+                      onPress={opt.onPress}
+                      android_ripple={{ color: colors.overlay.press }}
+                      accessibilityRole="button"
+                      accessibilityLabel={opt.label}
+                      className="flex-row items-center gap-md p-md rounded-md active:bg-surface-secondary"
                     >
-                      <Feather
-                        name={opt.icon}
-                        size={20}
-                        color={
+                      <View
+                        className={`w-10 h-10 rounded-full items-center justify-center ${
                           opt.destructive
-                            ? colors.tint.danger
-                            : colors.text.primary
-                        }
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        variant="subtitle"
-                        tone={opt.destructive ? "danger" : "primary"}
-                        numberOfLines={1}
-                        weight="700"
+                            ? "bg-danger/10"
+                            : "bg-surface-secondary"
+                        }`}
                       >
-                        {opt.label}
-                      </Text>
-                      <Text variant="caption" tone="tertiary" numberOfLines={2}>
-                        {opt.description}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
+                        <Feather
+                          name={opt.icon}
+                          size={20}
+                          color={
+                            opt.destructive
+                              ? colors.tint.danger
+                              : colors.text.primary
+                          }
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          variant="subtitle"
+                          tone={opt.destructive ? "danger" : "primary"}
+                          numberOfLines={1}
+                          weight="700"
+                        >
+                          {opt.label}
+                        </Text>
+                        <Text
+                          variant="caption"
+                          tone="tertiary"
+                          numberOfLines={2}
+                          className="mt-[2px]"
+                        >
+                          {opt.description}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
               </Surface>
 
               <Pressable
@@ -284,17 +258,12 @@ function PostMenuImpl({ post, onClose, isOwn, onDelete }: PostMenuProps) {
                 accessibilityRole="button"
                 accessibilityLabel="Cancel"
                 android_ripple={{ color: colors.overlay.press }}
-                style={{ marginTop: spacing.sm }}
+                className="mt-sm"
               >
                 <Surface
                   variant="solid"
                   radius={radii.xxl}
-                  style={{
-                    paddingVertical: spacing.base,
-                    alignItems: "center",
-                    borderWidth: 1,
-                    borderColor: colors.border.subtle,
-                  }}
+                  className="py-base items-center border border-subtle"
                 >
                   <Text variant="subtitle" tone="primary" weight="800">
                     Cancel

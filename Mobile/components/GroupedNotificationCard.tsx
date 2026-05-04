@@ -44,6 +44,7 @@ const FEATHER_GLYPH: Record<Notification["type"], keyof typeof Feather.glyphMap>
   like: "heart",
   comment: "message-circle",
   follow: "user-plus",
+  reshare: "repeat",
 };
 
 function buildSentence(group: NotificationGroup): string {
@@ -56,6 +57,8 @@ function buildSentence(group: NotificationGroup): string {
       ? "liked your post"
       : group.type === "comment"
       ? "commented on your post"
+      : group.type === "reshare"
+      ? "reshared your post"
       : "started following you";
 
   if (total === 1) return `${firstName} ${first.from.lastName} ${action}`;
