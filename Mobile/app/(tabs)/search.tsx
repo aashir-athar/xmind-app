@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useState } from "react";
+import React, { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -11,9 +11,13 @@ import { Text } from "@/components/ui/Text";
 import { TextField } from "@/components/ui/TextField";
 import UserSearchResult from "@/components/UserSearchResult";
 import { useTheme } from "@/hooks/useTheme";
-import { useSearch } from "@/hooks/useSearch";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSearch, useUserSearchServer } from "@/hooks/useSearch";
 import { useTrendingHashtags } from "@/hooks/useTrendingHashtags";
 import { formatNumber } from "@/utils/formatter";
+import type { User } from "@/types";
+
+const MAX_USER_RESULTS = 50;
 
 /**
  * Search.
@@ -29,12 +33,37 @@ export default function SearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors, spacing } = useTheme();
+  const { currentUser } = useCurrentUser();
   const { suggestedUsers, searchUsers, searchPosts } = useSearch();
   const { trending } = useTrendingHashtags(10);
 
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const userResults = searchUsers(deferredQuery);
+  const localUserResults = searchUsers(deferredQuery);
+  const serverUserResults = useUserSearchServer(deferredQuery);
+
+  // Merge local Fuse hits with server hits — dedupe by _id, exclude
+  // the current user, cap to a sane number. Local first because they're
+  // already in cache and feel instant; server matches fill the long tail
+  // (followers who haven't posted, etc).
+  const userResults = useMemo<User[]>(() => {
+    const seen = new Set<string>();
+    const merged: User[] = [];
+    for (const u of localUserResults) {
+      if (u._id === currentUser?._id) continue;
+      if (seen.has(u._id)) continue;
+      seen.add(u._id);
+      merged.push(u);
+    }
+    for (const u of serverUserResults) {
+      if (u._id === currentUser?._id) continue;
+      if (seen.has(u._id)) continue;
+      seen.add(u._id);
+      merged.push(u);
+    }
+    return merged.slice(0, MAX_USER_RESULTS);
+  }, [localUserResults, serverUserResults, currentUser?._id]);
+
   const postResults = searchPosts(deferredQuery);
   const showResults = deferredQuery.trim().length > 0;
   const totalResults = userResults.length + postResults.length;

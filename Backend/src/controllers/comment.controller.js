@@ -1,4 +1,5 @@
 import asyncHandler from "express-async-handler";
+import mongoose from "mongoose";
 import { getAuth } from "@clerk/express";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
@@ -52,6 +53,48 @@ export const createComment = asyncHandler(async (req, res) => {
   }
 
   res.status(201).json({ comment });
+});
+
+/**
+ * Atomic comment-like toggle.
+ *
+ * Same pattern as `likePost`: try to PULL the user from the likes array.
+ * If nothing was modified, ADD the user instead. The two-write approach
+ * is race-safe — only one of the two writes will report
+ * `modifiedCount > 0`.
+ */
+export const likeComment = asyncHandler(async (req, res) => {
+  const { userId } = getAuth(req);
+  const { commentId } = req.params;
+  if (!mongoose.isValidObjectId(commentId)) {
+    return res.status(400).json({ error: "Invalid comment id" });
+  }
+
+  const user = await User.findOne({ clerkId: userId }).select("_id").lean();
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const unlike = await Comment.updateOne(
+    { _id: commentId, likes: user._id },
+    { $pull: { likes: user._id } }
+  );
+
+  let liked;
+  if (unlike.matchedCount === 0) {
+    const like = await Comment.updateOne(
+      { _id: commentId },
+      { $addToSet: { likes: user._id } }
+    );
+    if (like.matchedCount === 0) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+    liked = true;
+  } else {
+    liked = false;
+  }
+
+  const fresh = await Comment.findById(commentId).select("likes").lean();
+  const likeCount = fresh ? (fresh.likes?.length ?? 0) : 0;
+  res.status(200).json({ liked, likeCount });
 });
 
 export const deleteComment = asyncHandler(async (req, res) => {

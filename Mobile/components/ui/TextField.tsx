@@ -74,8 +74,14 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
     : colors.border.subtle;
 
   const isPill = shape === "pill";
+  const isMultiline = !!rest.multiline;
   const radius = isPill ? radii.pill : radii.lg;
-  const height = isPill ? 44 : 52;
+  // Multiline fields need the wrapper to grow with content. Single-line
+  // fields stay at a fixed touch-target height (44 / 52). We use
+  // `minHeight` for multiline so a long bio stretches the wrapper instead
+  // of overflowing it (which is what made the text appear *above* the
+  // field rather than inside it).
+  const baseHeight = isPill ? 44 : 52;
 
   return (
     <View style={containerStyle}>
@@ -88,10 +94,11 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
       <View
         style={{
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: isMultiline ? "flex-start" : "center",
           gap: spacing.sm,
-          paddingHorizontal: isPill ? spacing.base : spacing.base,
-          height,
+          paddingHorizontal: spacing.base,
+          paddingVertical: isMultiline ? spacing.md : 0,
+          ...(isMultiline ? { minHeight: baseHeight } : { height: baseHeight }),
           borderRadius: radius,
           backgroundColor: colors.surface.secondary,
           borderWidth: StyleSheet.hairlineWidth,
@@ -102,13 +109,15 @@ const TextFieldImpl = forwardRef<TextInput, TextFieldProps>(function TextFieldIm
         <TextInput
           ref={ref}
           placeholderTextColor={placeholderTextColor ?? colors.text.tertiary}
+          textAlignVertical={isMultiline ? "top" : "center"}
           style={StyleSheet.flatten([
             {
               flex: 1,
               fontSize: typography.body.size,
               lineHeight: typography.body.lineHeight,
               color: colors.text.primary,
-              paddingVertical: 0,
+              padding: 0,
+              ...(isMultiline ? { minHeight: 80 } : null),
             },
             style,
           ])}

@@ -27,6 +27,7 @@ import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   type GestureResponderEvent,
+  Share,
   StyleSheet,
   View,
 } from "react-native";
@@ -48,6 +49,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
+import { useBookmarksStore } from "@/stores/useBookmarksStore";
 import { formatDate, formatNumber } from "@/utils/formatter";
 import type { Post, User } from "@/types";
 
@@ -172,6 +174,34 @@ function PostCardImpl({
       onMore(post);
     }
   }, [onMore, post]);
+
+  // Share — uses React Native's native share sheet so iOS / Android
+  // both get the system experience (Messages, AirDrop, WhatsApp, etc.).
+  const handleShare = useCallback(async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    try {
+      const author = `@${post.user.username}`;
+      const preview = post.content
+        ? post.content.length > 140
+          ? `${post.content.slice(0, 140)}…`
+          : post.content
+        : "";
+      const message = preview ? `${author}: ${preview}` : `${author} on xMind`;
+      await Share.share({ message, title: "Share post" });
+    } catch {
+      // User dismissed — non-error.
+    }
+  }, [post.content, post.user.username]);
+
+  // Bookmarks — local-first via Zustand + AsyncStorage. The contract
+  // (toggle, isBookmarked) lets a future server-side bookmarks API drop
+  // in by replacing the store implementation, with no call-site changes.
+  const isBookmarked = useBookmarksStore((s) => s.postIds.has(post._id));
+  const toggleBookmark = useBookmarksStore((s) => s.toggle);
+  const handleBookmark = useCallback(async () => {
+    Haptics.selectionAsync().catch(() => undefined);
+    await toggleBookmark(post._id);
+  }, [post._id, toggleBookmark]);
 
   const navigateToProfile = useCallback(() => {
     if (isOwn) router.push("/(tabs)/profile");
@@ -394,17 +424,24 @@ function PostCardImpl({
           >
             <Feather name="message-circle" size={24} color={colors.text.primary} />
           </Action>
-          <Action onPress={() => undefined} accessibilityLabel="Share">
+          <Action onPress={handleShare} accessibilityLabel="Share">
             <Feather name="send" size={22} color={colors.text.primary} />
           </Action>
           <View style={{ flex: 1 }} />
           <Pressable
-            onPress={() => undefined}
+            onPress={handleBookmark}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="Save"
+            accessibilityLabel={isBookmarked ? "Remove from saved" : "Save post"}
           >
-            <Feather name="bookmark" size={22} color={colors.text.primary} />
+            <Feather
+              name="bookmark"
+              size={22}
+              color={isBookmarked ? colors.tint.primary : colors.text.primary}
+              // Filled effect via tint colour swap — matches the heart
+              // pattern (single icon, colour flip on state change).
+              style={{ opacity: isBookmarked ? 1 : 0.95 }}
+            />
           </Pressable>
         </View>
 

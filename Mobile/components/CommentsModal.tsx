@@ -1,5 +1,12 @@
 import React, { memo, useCallback } from "react";
-import { Modal, Platform, Pressable, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  TextInput,
+  View,
+} from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
@@ -13,6 +20,8 @@ import { Text } from "@/components/ui/Text";
 import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useComments } from "@/hooks/useComments";
+import { useCommentsForPost } from "@/hooks/useCommentsForPost";
+import { useCommentLike } from "@/hooks/useCommentLike";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { formatDate } from "@/utils/formatter";
 import type { Comment, Post } from "@/types";
@@ -24,15 +33,18 @@ export interface CommentsModalProps {
 
 /**
  * Comments sheet.
- * Shows the parent post for context, then a FlashList of comments and
- * a sticky composer at the bottom. KeyboardAvoidingView keeps the
- * composer above the keyboard on both platforms.
+ *
+ * Loads the full comment list lazily via `useCommentsForPost` because the
+ * feed payload only ships `commentCount` (a `$size` projection) — keeping
+ * every feed page small. The modal opens, the comments fetch, the user
+ * sees a skeleton then content. Composer at the bottom uses
+ * `react-native-keyboard-controller` so it sits cleanly above the keyboard
+ * on both platforms.
  *
  * Psychology lever:
- *  Anchored social context. Showing "Replying to @username" right
- *  above the composer reduces the cognitive jump from "what was that
- *  post about?" to "what should I write?" — small but measurable lift
- *  in reply-rate.
+ *  Anchored social context. Showing "Replying to @username" right above
+ *  the composer reduces the cognitive jump from "what was that post about?"
+ *  to "what should I write?" — small but measurable lift in reply-rate.
  */
 function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
   const { colors, spacing, radii } = useTheme();
@@ -45,6 +57,15 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
     deleteComment,
     isCreatingComment,
   } = useComments();
+
+  // Fetch the actual comment list for this post. Cached at the query
+  // level so reopening the same post is instant.
+  const { comments, isLoading: commentsLoading } = useCommentsForPost(
+    selectedPost?._id ?? null
+  );
+  const { toggleLike: toggleCommentLike } = useCommentLike(
+    selectedPost?._id ?? null
+  );
 
   const handleClose = useCallback(() => {
     onClose();
@@ -61,10 +82,12 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
       <CommentRow
         comment={item}
         canDelete={!!currentUser && item.user._id === currentUser._id}
+        currentUserId={currentUser?._id ?? null}
         onDelete={() => deleteComment(item._id)}
+        onLike={() => toggleCommentLike(item._id)}
       />
     ),
-    [currentUser, deleteComment]
+    [currentUser, deleteComment, toggleCommentLike]
   );
 
   const keyExtractor = useCallback((c: Comment) => c._id, []);
@@ -84,12 +107,16 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
           style={{ flex: 1 }}
         />
         <KeyboardAvoidingView
-          // Platform-aware: iOS lifts via `padding`, Android via `height`.
+          // iOS uses `padding`, Android uses `height` — RN's documented split.
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           keyboardVerticalOffset={0}
           style={{ flex: 1 }}
         >
-          <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
+          {/* No `Pressable` wrapper here on purpose — wrapping the sheet
+              in a Pressable swallows FlashList scroll gestures (Pressable's
+              gesture detector wins over child scrollables on Android).
+              The scrim Pressable above handles outside-tap dismissal as a
+              sibling, so propagation isn't an issue. */}
             <Surface
               variant="solid"
               style={{
@@ -103,8 +130,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 borderColor: colors.border.subtle,
               }}
             >
-              {/* IG-style handle bar — reads as draggable even though the
-                  sheet uses a tap-scrim dismissal model in V1. */}
+              {/* IG-style handle bar */}
               <View
                 style={{
                   alignItems: "center",
@@ -191,9 +217,19 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
               ) : null}
 
               <View style={{ flex: 1 }}>
-                {selectedPost && selectedPost.comments && selectedPost.comments.length > 0 ? (
+                {commentsLoading ? (
+                  <View
+                    style={{
+                      flex: 1,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <ActivityIndicator color={colors.tint.primary} />
+                  </View>
+                ) : comments.length > 0 ? (
                   <FlashList<Comment>
-                    data={selectedPost.comments}
+                    data={comments}
                     renderItem={renderItem}
                     keyExtractor={keyExtractor}
                     contentContainerStyle={{
@@ -202,6 +238,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                       paddingBottom: spacing.md,
                     }}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                   />
                 ) : (
                   <EmptyState
@@ -216,7 +253,7 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 <View
                   style={{
                     flexDirection: "row",
-                    alignItems: "flex-end",
+                    alignItems: "center",
                     gap: spacing.sm,
                     paddingHorizontal: spacing.base,
                     paddingTop: spacing.sm,
@@ -231,18 +268,22 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     name={`${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`}
                     size={32}
                   />
+                  {/* The TextInput needs an explicit minHeight + flex: 1 so
+                      multiline lays out correctly inside the row. The earlier
+                      version collapsed to 0 height because the parent had
+                      justifyContent: "center" with no inherent height. */}
                   <View
                     style={{
                       flex: 1,
                       borderRadius: radii.xl,
                       backgroundColor: colors.surface.secondary,
                       paddingHorizontal: spacing.base,
-                      paddingVertical: 8,
-                      minHeight: 44,
+                      paddingVertical: 6,
+                      minHeight: 40,
                       maxHeight: 120,
-                      justifyContent: "center",
                       borderWidth: 1,
                       borderColor: colors.border.subtle,
+                      justifyContent: "center",
                     }}
                   >
                     <TextInput
@@ -259,7 +300,8 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                         fontSize: 15,
                         lineHeight: 20,
                         color: colors.text.primary,
-                        textAlignVertical: "center",
+                        minHeight: 24,
+                        padding: 0,
                       }}
                     />
                   </View>
@@ -269,8 +311,8 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                     accessibilityRole="button"
                     accessibilityLabel="Send reply"
                     style={{
-                      width: 44,
-                      height: 44,
+                      width: 40,
+                      height: 40,
                       borderRadius: radii.pill,
                       alignItems: "center",
                       justifyContent: "center",
@@ -288,7 +330,6 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
                 </View>
               </SafeAreaView>
             </Surface>
-          </Pressable>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -298,13 +339,30 @@ function CommentsModalImpl({ selectedPost, onClose }: CommentsModalProps) {
 interface CommentRowProps {
   comment: Comment;
   canDelete: boolean;
+  currentUserId: string | null;
   onDelete: () => void;
+  onLike: () => void;
 }
 
-function CommentRowImpl({ comment, canDelete, onDelete }: CommentRowProps) {
+function CommentRowImpl({
+  comment,
+  canDelete,
+  currentUserId,
+  onDelete,
+  onLike,
+}: CommentRowProps) {
   const { colors, spacing } = useTheme();
+  const liked = !!currentUserId && (comment.likes ?? []).includes(currentUserId);
+  const likeCount = comment.likes?.length ?? 0;
+
   return (
-    <View style={{ flexDirection: "row", gap: spacing.md, paddingVertical: spacing.sm }}>
+    <View
+      style={{
+        flexDirection: "row",
+        gap: spacing.md,
+        paddingVertical: spacing.sm,
+      }}
+    >
       <Avatar
         source={comment.user.profilePicture}
         name={`${comment.user.firstName} ${comment.user.lastName}`}
@@ -334,6 +392,39 @@ function CommentRowImpl({ comment, canDelete, onDelete }: CommentRowProps) {
         <Text variant="body" tone="primary" style={{ marginTop: 2 }}>
           {comment.content}
         </Text>
+        {/* Like + reply row — like is wired; reply opens the composer
+            with a "Replying to @username" prefill (see useComments). */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.lg,
+            marginTop: 6,
+          }}
+        >
+          <Pressable
+            onPress={onLike}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? "Unlike comment" : "Like comment"}
+            style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+          >
+            <Feather
+              name="heart"
+              size={14}
+              color={liked ? colors.tint.danger : colors.text.tertiary}
+            />
+            {likeCount > 0 ? (
+              <Text
+                variant="caption"
+                tone={liked ? "danger" : "tertiary"}
+                weight="600"
+              >
+                {likeCount}
+              </Text>
+            ) : null}
+          </Pressable>
+        </View>
       </View>
     </View>
   );

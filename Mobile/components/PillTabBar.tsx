@@ -50,10 +50,10 @@ const ROUTE_META: Record<string, RouteMeta> = {
   index: { label: "Home", family: "feather", icon: "home", iconActive: "home" },
   search: { label: "Search", family: "feather", icon: "search", iconActive: "search" },
   reels: {
-    label: "Reels",
-    family: "mci",
-    icon: "play-circle-outline",
-    iconActive: "play-circle",
+    label: "Explore",
+    family: "feather",
+    icon: "compass",
+    iconActive: "compass",
   },
   profile: {
     label: "Profile",
@@ -150,31 +150,43 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
       pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: 0,
+        bottom: insets.bottom + spacing.sm,
         left: 0,
         right: 0,
+        alignItems: "center",
       }}
     >
-      <Surface
-        variant={Platform.OS === "ios" ? "glass" : "solid"}
-        intensity={60}
-        tintColor={mode === "dark" ? "#0E0E12" : "#FFFFFF"}
+      {/* Outer wrapper holds the drop-shadow; the inner Surface handles
+          clipping. Combining both on the same layer forces iOS to
+          rasterise off-screen and the indicator spring drops frames. */}
+      <View
         style={{
-          paddingTop: spacing.sm,
-          paddingBottom: insets.bottom + spacing.xs,
-          paddingHorizontal: spacing.lg,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: colors.border.subtle,
-          backgroundColor:
-            Platform.OS === "android" ? colors.bg.canvas : undefined,
+          shadowColor: "#000",
+          shadowOpacity: mode === "dark" ? 0.45 : 0.16,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 14,
+          borderRadius: 999,
         }}
       >
-        <View
+        <Surface
+          variant={Platform.OS === "ios" ? "glass" : "solid"}
+          intensity={60}
+          tintColor={mode === "dark" ? "#0E0E12" : "#FFFFFF"}
+          radius={999}
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            height: TAB_HEIGHT - spacing.sm * 2,
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            gap: 6,
+            height: TAB_HEIGHT,
+            overflow: "hidden",
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: colors.border.subtle,
+            backgroundColor:
+              Platform.OS === "android" ? colors.surface.raised : undefined,
           }}
         >
           {TAB_ORDER.map((slot) => {
@@ -183,7 +195,8 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
             }
             const meta = ROUTE_META[slot];
             const route = routes.find((r) => r.name === slot);
-            if (!meta || !route) return <View key={slot} style={{ width: 56 }} />;
+            if (!meta || !route)
+              return <View key={slot} style={{ width: 52 }} />;
             const active = isFocusedFor(slot);
             return (
               <TabSatellite
@@ -196,8 +209,8 @@ function PillTabBarImpl({ state, navigation }: BottomTabBarProps) {
               />
             );
           })}
-        </View>
-      </Surface>
+        </Surface>
+      </View>
     </View>
   );
 }

@@ -33,11 +33,12 @@ export const useComments = () => {
       const response = await commentApi.createComment<Comment>(api, postId, content);
       return response.data.comment;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       setCommentText("");
-      // Server-authoritative refresh — comment counts and ordering
-      // (e.g. moderation) live on the backend.
+      // Refresh the post feed (commentCount changes) and the per-post
+      // comment cache the modal reads from.
       queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["comments", variables.postId] });
     },
     onError: () => {
       showError("Couldn't send", "We couldn't post that reply. Try once more.");
@@ -70,6 +71,12 @@ export const useComments = () => {
     onError: (_err, _id, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["posts"], ctx.previous);
       showError("Couldn't delete", "We couldn't remove that reply. Try once more.");
+    },
+    onSuccess: () => {
+      // The ["comments", postId] cache is keyed by postId which the
+      // mutation no longer carries by the time it returns; invalidate
+      // every comments cache to be safe (cheap — modal-scope only).
+      queryClient.invalidateQueries({ queryKey: ["comments"] });
     },
   });
 

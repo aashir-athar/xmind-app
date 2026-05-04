@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { format } from "date-fns";
 import { Feather } from "@expo/vector-icons";
 
@@ -44,6 +44,11 @@ export default function UserProfileScreen() {
   const { posts: userPosts, refetch: refetchPosts } = usePosts(username);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // If the user navigated here via their own handle, bounce them to the
+  // canonical profile tab. Hide the Follow / Message buttons regardless,
+  // so even mid-redirect the UI doesn't offer self-follow.
+  const isOwnProfile = !!user && !!currentUser && user._id === currentUser._id;
 
   const isFollowing = !!user && (currentUser?.following?.includes(user._id) ?? false);
 
@@ -108,6 +113,10 @@ export default function UserProfileScreen() {
     );
   }
 
+  if (isOwnProfile) {
+    return <Redirect href="/(tabs)/profile" />;
+  }
+
   const joined = user.createdAt ? format(new Date(user.createdAt), "MMMM yyyy") : null;
 
   return (
@@ -148,28 +157,43 @@ export default function UserProfileScreen() {
           className="mx-base -mt-xl pt-lg border border-subtle"
         >
           <View className="flex-row items-end justify-between -mt-[64px] mb-md">
-            <Avatar
-              source={user.profilePicture}
-              name={`${user.firstName} ${user.lastName}`}
-              size={88}
-              ringColor={colors.surface.primary}
-              style={{ borderWidth: 4, borderColor: colors.surface.primary }}
-            />
-            <View className="flex-row gap-sm">
-              <Button
-                label="Message"
-                variant="secondary"
-                size="sm"
-                onPress={handleMessage}
-              />
-              <Button
-                label={isFollowing ? "Following" : "Follow"}
-                variant={isFollowing ? "secondary" : "primary"}
-                size="sm"
-                loading={isFollowLoading}
-                onPress={handleFollow}
+            {/* Wrap the avatar in a circular View so the white ring reads as
+                a perfect circle. Putting the border on Avatar's outer
+                square container produced a square ring. */}
+            <View
+              style={{
+                borderRadius: 48,
+                borderWidth: 4,
+                borderColor: colors.bg.canvas,
+                backgroundColor: colors.bg.canvas,
+              }}
+            >
+              <Avatar
+                source={user.profilePicture}
+                name={`${user.firstName} ${user.lastName}`}
+                size={88}
               />
             </View>
+            {/* Hidden when looking at the current user — useful when an
+                old route still resolves here before the redirect kicks in,
+                or for any defensive pass we add later. */}
+            {isOwnProfile ? null : (
+              <View className="flex-row gap-sm">
+                <Button
+                  label="Message"
+                  variant="secondary"
+                  size="sm"
+                  onPress={handleMessage}
+                />
+                <Button
+                  label={isFollowing ? "Following" : "Follow"}
+                  variant={isFollowing ? "secondary" : "primary"}
+                  size="sm"
+                  loading={isFollowLoading}
+                  onPress={handleFollow}
+                />
+              </View>
+            )}
           </View>
 
           <View className="flex-row items-center gap-sm">
@@ -208,9 +232,27 @@ export default function UserProfileScreen() {
           </View>
 
           <View className="flex-row mt-lg rounded-lg bg-surface-secondary py-md">
-            <Stat label="Following" value={formatNumber(user.following?.length ?? 0)} />
+            <Stat
+              label="Following"
+              value={formatNumber(user.following?.length ?? 0)}
+              onPress={() =>
+                router.push({
+                  pathname: "/followers/[username]",
+                  params: { username: user.username, mode: "following" },
+                })
+              }
+            />
             <Divider />
-            <Stat label="Followers" value={formatNumber(user.followers?.length ?? 0)} />
+            <Stat
+              label="Followers"
+              value={formatNumber(user.followers?.length ?? 0)}
+              onPress={() =>
+                router.push({
+                  pathname: "/followers/[username]",
+                  params: { username: user.username, mode: "followers" },
+                })
+              }
+            />
             <Divider />
             <Stat label="Posts" value={formatNumber(userPosts?.length || 0)} />
           </View>
@@ -257,9 +299,23 @@ function Header({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+}) {
   return (
-    <Pressable accessibilityRole="button" className="flex-1 items-center">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${label}`}
+      onPress={onPress}
+      disabled={!onPress}
+      className="flex-1 items-center"
+    >
       <Text variant="title" tone="primary" weight="700">
         {value}
       </Text>

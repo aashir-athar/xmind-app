@@ -19,12 +19,12 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { format } from "date-fns";
 import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
@@ -46,6 +46,7 @@ import { formatNumber } from "@/utils/formatter";
 export default function ProfileScreen() {
   const { colors, spacing, radii } = useTheme();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const { currentUser, isLoading } = useCurrentUser();
   const { posts: userPosts, refetch: refetchPosts } = usePosts(
@@ -292,6 +293,15 @@ export default function ProfileScreen() {
             </View>
             <View style={{ flexDirection: "row", gap: spacing.sm, paddingBottom: spacing.sm }}>
               <Button
+                label="Saved"
+                variant="ghost"
+                size="sm"
+                leading={
+                  <Feather name="bookmark" size={14} color={colors.tint.primary} />
+                }
+                onPress={() => router.push("/saved")}
+              />
+              <Button
                 label="Edit profile"
                 variant="secondary"
                 size="sm"
@@ -331,10 +341,16 @@ export default function ProfileScreen() {
             {joined ? <MetaRow icon="calendar" label={`Joined ${joined}`} /> : null}
           </View>
 
-          {/* Stats */}
+          {/* Stats — tapping Following / Followers opens the list.
+              `width: '100%'` + `justifyContent: 'space-between'` keeps the
+              three slots distributed evenly even if a parent's flex
+              context is non-obvious. */}
           <View
             style={{
+              width: "100%",
               flexDirection: "row",
+              alignItems: "stretch",
+              justifyContent: "space-between",
               marginTop: spacing.lg,
               borderRadius: radii.lg,
               backgroundColor: colors.surface.secondary,
@@ -346,11 +362,23 @@ export default function ProfileScreen() {
             <Stat
               label="Following"
               value={formatNumber(currentUser.following?.length ?? 0)}
+              onPress={() =>
+                router.push({
+                  pathname: "/followers/[username]",
+                  params: { username: currentUser.username, mode: "following" },
+                })
+              }
             />
             <Divider />
             <Stat
               label="Followers"
               value={formatNumber(currentUser.followers?.length ?? 0)}
+              onPress={() =>
+                router.push({
+                  pathname: "/followers/[username]",
+                  params: { username: currentUser.username, mode: "followers" },
+                })
+              }
             />
             <Divider />
             <Stat label="Posts" value={formatNumber(userPosts?.length || 0)} />
@@ -358,17 +386,17 @@ export default function ProfileScreen() {
         </View>
 
         <View style={{ paddingHorizontal: spacing.base, marginTop: spacing.md }}>
-          <Card variant="solid">
-            <VerificationProgress
-              isVerified={currentUser.verified}
-              progress={getVerificationProgressValue()}
-              statusMessage={getVerificationStatusMessageValue()}
-              isEligible={verificationResult?.isEligible || false}
-              onVerificationRequest={handleVerificationRequest}
-              isChecking={isCheckingVerification}
-              missingRequirements={getVerificationRequirementsValue()}
-            />
-          </Card>
+          {/* VerificationProgress wraps itself in a Card already; nesting
+              another one produced two visible borders. */}
+          <VerificationProgress
+            isVerified={currentUser.verified}
+            progress={getVerificationProgressValue()}
+            statusMessage={getVerificationStatusMessageValue()}
+            isEligible={verificationResult?.isEligible || false}
+            onVerificationRequest={handleVerificationRequest}
+            isChecking={isCheckingVerification}
+            missingRequirements={getVerificationRequirementsValue()}
+          />
         </View>
 
         <View style={{ marginTop: spacing.md }}>
@@ -422,16 +450,35 @@ function MetaRow({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+}) {
+  // Explicit width over `flex: 1` so the row distribution survives stale
+  // Metro caches and any platform quirks where flex weights drift.
   return (
     <Pressable
       accessibilityRole="button"
-      style={{ flex: 1, alignItems: "center" }}
+      accessibilityLabel={`Open ${label}`}
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => ({
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+        opacity: pressed ? 0.7 : 1,
+      })}
     >
-      <Text variant="title" tone="primary" weight="800">
+      <Text variant="title" tone="primary" weight="800" align="center">
         {value}
       </Text>
-      <Text variant="caption" tone="tertiary">
+      <Text variant="caption" tone="tertiary" align="center">
         {label}
       </Text>
     </Pressable>

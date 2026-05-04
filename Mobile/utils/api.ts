@@ -202,6 +202,17 @@ export const userApi = {
 
   syncUser: <U>(api: AxiosInstance): ApiResponse<UserPayload<U>> =>
     api.post("/users/sync"),
+
+  /** Server-side user search. Covers users who haven't posted recently
+   *  — the local Fuse index can't see them. */
+  searchUsers: <U>(api: AxiosInstance, q: string): ApiResponse<UsersPayload<U>> =>
+    api.get("/users/search", { params: { q } }),
+
+  getFollowers: <U>(api: AxiosInstance, username: string): ApiResponse<UsersPayload<U>> =>
+    api.get(`/users/${encodeURIComponent(username)}/followers`),
+
+  getFollowing: <U>(api: AxiosInstance, username: string): ApiResponse<UsersPayload<U>> =>
+    api.get(`/users/${encodeURIComponent(username)}/following`),
 };
 
 export interface GetPostsOptions {
@@ -248,9 +259,13 @@ export const commentApi = {
   createComment: <C>(
     api: AxiosInstance,
     postId: string,
-    content: string
+    content: string,
+    parentId?: string | null
   ): ApiResponse<CommentPayload<C>> =>
-    api.post(`/comments/post/${encodeURIComponent(postId)}`, { content }),
+    api.post(`/comments/post/${encodeURIComponent(postId)}`, {
+      content,
+      parentId: parentId ?? undefined,
+    }),
 
   deleteComment: (
     api: AxiosInstance,
@@ -260,6 +275,12 @@ export const commentApi = {
 
   getComments: <C>(api: AxiosInstance, postId: string): ApiResponse<CommentsPayload<C>> =>
     api.get(`/comments/post/${encodeURIComponent(postId)}`),
+
+  likeComment: (
+    api: AxiosInstance,
+    commentId: string
+  ): ApiResponse<{ liked: boolean; likeCount: number }> =>
+    api.post(`/comments/${encodeURIComponent(commentId)}/like`),
 };
 
 export const notificationApi = {

@@ -1,22 +1,20 @@
 /**
- * ProfileTabs — sub-nav for a profile screen.
+ * ProfileTabs — Instagram-style icon segmented sub-nav.
  *
- * Architectural role:
- *  Twitter/Facebook-style segmented sub-navigation under the profile
- *  card. Mirrors the user's mental model of "what part of this person's
- *  output am I looking at right now". Posts, Replies, Media, Likes are
- *  the canonical four; Replies/Media/Likes are placeholder targets in
- *  V1, with copy that explains the upcoming feature instead of stubbing
- *  with a TODO.
+ * Why icons (not text labels):
+ *  Earlier iterations used text labels at flex:1 in a row. At narrow
+ *  widths the labels visually crammed against each other and made the
+ *  bar feel "attached" — even when whitespace technically existed
+ *  between tabs. Switching to glyphs eliminates that ambiguity entirely
+ *  and matches the IG profile pattern exactly: four big touch targets,
+ *  one indicator.
  *
- * Psychology lever:
- *  Progressive disclosure. The sub-nav shows the user there's more to
- *  this profile than the default Posts feed without flooding the page
- *  with content the user didn't ask for. Each tab is a doorway, not
- *  another stack of UI demanding attention.
+ * Each glyph also carries an `accessibilityLabel` so screen readers
+ * still get the tab name.
  */
 import React, { memo, useCallback, useEffect, useState } from "react";
 import { type LayoutChangeEvent, Pressable, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useAnimatedStyle,
@@ -24,16 +22,21 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 
 export type ProfileTab = "posts" | "replies" | "media" | "likes";
 
-const TAB_DEFS: Array<{ id: ProfileTab; label: string }> = [
-  { id: "posts", label: "Posts" },
-  { id: "replies", label: "Replies" },
-  { id: "media", label: "Media" },
-  { id: "likes", label: "Likes" },
+interface TabDef {
+  id: ProfileTab;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+}
+
+const TAB_DEFS: TabDef[] = [
+  { id: "posts", label: "Posts", icon: "grid" },
+  { id: "replies", label: "Replies", icon: "message-circle" },
+  { id: "media", label: "Media", icon: "image" },
+  { id: "likes", label: "Likes", icon: "heart" },
 ];
 
 export interface ProfileTabsProps {
@@ -54,7 +57,7 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
   useEffect(() => {
     if (tabWidth > 0) {
       indicatorX.value = withSpring(tabIndex * tabWidth, {
-        damping: 22,
+        damping: 20,
         stiffness: 220,
         mass: 0.9,
       });
@@ -83,9 +86,12 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
     <View
       onLayout={onLayout}
       style={{
+        width: "100%",
         flexDirection: "row",
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border.subtle,
+        alignItems: "stretch",
+        justifyContent: "space-between",
+        borderTopWidth: 0.5,
+        borderTopColor: colors.border.subtle,
         backgroundColor: colors.bg.canvas,
         position: "relative",
       }}
@@ -96,13 +102,11 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
           style={[
             {
               position: "absolute",
-              bottom: 0,
+              top: 0,
               left: 0,
               width: tabWidth,
-              height: 3,
+              height: 2,
               backgroundColor: colors.tint.primary,
-              borderTopLeftRadius: 3,
-              borderTopRightRadius: 3,
             },
             indicatorStyle,
           ]}
@@ -124,16 +128,14 @@ function ProfileTabsImpl({ active, onChange }: ProfileTabsProps) {
               alignItems: "center",
               justifyContent: "center",
               paddingVertical: spacing.md,
-              opacity: pressed ? 0.7 : 1,
+              opacity: pressed ? 0.6 : 1,
             })}
           >
-            <Text
-              variant="label"
-              tone={focused ? "primary" : "tertiary"}
-              weight={focused ? "700" : "600"}
-            >
-              {tab.label}
-            </Text>
+            <Feather
+              name={tab.icon}
+              size={22}
+              color={focused ? colors.text.primary : colors.text.tertiary}
+            />
           </Pressable>
         );
       })}

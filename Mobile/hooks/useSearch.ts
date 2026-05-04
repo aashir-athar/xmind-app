@@ -16,11 +16,12 @@
  *  The reference recommendation comes from
  *  `expo-algorithms-skill/references/04-data.md`.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Fuse, { type IFuseOptions } from "fuse.js";
 
 import { usePosts } from "./usePosts";
 import { useCurrentUser } from "./useCurrentUser";
+import { useApiClient, userApi } from "../utils/api";
 import type { Post, User } from "../types";
 
 const MAX_HASHTAGS = 20;
@@ -59,6 +60,9 @@ const POST_FUSE_OPTIONS: IFuseOptions<Post> = {
 export const useSearch = () => {
   const { posts } = usePosts();
   const { currentUser } = useCurrentUser();
+  const api = useApiClient();
+  const apiRef = useRef(api);
+  apiRef.current = api;
 
   const trendingHashtags = useMemo(() => {
     const hashtagCounts: Record<string, number> = {};
@@ -124,6 +128,10 @@ export const useSearch = () => {
     return userFuse.search(normalised, { limit: MAX_RESULTS }).map((r) => r.item);
   };
 
+  // The screen drives the merged search via the dedicated hook below.
+  // Embedding it here was the wrong API surface — calling a state setter
+  // from a function invoked during render produced a render loop.
+
   const searchPosts = (searchQuery: string): Post[] => {
     const q = searchQuery.trim();
     if (!q) return [];
@@ -154,4 +162,42 @@ export const useSearch = () => {
     posts,
     allUsernames,
   };
+};
+
+/**
+ * Server-side user search hook.
+ *
+ * Covers users who haven't posted recently (the local Fuse index is
+ * built over the cached feed only). Debounced 250 ms. The returned list
+ * is meant to be merged with `searchUsers(query)` from `useSearch`,
+ * deduped by `_id`.
+ */
+export const useUserSearchServer = (query: string): User[] => {
+  const api = useApiClient();
+  const apiRef = useRef(api);
+  apiRef.current = api;
+  const [results, setResults] = useState<User[]>([]);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await userApi.searchUsers<User>(apiRef.current, q);
+        if (!cancelled) setResults(response.data.users ?? []);
+      } catch {
+        if (!cancelled) setResults([]);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  return results;
 };

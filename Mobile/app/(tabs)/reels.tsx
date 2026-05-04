@@ -1,27 +1,27 @@
 /**
- * Reels — IG-style media-only feed.
+ * Explore — IG-style media-first discovery grid.
  *
- * Lever: pattern-completion + endless-scroll dopamine pacing.
- *  Filtering the cached feed to image-only posts gives users the
- *  visual-first browsing mode they expect from IG/Watch without
- *  introducing a new content type backend-side. When a Reels backend
- *  arrives (short-video schema), this screen is the drop-in renderer.
+ * Renamed from "Reels" because the data layer ships posts with photos,
+ * not short-form video. Calling it Reels invited the wrong expectation;
+ * Explore matches what the screen actually does — surface visual posts
+ * across the network ranked by engagement velocity. When a video schema
+ * lands, this screen can either branch into Reels or remain Explore and
+ * a separate Reels tab can ship.
  *
- * v1: 3-column grid of square media. Tapping a tile opens the
- *  ImageModal (re-uses the existing post-image lightbox) — a future
- *  PostDetail screen will replace that with a full-bleed viewer.
+ * Tapping a tile routes to the post detail screen so the experience is
+ * consistent with notification taps and hashtag drills.
  */
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Pressable, RefreshControl, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
 import { Feather } from "@expo/vector-icons";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
-import ImageModal from "@/components/ImageModal";
 import { useFeedRanking } from "@/hooks/useFeedRanking";
 import { useTheme } from "@/hooks/useTheme";
 import type { Post } from "@/types";
@@ -35,6 +35,7 @@ interface GridRow {
 
 export default function ReelsScreen() {
   const { colors, spacing } = useTheme();
+  const router = useRouter();
   const {
     posts,
     isLoading,
@@ -63,15 +64,15 @@ export default function ReelsScreen() {
     return out;
   }, [mediaPosts]);
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
   const renderRow = useCallback(
     ({ item }: ListRenderItemInfo<GridRow>) => (
       <View style={{ flexDirection: "row" }}>
         {item.posts.map((p, idx) => (
           <Pressable
             key={p?._id ?? `empty-${idx}`}
-            onPress={() => p?.image && setPreviewUrl(p.image)}
+            onPress={() =>
+              p && router.push({ pathname: "/post/[postId]", params: { postId: p._id } })
+            }
             disabled={!p?.image}
             style={{ flex: 1, aspectRatio: 1, padding: 1 }}
           >
@@ -90,7 +91,7 @@ export default function ReelsScreen() {
         ))}
       </View>
     ),
-    [colors.surface.sunken]
+    [colors.surface.sunken, router]
   );
 
   const keyExtractor = useCallback((row: GridRow) => row.id, []);
@@ -109,9 +110,9 @@ export default function ReelsScreen() {
             gap: spacing.sm,
           }}
         >
-          <Feather name="play" size={22} color={colors.tint.primary} />
+          <Feather name="compass" size={22} color={colors.tint.primary} />
           <Text variant="headline" tone="primary">
-            Reels
+            Explore
           </Text>
         </View>
       </SafeAreaView>
@@ -133,9 +134,9 @@ export default function ReelsScreen() {
         </View>
       ) : mediaPosts.length === 0 ? (
         <EmptyState
-          icon={<Feather name="image" size={28} color={colors.tint.primary} />}
-          title="No reels yet"
-          description="Once people start posting photos, you'll find them here as a fast-scrolling grid."
+          icon={<Feather name="compass" size={28} color={colors.tint.primary} />}
+          title="Nothing to explore yet"
+          description="Once people start posting photos, you'll see them here in a fast-scrolling grid."
         />
       ) : (
         <FlashList<GridRow>
@@ -154,13 +155,6 @@ export default function ReelsScreen() {
           }
         />
       )}
-
-      <ImageModal
-        isVisible={!!previewUrl}
-        onClose={() => setPreviewUrl(null)}
-        imageUrl={previewUrl ?? ""}
-        imageTitle="Reel"
-      />
     </View>
   );
 }

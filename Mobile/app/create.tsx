@@ -9,11 +9,17 @@
  *  centre create button.
  */
 import React, { useCallback, useEffect } from "react";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useUser } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
@@ -24,13 +30,17 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 import { useCreatePost } from "@/hooks/useCreatePost";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const MAX_LEN = 300;
 
 export default function CreateScreen() {
   const { colors, spacing } = useTheme();
   const router = useRouter();
-  const { user } = useUser();
+  // Clerk's `imageUrl` is the user's Clerk avatar, not their xMind profile
+  // picture. Read from `useCurrentUser` so the composer always shows the
+  // avatar the rest of the app shows.
+  const { currentUser } = useCurrentUser();
   const {
     content,
     setContent,
@@ -92,23 +102,31 @@ export default function CreateScreen() {
       </SafeAreaView>
 
       <KeyboardAvoidingView
-        // iOS uses `padding` so the inset grows under the composer; Android
-        // uses `height` because `padding` clashes with the system soft-keyboard
-        // resize on edge-to-edge layouts (RN's documented platform split).
+        // iOS uses `padding`, Android uses `height` — RN's documented split.
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >
-        <View style={{ flex: 1, padding: spacing.lg }}>
+        {/* keyboardShouldPersistTaps="always" is the fix for the bug where
+            tapping the image / hashtag buttons while the keyboard is up
+            did nothing — without this prop, the first tap inside the
+            keyboard-open scroll view is consumed by the keyboard's
+            dismiss handler before reaching the IconButton. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1, padding: spacing.lg }}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={{ flexDirection: "row", gap: spacing.md }}>
             <Avatar
-              source={user?.imageUrl}
-              name={`${user?.firstName ?? ""} ${user?.lastName ?? ""}`}
+              source={currentUser?.profilePicture}
+              name={`${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`}
               size={44}
             />
             <View style={{ flex: 1 }}>
               <Text variant="subtitle" tone="primary" weight="700">
-                {user?.firstName} {user?.lastName}
+                {currentUser?.firstName} {currentUser?.lastName}
               </Text>
               <Text variant="caption" tone="tertiary">
                 Posting publicly
@@ -116,7 +134,7 @@ export default function CreateScreen() {
             </View>
           </View>
 
-          <View style={{ marginTop: spacing.lg, flex: 1 }}>
+          <View style={{ marginTop: spacing.lg, minHeight: 180 }}>
             <TextInput
               autoFocus
               multiline
@@ -125,11 +143,11 @@ export default function CreateScreen() {
               placeholder="What's on your mind?"
               placeholderTextColor={colors.text.tertiary}
               style={{
-                flex: 1,
                 fontSize: 18,
                 lineHeight: 26,
                 color: colors.text.primary,
                 textAlignVertical: "top",
+                minHeight: 180,
               }}
               accessibilityLabel="Post content"
             />
@@ -171,7 +189,7 @@ export default function CreateScreen() {
               </Pressable>
             </View>
           ) : null}
-        </View>
+        </ScrollView>
 
         <View
           style={{
@@ -186,9 +204,15 @@ export default function CreateScreen() {
           }}
         >
           <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            {/* `Keyboard.dismiss()` then defer to next tick so the
+                IconButton's onPress runs without competing with the
+                keyboard's tap-to-dismiss. */}
             <IconButton
               accessibilityLabel="Add image"
-              onPress={pickImageFromGallery}
+              onPress={() => {
+                Keyboard.dismiss();
+                setTimeout(() => pickImageFromGallery(), 50);
+              }}
               variant="filled"
             >
               <Feather name="image" size={20} color={colors.tint.primary} />

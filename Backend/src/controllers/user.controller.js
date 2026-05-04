@@ -272,44 +272,114 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
   res.status(200).json({ user });
 });
 
+/**
+ * Server-side user search.
+ *
+ * The mobile client builds a Fuse.js index over the in-memory feed
+ * users for instant fuzzy-match, but that only sees users who have
+ * posted recently. This endpoint covers the long tail — anyone in the
+ * collection — so a user who has never posted is still findable by
+ * handle or name.
+ *
+ * Query is matched case-insensitively against `username`, `firstName`,
+ * and `lastName`. Capped to 20 results.
+ */
+export const searchUsers = asyncHandler(async (req, res) => {
+  const raw = String(req.query.q ?? "").trim();
+  if (raw.length < 2) {
+    return res.status(200).json({ users: [] });
+  }
+  // Escape regex metacharacters so a typed `.` doesn't match-anything.
+  const safe = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(safe, "i");
+
+  const users = await User.find({
+    $or: [{ username: re }, { firstName: re }, { lastName: re }],
+  })
+    .select("username firstName lastName profilePicture verified followers following")
+    .limit(20)
+    .lean();
+
+  res.status(200).json({ users });
+});
+
+/**
+ * Followers and Following lists. Both fetch the user, then resolve the
+ * referenced ids to slim user docs via `$in`. Page-size capped to keep
+ * payloads bounded — the mobile UI shows a list with a "Load more"
+ * affordance against this same endpoint when the list grows.
+ */
+export const getFollowers = asyncHandler(async (req, res) => {
+  const username = String(req.params.username ?? "").trim().toLowerCase();
+  const user = await User.findOne({ username }).select("followers").lean();
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const users = await User.find({ _id: { $in: user.followers ?? [] } })
+    .select("username firstName lastName profilePicture verified followers")
+    .limit(200)
+    .lean();
+  res.status(200).json({ users });
+});
+
+export const getFollowing = asyncHandler(async (req, res) => {
+  const username = String(req.params.username ?? "").trim().toLowerCase();
+  const user = await User.findOne({ username }).select("following").lean();
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const users = await User.find({ _id: { $in: user.following ?? [] } })
+    .select("username firstName lastName profilePicture verified followers")
+    .limit(200)
+    .lean();
+  res.status(200).json({ users });
+});
+
 export const followUser = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
   const { targetUserId } = req.params;
 
-  if (userId === targetUserId)
-    return res.status(400).json({ error: "You cannot follow yourself" });
-
+  // Resolve the current user FIRST so we can compare Mongo `_id` to
+  // `targetUserId`. The previous version compared `userId` (Clerk's id)
+  // to `targetUserId` (Mongo's _id), which never matched, so users were
+  // able to follow themselves and trigger a self-follow notification.
   const currentUser = await User.findOne({ clerkId: userId });
+  if (!currentUser) return res.status(404).json({ error: "User not found" });
+
+  if (currentUser._id.toString() === String(targetUserId)) {
+    return res.status(400).json({ error: "You cannot follow yourself" });
+  }
+
   const targetUser = await User.findById(targetUserId);
+  if (!targetUser) return res.status(404).json({ error: "User not found" });
 
-  if (!currentUser || !targetUser)
-    return res.status(404).json({ error: "User not found" });
-
-  const isFollowing = currentUser.following.includes(targetUserId);
+  const isFollowing = currentUser.following
+    .map((id) => id.toString())
+    .includes(String(targetUserId));
 
   if (isFollowing) {
-    // unfollow
-    await User.findByIdAndUpdate(currentUser._id, {
-      $pull: { following: targetUserId },
-    });
-    await User.findByIdAndUpdate(targetUserId, {
-      $pull: { followers: currentUser._id },
-    });
+    await Promise.all([
+      User.findByIdAndUpdate(currentUser._id, {
+        $pull: { following: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $pull: { followers: currentUser._id },
+      }),
+    ]);
   } else {
-    // follow
-    await User.findByIdAndUpdate(currentUser._id, {
-      $push: { following: targetUserId },
-    });
-    await User.findByIdAndUpdate(targetUserId, {
-      $push: { followers: currentUser._id },
-    });
+    await Promise.all([
+      User.findByIdAndUpdate(currentUser._id, {
+        $addToSet: { following: targetUserId },
+      }),
+      User.findByIdAndUpdate(targetUserId, {
+        $addToSet: { followers: currentUser._id },
+      }),
+    ]);
 
-    // create notification
-    await Notification.create({
+    // Notification is fire-and-forget; never block the follow toggle on it.
+    Notification.create({
       from: currentUser._id,
       to: targetUserId,
       type: "follow",
-    });
+    }).catch((err) => console.error("[follow] notification error:", err));
   }
 
   res.status(200).json({
