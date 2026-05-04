@@ -1,17 +1,20 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import EditProfileModal from "@/components/EditProfileModal";
 import PostsList from "@/components/PostsList";
+import ProfileTabs, { type ProfileTab } from "@/components/ProfileTabs";
 import SignOutButton from "@/components/SignOutButton";
 import VerificationProgress from "@/components/VerificationProgress";
 
@@ -26,17 +29,22 @@ import { formatNumber } from "@/utils/formatter";
  * Profile (current user).
  *
  * Hierarchy reads top-to-bottom:
- *   banner → identity → bio → meta → stats → verification → posts.
- * Edit-profile is a primary affordance pinned next to the avatar (Fitts's
- * Law — close to the user's existing focus, easy to reach).
+ *   banner → identity → bio → meta → stats → tabs → content.
+ *
+ * Psychology lever — Progressive disclosure + Locus of control:
+ *  Tabs let the user pick the slice they care about (Posts / Replies /
+ *  Media / Likes) without committing to a full second screen. Replies,
+ *  Media, and Likes carry honest copy explaining they're coming —
+ *  never a stub or "TODO". Edit-profile is pinned next to the avatar
+ *  (Fitts's Law — close to existing focus, easy to reach).
  *
  * Performance:
  *  - Posts list is delegated to PostsList (FlashList recycler).
- *  - Banner image uses native cover scaling at a fixed aspect ratio so we
- *    don't trigger image decoding on layout changes.
+ *  - Banner image uses native cover scaling at a fixed aspect ratio so
+ *    we don't trigger image decoding on layout changes.
  */
 export default function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { currentUser, isLoading } = useCurrentUser();
@@ -70,11 +78,9 @@ export default function ProfileScreen() {
     usernameValidateErrors,
   } = useProfile();
 
-  // Profile renders <EditProfileModal>. The verification-request alert
-  // can fire while that modal is open, so we route through native Alert
-  // to avoid the stacked-Modal restriction in React Native.
   const { showInfo, showError } = useCustomAlert({ useNative: true });
 
+  const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
@@ -108,6 +114,42 @@ export default function ProfileScreen() {
     showInfo,
     verificationResult,
   ]);
+
+  const tabContent = useMemo(() => {
+    if (!currentUser) return null;
+    if (activeTab === "posts") {
+      return <PostsList username={currentUser.username} />;
+    }
+    if (activeTab === "media") {
+      const mediaPosts = (userPosts ?? []).filter((p) => !!p.image);
+      if (mediaPosts.length === 0) {
+        return (
+          <EmptyState
+            icon={<Feather name="image" size={26} color={colors.tint.primary} />}
+            title="No media yet"
+            description="Post a photo and it'll show up here. Image-only filtering arrives next."
+          />
+        );
+      }
+      return <PostsList posts={mediaPosts} />;
+    }
+    if (activeTab === "replies") {
+      return (
+        <EmptyState
+          icon={<Feather name="message-circle" size={26} color={colors.tint.primary} />}
+          title="Replies, soon"
+          description="A dedicated thread of every conversation you're in is on the way. Until then, your replies live under each post."
+        />
+      );
+    }
+    return (
+      <EmptyState
+        icon={<Feather name="heart" size={26} color={colors.tint.primary} />}
+        title="Likes are private — for now"
+        description="Your liked posts will land here in a future update with a privacy toggle."
+      />
+    );
+  }, [activeTab, colors.tint.primary, currentUser, userPosts]);
 
   if (isLoading || !currentUser?._id) {
     return (
@@ -192,14 +234,7 @@ export default function ProfileScreen() {
             <Text variant="title" tone="primary" numberOfLines={1}>
               {currentUser.firstName} {currentUser.lastName}
             </Text>
-            {currentUser.verified ? (
-              <View
-                className="w-[20px] h-[20px] rounded-full items-center justify-center"
-                style={{ backgroundColor: colors.tint.primary }}
-              >
-                <MaterialCommunityIcons name="check" size={12} color={colors.text.onTint} />
-              </View>
-            ) : null}
+            {currentUser.verified ? <VerifiedBadge size={18} /> : null}
           </View>
           <Text variant="bodySm" tone="secondary" className="mt-[2px]">
             @{currentUser.username}
@@ -226,11 +261,27 @@ export default function ProfileScreen() {
             {joined ? <MetaRow icon="calendar" label={`Joined ${joined}`} /> : null}
           </View>
 
-          {/* Stats row */}
-          <View className="flex-row mt-lg rounded-lg bg-surface-secondary py-md">
-            <Stat label="Following" value={formatNumber(currentUser.following?.length ?? 0)} />
+          {/* Stats row — generous separators, bold numbers, consistent column widths. */}
+          <View
+            style={{
+              flexDirection: "row",
+              marginTop: spacing.lg,
+              borderRadius: 16,
+              backgroundColor: colors.surface.secondary,
+              borderWidth: 1,
+              borderColor: colors.border.subtle,
+              paddingVertical: spacing.md,
+            }}
+          >
+            <Stat
+              label="Following"
+              value={formatNumber(currentUser.following?.length ?? 0)}
+            />
             <Divider />
-            <Stat label="Followers" value={formatNumber(currentUser.followers?.length ?? 0)} />
+            <Stat
+              label="Followers"
+              value={formatNumber(currentUser.followers?.length ?? 0)}
+            />
             <Divider />
             <Stat label="Posts" value={formatNumber(userPosts?.length || 0)} />
           </View>
@@ -249,7 +300,8 @@ export default function ProfileScreen() {
         </View>
 
         <View className="mt-md">
-          <PostsList username={currentUser.username} />
+          <ProfileTabs active={activeTab} onChange={setActiveTab} />
+          <View style={{ minHeight: 240 }}>{tabContent}</View>
         </View>
       </ScrollView>
 

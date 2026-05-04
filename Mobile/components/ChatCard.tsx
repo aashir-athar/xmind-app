@@ -1,9 +1,9 @@
 import React, { memo } from "react";
 import { Pressable, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
 import type { ConversationType } from "@/data/conversations";
 
@@ -14,6 +14,15 @@ export interface ChatCardProps {
   onLongPress: () => void;
 }
 
+// V1 mock — every conversation is treated as having one unread until
+// the user opens it. We don't have a real read-state on the mock data,
+// so we infer "unread" as "the last message wasn't sent by the viewer".
+function inferUnread(conversation: ConversationType): boolean {
+  const last = conversation.messages[conversation.messages.length - 1];
+  if (!last) return false;
+  return !last.fromUser;
+}
+
 /**
  * Conversation row.
  *
@@ -21,11 +30,17 @@ export interface ChatCardProps {
  * a constant micro-animation across every list row produces ambient
  * motion fatigue and keeps the GPU warm for no information gain. A
  * static green dot communicates the same fact at zero cost.
+ *
+ * Added a discrete unread dot + bolder name when there's an unread
+ * message — the cue the user expects from every messaging app, sized
+ * down to a single 8px disc so it never dominates the row.
  */
 function ChatCardImpl({ conversation, onPress, onLongPress }: ChatCardProps) {
   const { colors } = useTheme();
 
   if (!conversation || !conversation.user) return null;
+
+  const unread = inferUnread(conversation);
 
   return (
     <Pressable
@@ -33,8 +48,6 @@ function ChatCardImpl({ conversation, onPress, onLongPress }: ChatCardProps) {
       onLongPress={onLongPress}
       delayLongPress={400}
       android_ripple={{ color: colors.overlay.press }}
-      // The pressed-opacity needs the runtime pressable state, so the
-      // outer flex/spacing/border is className while opacity stays inline.
       className="flex-row items-center gap-md p-base my-xs rounded-lg bg-surface border border-subtle"
       style={({ pressed }) => ({ opacity: pressed ? 0.88 : 1 })}
     >
@@ -56,30 +69,42 @@ function ChatCardImpl({ conversation, onPress, onLongPress }: ChatCardProps) {
 
       <View className="flex-1 min-w-0">
         <View className="flex-row items-center gap-xs">
-          <Text variant="subtitle" tone="primary" numberOfLines={1} className="flex-1">
+          <Text
+            variant="subtitle"
+            tone="primary"
+            weight={unread ? "700" : "600"}
+            numberOfLines={1}
+            className="flex-1"
+          >
             {conversation.user.name || "Unknown"}
           </Text>
-          {conversation.user.verified ? (
-            <View
-              className="w-[16px] h-[16px] rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.tint.primary }}
-            >
-              <MaterialCommunityIcons name="check" size={10} color={colors.text.onTint} />
-            </View>
-          ) : null}
-          <Text variant="caption" tone="tertiary">
+          {conversation.user.verified ? <VerifiedBadge size={14} /> : null}
+          <Text
+            variant="caption"
+            tone={unread ? "tint" : "tertiary"}
+            weight={unread ? "700" : "500"}
+          >
             {conversation.time || "now"}
           </Text>
         </View>
 
-        <Text
-          variant="bodySm"
-          tone="secondary"
-          numberOfLines={2}
-          className="mt-[2px]"
-        >
-          {conversation.lastMessage || "No messages yet"}
-        </Text>
+        <View className="flex-row items-center gap-xs mt-[2px]">
+          <Text
+            variant="bodySm"
+            tone={unread ? "primary" : "secondary"}
+            weight={unread ? "600" : "400"}
+            numberOfLines={2}
+            className="flex-1"
+          >
+            {conversation.lastMessage || "No messages yet"}
+          </Text>
+          {unread ? (
+            <View
+              className="w-[8px] h-[8px] rounded-full"
+              style={{ backgroundColor: colors.tint.primary }}
+            />
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );

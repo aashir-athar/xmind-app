@@ -1,448 +1,401 @@
-# xMind
+<div align="center">
 
-A calm, premium social app — an X / Twitter-style client built on Expo
-React Native with a focused 2026 design language.
+  <img src="Mobile/assets/images/xMind-Logo1.png" alt="xMind logo" width="120" />
 
-> A quieter place to think out loud.
+  <h1>xMind — open-source Twitter / Facebook-class social app, built with React Native + Expo SDK 54</h1>
 
-```
-[ Mobile (Expo SDK 55) ]  ←→  [ Backend (Node + MongoDB) ]
-       Clerk auth                    REST + Cloudinary
-       React Query
-       Reanimated
-       NativeWind
-```
+  <p>
+    Short-form social network with a hybrid on-device feed ranker, real-time-feeling feed, hashtags, profiles, follows, notifications, and messages — engineered to feel as fast as the originals on a 2&nbsp;GB-RAM Android device.
+  </p>
 
----
+  <p>
+    <a href="https://github.com/aashir-athar/xmind-app/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/aashir-athar/xmind-app?style=flat-square&color=5B3DF5" /></a>
+    <a href="https://github.com/aashir-athar/xmind-app/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/aashir-athar/xmind-app?style=flat-square&color=5B3DF5" /></a>
+    <a href="https://github.com/aashir-athar/xmind-app/issues"><img alt="Issues" src="https://img.shields.io/github/issues/aashir-athar/xmind-app?style=flat-square&color=5B3DF5" /></a>
+    <a href="https://github.com/aashir-athar/xmind-app/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/aashir-athar/xmind-app?style=flat-square&color=5B3DF5" /></a>
+    <a href="https://github.com/aashir-athar/xmind-app/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/aashir-athar/xmind-app?style=flat-square&color=5B3DF5" /></a>
+    <br />
+    <img alt="Expo SDK 54" src="https://img.shields.io/badge/Expo_SDK-54-000?style=flat-square&logo=expo&logoColor=fff" />
+    <img alt="React Native 0.81.5" src="https://img.shields.io/badge/React_Native-0.81.5-61dafb?style=flat-square&logo=react" />
+    <img alt="React 19.1" src="https://img.shields.io/badge/React-19.1-61dafb?style=flat-square&logo=react" />
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&logo=typescript&logoColor=fff" />
+    <img alt="Platforms" src="https://img.shields.io/badge/Platforms-iOS_%7C_Android-555?style=flat-square" />
+  </p>
 
-## Table of contents
+</div>
 
-1. [What this app is](#what-this-app-is)
-2. [Design philosophy](#design-philosophy)
-3. [Architecture](#architecture)
-4. [Tech stack](#tech-stack)
-5. [Project layout](#project-layout)
-6. [Design system](#design-system)
-7. [Platform-aware patterns (iOS / Android)](#platform-aware-patterns-ios--android)
-8. [Performance budget](#performance-budget)
-9. [Accessibility](#accessibility)
-10. [Voice and copy](#voice-and-copy)
-11. [Running locally](#running-locally)
-12. [Common scripts](#common-scripts)
-13. [Environment variables](#environment-variables)
-14. [Production builds](#production-builds)
-15. [Backend](#backend)
-16. [License](#license)
+> A complete, open-source social-media app you can clone, ship, and learn from. xMind pairs a 120 fps mobile UI built on Expo SDK 54, React Native 0.81, NativeWind 4, FlashList, and Reanimated v4 with a serverless Express + MongoDB Atlas backend on Vercel — guarded by Clerk auth, Cloudinary media, and Arcjet rate-limit shields. Includes a layered on-device feed ranker (TF-IDF, MMR diversity, time-zone-aware decay), a 2026 design-token system, dark/light theming, and platform-aware Liquid Glass / Blur / flat surfaces.
 
 ---
 
-## What this app is
+## Table of Contents
 
-xMind is a complete social-feed app: authentication, a ranked feed,
-post creation with images, hashtags, search, threaded comments,
-notifications, profiles with verification, and a 1-on-1 messaging UI.
-
-It is built as a **portfolio-grade reference implementation**:
-
-- Senior-level React Native (Expo) patterns end-to-end.
-- Strict TypeScript across the entire codebase, with named domain types.
-- A design system that scales, with platform-aware materials (Liquid
-  Glass on iOS 26+, BlurView on iOS < 26, flat themed surfaces on Android).
-- Performance tuned for low-end Android (2 GB RAM devices) — virtualized
-  lists, single-shared-value animations, no `setInterval` shimmers,
-  zero per-frame style allocations in scroll paths.
+- [Why xMind?](#why-xmind)
+- [Built For](#built-for)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [The Feed Ranker](#the-feed-ranker)
+- [Design Philosophy](#design-philosophy)
+- [Getting Started](#getting-started)
+- [Scripts](#scripts)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Contributors](#contributors)
+- [Star History](#star-history)
+- [FAQ](#faq)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
 
 ---
 
-## Design philosophy
+## Why xMind?
 
-The 2026 brief was the operating constraint:
+Most "Twitter clone" repos stop at a basic feed — chronological list, like button, fingers crossed. xMind goes further:
 
-| Pillar | Decision |
-|---|---|
-| **Restraint with signature** | Generous whitespace, large readable type, one primary CTA per screen. Decoration is removed unless it carries information. |
-| **Material discipline** | A single `Surface` primitive owns all translucent material; BlurView is forbidden on Android by policy. |
-| **Pill TabBar** | Capsule bar floating over content; sliding pill indicator drawn entirely on the UI thread. |
-| **Theme = OS** | `useColorScheme()` flips light → dark in real time. No theme toggle in the UI; we respect the user's device-level preference. |
-| **Psychology, applied** | Progressive disclosure on the composer. Empty states name the next action. Hick's Law in tab labels and search results. |
-| **Ethics, not dark patterns** | No fake countdowns, no engagement traps. Loss-aversion language only when the loss is real. |
-| **No emojis** | Anywhere — UI strings, code comments, errors. Words are clearer. |
+- **A real on-device feed ranker.** Eleven layered signals — hard filters, exposure decay, TF-IDF cosine, normalised engagement velocity, time-zone-aware time decay, second-degree connection strength, sentiment-proxy quality, cold-start, MMR diversity rerank, per-author cap, and a 4:1 chronological blend. All deterministic, all on-device, all unit-testable.
+- **A platform-aware design system.** A single `<Surface variant="glass" />` decides per request: Liquid Glass on iOS 26+, BlurView on iOS&nbsp;<&nbsp;26, flat tinted surface on Android. BlurView is forbidden on Android by project policy because it tanks scroll FPS on low-end GPUs.
+- **A complete production stack.** Clerk auth, MongoDB Atlas, Cloudinary media, Arcjet bot/rate-limit shield, Vercel serverless deploy, EAS Build for iOS / Android binaries.
+- **Performance baked in.** FlashList for every virtualised list. `expo-image` for every image. Reanimated v4 worklets for animations on the UI thread. New Architecture (Fabric / TurboModules) enabled. Targets 120 fps on a 2&nbsp;GB-RAM Android device.
 
-Reference: the rules above match the "2026 fusion" guidance in the
-internal *web-app-uiux-psychology-copywriting-2026* brief.
+---
+
+## Built For
+
+Developers building a `react native expo sdk 54 starter`, a `mobile-first social network mvp`, a `nativewind tailwind starter`, a `clerk auth react native example`, or a `mongodb cloudinary expo template`. Anyone who wants a production-grade open-source twitter clone they can fork, study, or ship.
+
+---
+
+## Features
+
+- Cursor-paginated feed with optimistic likes and optimistic delete
+- Layered hybrid feed ranker (TF-IDF + MMR + chronological blend)
+- "Not interested" + "Mute @username" curation, persisted across cold starts
+- Trending hashtag rail driven by 24h velocity aggregation (Vercel-cached, 5-minute TTL)
+- Hashtag-filtered feed, search across users + posts, "people to follow" suggestions
+- Profile with banner, avatar, stats, and a Posts / Replies / Media / Likes sub-nav
+- Comments sheet with "Replying to @username" hint and threaded composer
+- Same-day grouped notifications ("Alex and 12 others liked your post")
+- Mock messages with unread dots and conversation cards
+- Verified-author SVG badge, custom char-counter ring on the composer
+- Dark / Light / system theme via NativeWind 4 CSS variables
+- Pill-shaped tab bar with sliding indicator on the UI thread
+- Pull-to-refresh + infinite scroll + viewability tracking
+- Clerk-powered Apple + Google sign-in
+- Cloudinary image transforms (auto format, auto quality, 1080px cap)
+- Arcjet bot detection + rate limit on the backend
+- Atomic like-toggle on the backend (`$pull` then `$addToSet`)
+- Cached mongoose connection across Vercel cold starts
+- Cursor-paginated feed with `commentCount` projected via `$size` (no full comment population)
+
+---
+
+## Tech Stack
+
+| Category | Tool | Why |
+|---|---|---|
+| Mobile framework | Expo SDK 54, React Native 0.81.5, React 19.1 | Latest stable surface with the New Architecture on by default |
+| Navigation | expo-router | File-based routing, typed routes, stack + tabs |
+| State / data | TanStack React Query, Zustand | Server state separated from client state |
+| Forms / validation | react-hook-form, zod | Performance-first forms with strict typing |
+| Styling | NativeWind 4 + Tailwind 3 + design tokens | CSS-variable theming + token contract for screens |
+| Lists | @shopify/flash-list | Native cell recycling, smooth on low-end Android |
+| Animation | react-native-reanimated v4 + worklets | UI-thread animations |
+| Glass / blur | expo-glass-effect, expo-blur | iOS 26 Liquid Glass with platform-correct fallback |
+| Images | expo-image | Off-thread decode + cross-cell cache |
+| Auth | @clerk/clerk-expo + @clerk/express | Apple / Google one-tap sign-in |
+| Backend | Express 5 on Vercel | Serverless, zero-cold-start with cached mongoose |
+| Database | MongoDB Atlas + mongoose 8 | Indexed cursor pagination on `{createdAt, _id}` |
+| Media | Cloudinary | Auto format / quality, 1080px cap |
+| Security | Arcjet | Bot detection + rate limit |
+| Icons | @expo/vector-icons + custom SVG | Verified badge is a hand-tuned SVG, not a glyph |
 
 ---
 
 ## Architecture
 
-```
-Mobile/
-├─ app/                           Expo Router (file-based)
-│  ├─ _layout.tsx                 Provider stack: Gesture → SafeArea → Clerk → Query
-│  ├─ (auth)/                     Welcome + sign-in (auth-only)
-│  └─ (tabs)/                     Home, Search, Inbox, Messages, Profile
-│
-├─ components/
-│  ├─ ui/                         Design-system primitives (themed, memoised)
-│  │   Surface, Text, Button, IconButton, Avatar, Card,
-│  │   TextField, Skeleton, EmptyState, ScreenHeader
-│  ├─ PillTabBar.tsx              2026 capsule tab bar (animated pill indicator)
-│  ├─ PostCard / PostsList /…     Feature-level components (memoised)
-│  └─ …Modal.tsx                  Cross-platform modal surfaces
-│
-├─ constants/
-│  ├─ tokens.ts                   Spacing, radii, type, motion, palettes
-│  └─ colors.ts                   Legacy `BRAND_COLORS` shim (mirrors the new tokens)
-│
-├─ hooks/
-│  ├─ useTheme.ts                 Resolves the active palette from useColorScheme()
-│  └─ use*.ts                     Domain hooks: posts, profile, comments, search, …
-│
-├─ utils/
-│  └─ feedRanking.ts              Multi-factor feed ranking
-│
-└─ types/index.ts                 Public domain types
+```mermaid
+flowchart LR
+    subgraph Mobile [Mobile App - Expo SDK 54]
+      direction TB
+      U[User] --> RN[React Native UI]
+      RN -->|TanStack Query| RQ[(Query Cache)]
+      RQ -->|axios + Clerk JWT| API
+      RN --> FR[Feed Ranker - 11 signal layers]
+      RN --> FB[Feedback Store - AsyncStorage]
+      RN --> SS[Session Store - seen posts + activity]
+    end
+
+    subgraph Edge [Backend - Vercel Serverless]
+      API[/Express API/]
+      API -->|protectRoute| CLERK[Clerk]
+      API -->|arcjetMiddleware| ARC[Arcjet]
+      API --> CTRL[Controllers]
+      CTRL --> M[(MongoDB Atlas)]
+      CTRL --> CL[Cloudinary]
+    end
+
+    Mobile -. OAuth .-> CLERK
 ```
 
-### Provider stack
-
-Order matters and is enforced in `app/_layout.tsx`:
-
 ```
-GestureHandlerRootView
-  → SafeAreaProvider
-    → ClerkProvider
-      → QueryClientProvider
-        → ThemedStack (StatusBar follows useColorScheme)
-```
-
-Gesture handler must wrap everything for swipe-back navigation. React
-Query defaults are deliberately conservative: `staleTime: 30s`,
-`refetchOnWindowFocus: false`. Mobile screens shouldn't refetch the
-moment the user blinks.
-
----
-
-## Tech stack
-
-| Concern | Choice | Reason |
-|---|---|---|
-| **Runtime** | Expo SDK 55, React Native 0.83 | Liquid Glass APIs, new arch by default |
-| **Router** | Expo Router (file-based) | Conventional, type-safe, deep-linkable |
-| **Auth** | Clerk + `@clerk/clerk-expo` | OAuth, secure token cache, passwordless |
-| **Server state** | TanStack Query 5 | Cache control, mutations, optimistic UI |
-| **Forms / state** | Local `useState` + custom hooks | No global store needed for this scope |
-| **Animation** | Reanimated 4 (worklets) | UI-thread driven, 60 fps under scroll |
-| **Lists** | `@shopify/flash-list` v2 | Cell recycling, low memory, fast on 2 GB devices |
-| **Styling** | NativeWind 4 + theme tokens | Tailwind ergonomics + runtime theme |
-| **Glass material** | `expo-glass-effect` (iOS 26+) + `expo-blur` (iOS < 26) | Native Liquid Glass with safe fallback |
-| **Haptics** | `expo-haptics` | Subtle confirmation on tap targets |
-| **Lang** | TypeScript strict mode | No `any` allowed in domain code |
-
----
-
-## Project layout
-
-The mobile project is colocated under `Mobile/`. The backend (Node +
-Express + MongoDB) lives under `Backend/`. Each is independently
-runnable; they communicate over HTTP.
-
----
-
-## Design system
-
-All design tokens live in [`Mobile/constants/tokens.ts`](Mobile/constants/tokens.ts).
-
-### Layers
-
-1. **Primitive scale** — spacing, radii, motion, typography sizes.
-2. **Semantic palettes** — `lightPalette` and `darkPalette` exported as
-   `ColorPalette`. Both share the brand hues; only neutrals and
-   surfaces flip.
-3. **Theme contract** — `useTheme()` returns
-   `{ mode, colors, spacing, radii, typography, motion, elevation, statusBarStyle }`.
-
-### Tailwind alignment
-
-[`tailwind.config.js`](Mobile/tailwind.config.js) mirrors the same
-tokens so NativeWind classes (`bg-bg-canvas`, `text-text-primary`,
-`rounded-pill`, `dark:bg-bg-dk-canvas`) and the runtime hook stay in
-sync. `darkMode: 'media'` makes NativeWind react to OS preference
-without a manual class toggle.
-
-### Primitives
-
-Every primitive is themed, memoised, and accessible by default.
-
-| Primitive | Purpose |
-|---|---|
-| `Surface` | Cross-platform translucent / solid container. Owns the iOS-26 / iOS / Android material decision in one place. |
-| `Text` | Type-scale tokens + semantic colour roles. |
-| `Button` | Capsule, three variants, haptic, hit-slop ≥ 8px, ≥ 48px tap target. |
-| `IconButton` | Round button for headers and inline actions. |
-| `Avatar` | Image with deterministic initials fallback. |
-| `Card` | Presentational wrapper around `Surface`. |
-| `TextField` | Themed input with focus ring + error/helper slots. |
-| `Skeleton` | Single-driver Reanimated pulse. No `setInterval`. |
-| `EmptyState` | Consistent empty UX across feed, search, inbox. |
-| `ScreenHeader` | Unified header with floating-glass option. |
-
----
-
-## Platform-aware patterns (iOS / Android)
-
-### Materials
-
-The `Surface` primitive is the single source of truth.
-
-```
-variant="glass":
-  ├─ iOS 26+      → expo-glass-effect <GlassView>
-  ├─ iOS < 26     → expo-blur <BlurView>
-  └─ Android      → flat themed surface (NEVER BlurView)
+xMind/
+|- Mobile/                   # React Native + Expo app
+|   |- app/                  # expo-router routes
+|   |   |- (tabs)/           # home, search, notifications, messages, profile
+|   |   |- (auth)/           # welcome, sign-in
+|   |   |- hashtag-posts.tsx
+|   |   |- user-profile.tsx
+|   |- components/           # feature + ui primitives
+|   |   |- ui/               # Surface, Text, Button, Avatar, VerifiedBadge,
+|   |   |                    #  CharCounterRing, Skeleton, EmptyState, Card
+|   |   |- PostCard.tsx
+|   |   |- PostsList.tsx
+|   |   |- PostComposer.tsx
+|   |   |- PostMenu.tsx
+|   |   |- TrendingRail.tsx
+|   |   |- ProfileTabs.tsx
+|   |   |- GroupedNotificationCard.tsx
+|   |   |- CommentsModal.tsx
+|   |   |- ChatModal.tsx + ChatCard.tsx
+|   |   |- PillTabBar.tsx
+|   |- hooks/                # useFeedRanking, useTrendingHashtags,
+|   |                        #  useSearch, useNotifications, usePosts,
+|   |                        #  useTheme, useCurrentUser, ...
+|   |- stores/               # useSessionStore, useFeedbackStore (Zustand)
+|   |- utils/                # feedRanking.ts, tfidf.ts, notificationGrouping.ts,
+|   |                        #  formatter.ts, api.ts
+|   |- constants/            # tokens.ts (design system)
+|   |- types/                # User, Post, Comment, Notification
+|   |- global.css            # CSS-variable palette
+|   |- tailwind.config.js
+|   |- app.json + package.json
+|- Backend/                  # Express + Mongo on Vercel
+|   |- src/
+|   |   |- server.js
+|   |   |- config/           # db.js, env.js, cloudinary.js, arcjet.js
+|   |   |- controllers/      # post, comment, notification, user
+|   |   |- routes/
+|   |   |- models/           # post, user, comment, notification
+|   |   |- middleware/       # auth, arcjet, upload
+|- README.md
+|- zero-to-deploy.md
 ```
 
-**Why no BlurView on Android.** Android's BlurView implementation in
-SDK 55 is software-composited on most low-end GPUs and tanks scroll
-FPS. The Surface primitive substitutes a tinted flat surface tuned to
-look intentional rather than missing.
+---
 
-### Tab bar
+## The Feed Ranker
 
-[`PillTabBar`](Mobile/components/PillTabBar.tsx) is a capsule bar
-with a single animated pill indicator. The indicator's `translateX`
-is derived from one shared value, so taps mutate one signal — no
-JS-bridge crossings during the spring.
+The mobile app re-scores each fetched feed page on-device, using eleven layered signals applied in this order:
 
-### Status bar
+1. **Hard filters** — muted authors, blocked, max age (48h), low quality, "not interested" posts/authors/hashtags, viewer's own posts.
+2. **Exposure decay** — posts seen in the current session keep a 0.4× score multiplier (faded, not removed). Visibility is detected via FlashList `viewabilityConfig` at 60% threshold.
+3. **Topical relevance** — TF-IDF cosine similarity between the post's content and the user's interaction profile (likes + own posts). Hashtags weight 3× a regular term. Vocabulary capped at top 500 by document frequency.
+4. **Engagement velocity** — engagement / hour, normalised against the author's follower count via `log10(followers + 10)`. Stops viral spikes from drowning everything else.
+5. **Time decay** — half-life curve with timezone-aware adjustment: posts in the user's active hours (inferred from session activity) decay slower. Trending bonus for recent posts past an engagement floor.
+6. **Connection strength** — direct follow + 2nd-degree (follow-of-follow) + per-author affinity rate from interaction history.
+7. **Quality + sentiment** — verified author bonus, length goldilocks, hashtag penalty above 5, all-caps + `!!!` sentiment proxy penalty, clickbait-phrase penalty.
+8. **Cold-start fallback** — when the user has fewer than 5 interactions, drop personalisation and rank on `verified + velocity + recency` only.
+9. **MMR diversity rerank** — top-100 candidates re-ordered with Maximal Marginal Relevance (lambda = 0.7) using TF-IDF cosine as the diversity penalty. Breaks "ten posts on the same hashtag in a row".
+10. **Per-author cap** — at most 2 posts per author after MMR.
+11. **Chronological blend** — one chronological filler post for every 4 ranked posts. Even strong personalisation can't fully hide what just happened.
 
-`StatusBar` lives in `app/_layout.tsx` and is bound to
-`useTheme().statusBarStyle`. Light/dark icon contrast follows the OS
-on first paint, no flashes.
-
-### Safe areas
-
-Every screen consumes `useSafeAreaInsets()` from
-`react-native-safe-area-context`. We don't use the legacy
-`react-native` SafeAreaView. This is uniform across iOS notch / Dynamic
-Island and Android gesture-nav devices.
-
-### Keyboard
-
-`KeyboardAvoidingView` is wired with `behavior="padding"` on iOS and
-`"height"` on Android — the only combination we found that keeps the
-composer docked above the keyboard on every test device.
+Each signal is a pure function — `topicalRelevance`, `engagementVelocity`, `recency`, `connectionStrength`, `qualityScore` — so they're easy to unit-test in isolation.
 
 ---
 
-## Performance budget
+## Design Philosophy
 
-This codebase is tuned for **60 fps on 2 GB Android devices**. The
-budget is not aspirational; it's enforced by the choices below.
-
-### Lists
-
-- Every list is `FlashList` with `removeClippedSubviews`.
-- `keyExtractor` and `renderItem` are stable via `useCallback`.
-- Cells are `React.memo`'d with explicit equality on the small set of
-  fields that actually change (likes count, comments count, image, etc.).
-
-### Animations
-
-- All animations run on the UI thread via Reanimated shared values.
-- No `setInterval`-driven shimmers — the original `NoNotificationsFound`
-  and `ChatCard` pulses were rewritten on `withRepeat` so they stop
-  cleanly on unmount and don't allocate JS work per frame.
-- Per-cell entrance animations were removed from feed cells. They
-  flicker on FlashList recycling and add ~2.5 s of staggered motion
-  every time the feed remounts.
-
-### Renders
-
-- `useCallback` wraps every list-row handler so memo'd children stay
-  identity-stable.
-- `useDeferredValue` defers heavy filters in search / messages so each
-  keystroke is paint-fast.
-- React Query defaults are conservative; the app does not refetch on
-  focus.
-
-### Bundle
-
-- A single legacy `BRAND_COLORS` shim retained for backwards-compat is
-  ~2 KB and re-exports tokens, not duplicate values.
-- Tab bar components from the previous SDK iteration
-  (`CustomTabBar`, `AnimatedTabContainer`, `TabBackground`, `TabIcon`)
-  were removed.
+- **Tokens first.** Every padding, radius, colour, font size, and motion curve flows from `Mobile/constants/tokens.ts` and the matching `tailwind.config.js`. No hex codes, no magic numbers in screens.
+- **Platform-aware translucency.** A single `<Surface variant="glass" />` resolves to Liquid Glass / BlurView / flat surface so screens stay clean and Android scroll stays fast.
+- **Honest microcopy.** Empty states name the next action. Error states take the blame. Confirmations explain the consequence. No dark patterns — no fake "recommended" badge on the sign-in screen, no engagement nags on the empty inbox.
+- **Motion as language, not decoration.** Reanimated worklets drive every interaction (tab indicator, button spring, heart pulse, profile-tab indicator) on the UI thread. Removed long-running `withRepeat` pulses on list rows because ambient motion fatigues users.
+- **Curation as agency.** "Not interested" + "Mute @username" feed back into the on-device ranker via a persisted Zustand store. The user shapes their feed; the algorithm cooperates.
 
 ---
 
-## Accessibility
-
-- Every interactive element has `accessibilityRole` and
-  `accessibilityLabel`.
-- Tap targets are ≥ 44 × 44 (WCAG 2.5.5) by construction in `Button`,
-  `IconButton`, and the tab bar.
-- Type honours OS scaling (`allowFontScaling`).
-- Focus state in `TextField` uses a coloured ring, not a colour-only cue.
-- Light / dark themes meet WCAG 2.2 AA contrast on text and surfaces.
-
----
-
-## Voice and copy
-
-Every visible string in xMind goes through one editorial filter. The voice
-is part of the product, not decoration after the fact.
-
-### Brand voice
-
-| Attribute | Example |
-|---|---|
-| **Calm** | "It's quiet in here." (instead of "No notifications.") |
-| **Sharp** | "Say something true." (instead of "What's on your mind?") |
-| **Specific** | "Inbox zero." (instead of "No conversations yet.") |
-| **Honest about loss** | "It'll be gone from your feed and from anyone who's already seen it." |
-
-### Word list
-
-| Use | Avoid |
-|---|---|
-| think, say, post, true, quietly, slowly | amazing, instantly, unleash, unlock, discover, epic, boom |
-| your feed, your inbox, a thought, a reply | content, engagement, users, awesome experience |
-
-### Patterns we apply
-
-- **BAB** (Before / After / Bridge) on the welcome screen — "Slow social,
-  on purpose. Say what you actually think — and find the people who
-  think too." → CTA "Get started".
-- **FAB** (Feature / Advantage / Benefit) on sign-in — "One tap. No
-  passwords. We only keep what we need."
-- **Goal-Gradient Effect** on verification — phrasing sharpens as the
-  user gets closer ("Almost there — 2 steps left").
-- **Hick's Law** in tab labels — five icons, full label only on the
-  active tab.
-- **Progressive disclosure** in the composer — placeholder + 40 px when
-  idle, expands to icon row + counter + Post button on focus.
-- **Empty states name the next action** —
-  *"It's quiet in here. Reactions, replies, and follows land here.
-  Posting is the fastest way to start one."*
-
-### Patterns we refuse
-
-- **Fake urgency or scarcity** — no "10 people are looking at this."
-- **Confirm-shaming** — destructive dialogs name the cost truthfully
-  ("It'll be gone…") instead of guilting the user out of the action.
-- **Vague errors** — "Couldn't post" is paired with what's safe ("Your
-  draft is still here") and a next step.
-- **Brag adjectives** — "amazing," "instantly," "epic" don't ship.
-- **Emojis** — anywhere. Words are clearer.
-
----
-
-## Running locally
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- npm 10+
-- Expo CLI (auto-fetched via `npx`)
-- Xcode 16+ for iOS (Liquid Glass requires iOS 26 SDK)
-- Android Studio + an Android 14+ emulator or device
+- Node 20 LTS, npm 10 (or Bun / pnpm — `expo install` is package-manager agnostic)
+- iOS: Xcode 15+ on macOS for native builds, or Expo Go for the JS-only path
+- Android: Android Studio with API 34+ for native builds, or Expo Go
+- Accounts (free tiers are fine): MongoDB Atlas, Clerk, Cloudinary, Arcjet, Vercel
 
-### Install
+### Clone
 
 ```bash
-git clone <repo-url>
-cd "X Clone App/Mobile"
+git clone https://github.com/aashir-athar/xmind-app.git
+cd xmind-app
+```
+
+### Mobile
+
+```bash
+cd Mobile
 npm install --legacy-peer-deps
+cp .env.example .env       # then fill in EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY and EXPO_PUBLIC_API_URL
+npx expo start
 ```
 
-The `--legacy-peer-deps` flag is currently required because
-`react-native@0.83.6` declares an optional peer on `@types/react@^19.1.1`
-that conflicts with the 19.2.x range pulled by other packages. It is
-benign — npm resolves to 19.2 either way.
-
-### Start
+### Backend
 
 ```bash
-npm run start             # Metro + Expo Dev Tools
-# or
-npm run ios               # iOS simulator
-npm run android           # Android emulator
-npm run web               # Web (limited; native-only features won't work)
+cd Backend
+npm install
+cp .env.example .env       # then fill MONGO_URI, CLERK_SECRET_KEY, CLOUDINARY_*, ARCJET_KEY
+npm run dev
 ```
 
-### Validate
-
-```bash
-npx expo-doctor           # 18/18 checks passing on a clean install
-npx tsc --noEmit          # zero errors in strict mode
-```
+For full clone-to-store deployment instructions see [zero-to-deploy.md](./zero-to-deploy.md).
 
 ---
 
-## Common scripts
+## Scripts
 
-| Command | What it does |
+### Mobile (`Mobile/package.json`)
+
+| Script | What it does |
 |---|---|
-| `npm run start` | Boot Metro + dev tools |
-| `npm run ios` | Run on iOS simulator |
-| `npm run android` | Run on Android emulator |
-| `npm run web` | Run web target |
-| `npm run lint` | Expo's lint preset |
-| `npm run reset-project` | Reset to template starter (destructive) |
+| `npm start` | Starts the Metro bundler with Expo dev tools |
+| `npm run ios` | Boots an iOS simulator on macOS |
+| `npm run android` | Boots an Android emulator |
+| `npm run web` | Runs the web target (development only) |
+| `npm run lint` | Runs `expo lint` |
+
+### Backend (`Backend/package.json`)
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Starts the Express server with `node --watch` |
+| `npm start` | Production-mode launch (used by Vercel) |
 
 ---
 
-## Environment variables
+## Roadmap
 
-The mobile app reads two public Expo env vars:
-
-```
-EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_…
-EXPO_PUBLIC_API_BASE_URL=https://your-api.example.com/api
-```
-
-Place them in `Mobile/.env`. Both must be prefixed with
-`EXPO_PUBLIC_` to be available at runtime.
-
-If you don't set `EXPO_PUBLIC_API_BASE_URL`, the app falls back to a
-deployed backend at
-`https://x-clone-react-native-seven.vercel.app/api` (see
-[`Mobile/utils/api.ts`](Mobile/utils/api.ts)). For local backend
-development, set the variable to your machine's LAN IP — `localhost`
-will not resolve from a physical device.
+- [x] Cursor-paginated feed with optimistic interactions
+- [x] Layered hybrid feed ranker
+- [x] Trending hashtag rail (24h aggregation, 5-minute warm cache)
+- [x] "Not interested" + "Mute author" feedback loop
+- [x] Same-day grouped notifications
+- [x] Profile sub-nav (Posts / Replies / Media / Likes)
+- [x] Verified badge as custom SVG
+- [ ] Real backend interaction-history table (the ranker currently approximates from cached likes)
+- [ ] Real-time updates via SSE or websockets
+- [ ] Replies feed under the profile sub-nav
+- [ ] DM backend (current messages tab is a mock)
+- [ ] Push notifications via expo-notifications
+- [ ] Maestro E2E suite
 
 ---
 
-## Production builds
+## Contributing
 
-This project uses Expo prebuild + EAS-compatible config. The
-`expo-image-picker` plugin in `app.json` declares the camera and
-photo permission strings; no manual native edits are required.
+xMind welcomes pull requests. **First-time contributors very welcome — we have a `good first issue` label specifically for you.** Pick one, drop a comment, and we'll help you get a PR landed.
+
+- Browse: [`good first issue` on GitHub](https://github.com/aashir-athar/xmind-app/labels/good%20first%20issue)
+- Branch naming: `feat/<short-slug>`, `fix/<short-slug>`, `chore/<short-slug>`
+- Commit style: [Conventional Commits](https://www.conventionalcommits.org/) (`feat: …`, `fix: …`, `refactor: …`)
+- Pull request: target `main`, link the issue, describe the user-facing change in 2-3 sentences
+
+Before opening a PR, please run:
 
 ```bash
-npx expo prebuild           # generate ios/ + android/ projects
-npx expo run:ios --device   # release build to a connected iOS device
-npx expo run:android        # build APK / AAB for Android
+cd Mobile && npx tsc --noEmit
 ```
 
-For OTA updates, configure EAS Update separately —
-[`expo-glass-effect`](https://docs.expo.dev/versions/latest/sdk/glass-effect/)
-includes a runtime feature-detection helper (`isLiquidGlassAvailable`)
-which the `Surface` primitive uses, so older clients automatically fall
-back to BlurView without an OTA gate.
+and confirm there are zero TypeScript errors.
 
 ---
 
-## Backend
+## Contributors
 
-The companion backend lives in [`Backend/`](Backend/). It's a Node
-+ Express + MongoDB API with Clerk webhook integration and Cloudinary
-image hosting. Refer to that directory's local README for setup; the
-mobile app talks to it over standard REST.
+<a href="https://github.com/aashir-athar/xmind-app/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=aashir-athar/xmind-app" alt="Contributors" />
+</a>
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/#aashir-athar/xmind-app&Date">
+  <img src="https://api.star-history.com/svg?repos=aashir-athar/xmind-app&type=Date" alt="Star history chart" />
+</a>
+
+---
+
+## FAQ
+
+<details>
+<summary><strong>Why is the feed ranker on-device instead of on the backend?</strong></summary>
+<br />
+Two reasons. First, every signal in the ranker can be computed from data already in the user's TanStack Query cache, so per-user feed personalisation needs no extra backend table or cron job. Second, on-device ranking gives every screen render the fresh result without a round trip — pulling to refresh re-ranks instantly. The backend stays a clean cursor-paginated source of truth.
+</details>
+
+<details>
+<summary><strong>How does the trending rail stay fast on Vercel cold starts?</strong></summary>
+<br />
+The /api/posts/trending controller caches the aggregation in an in-memory Map keyed on `(limit)` with a 5-minute TTL. Vercel reuses warm processes for several minutes, so most requests hit the cache. The first request after a cold start runs the aggregation in ~150ms thanks to the `{createdAt: -1}` index on the Post collection.
+</details>
+
+<details>
+<summary><strong>Why no BlurView on Android?</strong></summary>
+<br />
+On most Android GPUs, runtime blur forces software composition for the entire compositor tree underneath. That's fine on a Pixel 8; on a 2 GB-RAM phone it's a 30-FPS frame-pacing disaster. Our `<Surface variant="glass" />` primitive renders a flat tinted surface on Android, BlurView on iOS&nbsp;<&nbsp;26, and Liquid Glass on iOS 26+ — all behind a single API.
+</details>
+
+<details>
+<summary><strong>Can I use this with my own backend?</strong></summary>
+<br />
+Yes. Set `EXPO_PUBLIC_API_URL` to your endpoint and match the contract documented in `Mobile/utils/api.ts` (cursor-paginated `/posts`, `/posts/trending`, `/posts/:id/like`, etc.). The mobile app is a faithful client of that contract; nothing else couples it to Vercel + Express.
+</details>
+
+<details>
+<summary><strong>Does it work on Expo Go or do I need a dev client?</strong></summary>
+<br />
+Most of the app runs in Expo Go. `expo-glass-effect` requires a dev client because it ships a native module — but it falls back to BlurView automatically on iOS&nbsp;<&nbsp;26 and to a flat surface on Android, so Expo Go renders the right thing without crashing. For final builds, use `eas build`.
+</details>
+
+<details>
+<summary><strong>What about offline support?</strong></summary>
+<br />
+React Query persists the feed and profile data in memory for the session. The Feedback store ("not interested", muted authors) is persisted via AsyncStorage and survives cold starts. Full offline-first storage (SQLite or WatermelonDB) is on the roadmap.
+</details>
+
+---
+
+## Acknowledgments
+
+- [Expo](https://expo.dev) — the SDK that makes shipping React Native a one-command affair
+- [Shopify FlashList](https://shopify.github.io/flash-list/) — the only virtualised list that holds 120 fps on low-end Android
+- [Tailwind / NativeWind](https://www.nativewind.dev/) — token-driven styling without runtime overhead
+- [TanStack Query](https://tanstack.com/query) — the server-state library every mobile app needs
+- [Reanimated](https://docs.swmansion.com/react-native-reanimated/) — UI-thread animations that don't starve the JS thread
+- [Clerk](https://clerk.com), [Cloudinary](https://cloudinary.com), [Arcjet](https://arcjet.com), [MongoDB Atlas](https://www.mongodb.com/atlas) — production infrastructure with generous free tiers
 
 ---
 
 ## License
 
-MIT.
+[MIT](./LICENSE) — use it, fork it, ship it.
+
+---
+
+<div align="center">
+
+  Built by <a href="https://github.com/aashir-athar"><strong>Aashir Athar</strong></a>
+
+  <a href="https://github.com/aashir-athar"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-aashir--athar-181717?style=flat-square&logo=github" /></a>
+  <a href="https://twitter.com/"><img alt="X / Twitter" src="https://img.shields.io/badge/X-%40aashir--athar-000?style=flat-square&logo=x" /></a>
+  <a href="https://www.linkedin.com/"><img alt="LinkedIn" src="https://img.shields.io/badge/LinkedIn-Aashir_Athar-0A66C2?style=flat-square&logo=linkedin&logoColor=fff" /></a>
+
+</div>
+
+<!--
+  GitHub repo housekeeping reminder for the maintainer:
+  - Set the repo "About" blurb to: "Open-source Twitter / Facebook-class social media app built with React Native + Expo SDK 54. Layered on-device feed ranker (TF-IDF + MMR), Clerk auth, MongoDB + Vercel."
+  - Add topics: react-native, expo, expo-sdk-54, typescript, mobile-app, social-network, twitter-clone, facebook-clone, nativewind, tailwindcss, flashlist, reanimated, clerk, mongodb, cloudinary, arcjet, vercel, tfidf, mmr, feed-ranking
+  - Set the repo Homepage URL to your live demo (or the Vercel backend URL).
+-->

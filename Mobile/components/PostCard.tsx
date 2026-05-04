@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
-import { AntDesign, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -18,6 +18,7 @@ import * as Haptics from "expo-haptics";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card } from "@/components/ui/Card";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { formatDate, formatNumber } from "@/utils/formatter";
 import type { Post, User } from "@/types";
@@ -35,6 +36,8 @@ export interface PostCardProps {
   onLike: (postId: string) => void;
   onComment: (post: Post) => void;
   onDelete: (postId: string) => void;
+  /** Opens the post-overflow sheet (mute author, not interested, report). */
+  onMore?: (post: Post) => void;
 }
 
 /**
@@ -47,6 +50,8 @@ export interface PostCardProps {
  *  - Like animation pulses on tap (variable-reward dopamine cue) but
  *    deliberately stops short of bouncy theatrics — every interaction
  *    in the app shouldn't feel like a slot machine.
+ *  - Verified badge is a custom SVG (not an icon-font glyph) so the
+ *    silhouette reads instantly as "official, not generic check".
  *
  * Performance:
  *  - Memoised at the boundary; renders only when its prop identity
@@ -60,6 +65,7 @@ function PostCardImpl({
   onLike,
   onComment,
   onDelete,
+  onMore,
 }: PostCardProps) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -96,6 +102,13 @@ function PostCardImpl({
       () => onDelete(post._id)
     );
   }, [onDelete, post._id, showDeleteConfirmation]);
+
+  const handleMore = useCallback(() => {
+    if (onMore) {
+      Haptics.selectionAsync().catch(() => undefined);
+      onMore(post);
+    }
+  }, [onMore, post]);
 
   const navigateToProfile = useCallback(() => {
     if (isOwn) router.push("/(tabs)/profile");
@@ -165,34 +178,36 @@ function PostCardImpl({
                 <Text variant="subtitle" tone="primary" numberOfLines={1}>
                   {post.user.firstName} {post.user.lastName}
                 </Text>
-                {post.user.verified ? (
-                  <View
-                    className="w-[16px] h-[16px] rounded-full items-center justify-center"
-                    style={{ backgroundColor: colors.tint.primary }}
-                  >
-                    <MaterialCommunityIcons
-                      name="check"
-                      size={10}
-                      color={colors.text.onTint}
-                    />
-                  </View>
-                ) : null}
+                {post.user.verified ? <VerifiedBadge size={15} /> : null}
                 <Text variant="bodySm" tone="tertiary" numberOfLines={1}>
                   @{post.user.username} · {formatDate(post.createdAt)}
                 </Text>
               </Pressable>
 
-              {isOwn ? (
-                <Pressable
-                  onPress={handleDelete}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Delete post"
-                  className="w-[32px] h-[32px] rounded-pill items-center justify-center"
-                >
-                  <Feather name="trash-2" size={16} color={colors.text.tertiary} />
-                </Pressable>
-              ) : null}
+              <View className="flex-row items-center">
+                {onMore ? (
+                  <Pressable
+                    onPress={handleMore}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="More options"
+                    className="w-[32px] h-[32px] rounded-pill items-center justify-center"
+                  >
+                    <Feather name="more-horizontal" size={18} color={colors.text.tertiary} />
+                  </Pressable>
+                ) : null}
+                {isOwn ? (
+                  <Pressable
+                    onPress={handleDelete}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete post"
+                    className="w-[32px] h-[32px] rounded-pill items-center justify-center"
+                  >
+                    <Feather name="trash-2" size={16} color={colors.text.tertiary} />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
 
             {/* Content */}
@@ -324,7 +339,8 @@ export const PostCard = memo(PostCardImpl, (prev, next) => {
     prev.post.image === next.post.image &&
     prev.post.content === next.post.content &&
     prev.isLiked === next.isLiked &&
-    prev.currentUser?._id === next.currentUser?._id
+    prev.currentUser?._id === next.currentUser?._id &&
+    prev.onMore === next.onMore
   );
 });
 PostCard.displayName = "PostCard";

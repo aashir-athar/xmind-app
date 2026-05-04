@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { format } from "date-fns";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import PostsList from "@/components/PostsList";
 import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -106,14 +108,16 @@ export default function UserProfileScreen() {
           />
         }
       >
-        <Image
+        <ExpoImage
           source={
             user.bannerImage
               ? { uri: user.bannerImage }
               : require("../assets/images/default-banner.jpeg")
           }
-          style={{ width: "100%", height: 220 }}
-          resizeMode="cover"
+          style={{ width: "100%", aspectRatio: 3 / 1 }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
 
         <Card
@@ -142,14 +146,7 @@ export default function UserProfileScreen() {
             <Text variant="title" tone="primary" numberOfLines={1}>
               {user.firstName} {user.lastName}
             </Text>
-            {user.verified ? (
-              <View
-                className="w-[20px] h-[20px] rounded-full items-center justify-center"
-                style={{ backgroundColor: colors.tint.primary }}
-              >
-                <MaterialCommunityIcons name="check" size={12} color={colors.text.onTint} />
-              </View>
-            ) : null}
+            {user.verified ? <VerifiedBadge size={18} /> : null}
           </View>
           <Text variant="bodySm" tone="secondary" className="mt-[2px]">
             @{user.username}

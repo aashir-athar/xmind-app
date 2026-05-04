@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { Image, View } from "react-native";
+import { View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -25,6 +26,14 @@ import { useTheme } from "@/hooks/useTheme";
  *  - Agitate: implicit — every other social app already does this.
  *  - Solution: a fast, clean place to share what's actually happening.
  *
+ * Motion strategy:
+ *  - The hero illustration breathes on a slow vertical loop and a
+ *    second decorative layer counter-rotates very slightly to imply
+ *    parallax depth without ever crossing into the kind of motion
+ *    that triggers reduced-motion settings or vestibular discomfort.
+ *  - Title + body fade and rise once on mount. Single, intentional
+ *    cue — never a "look at me" entrance.
+ *
  * Layout uses NativeWind classes; only Reanimated-driven transforms
  * stay inline. A single primary CTA reduces decision time (Hick's Law).
  */
@@ -33,6 +42,7 @@ export default function WelcomeScreen() {
   const { colors } = useTheme();
 
   const float = useSharedValue(0);
+  const drift = useSharedValue(0);
   const fade = useSharedValue(0);
   const rise = useSharedValue(24);
 
@@ -42,12 +52,33 @@ export default function WelcomeScreen() {
       -1,
       true
     );
+    // Slower counter-loop on the back layer for the parallax effect.
+    drift.value = withRepeat(
+      withTiming(1, { duration: 4800, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true
+    );
     fade.value = withDelay(120, withTiming(1, { duration: 480 }));
     rise.value = withDelay(120, withSpring(0, { damping: 22, stiffness: 220, mass: 0.9 }));
-  }, [float, fade, rise]);
+  }, [drift, fade, float, rise]);
 
+  // Foreground hero — moves more
   const heroStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 8 }],
+    transform: [
+      { translateY: -float.value * 10 },
+      { translateX: float.value * 4 },
+    ],
+  }));
+
+  // Background glow halo — moves less, opposite direction. The two
+  // layers together produce a parallax depth cue without any 3D math.
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.35 + drift.value * 0.15,
+    transform: [
+      { translateY: drift.value * 6 },
+      { translateX: -drift.value * 3 },
+      { scale: 1 + drift.value * 0.04 },
+    ],
   }));
 
   const contentStyle = useAnimatedStyle(() => ({
@@ -59,13 +90,40 @@ export default function WelcomeScreen() {
     <View className="flex-1 bg-canvas">
       <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         <View className="flex-1 items-center justify-center px-xl">
-          <Animated.View style={heroStyle}>
-            <Image
-              source={require("../../assets/images/auth2.png")}
-              style={{ width: 280, height: 220 }}
-              resizeMode="contain"
+          <View
+            style={{
+              width: 320,
+              height: 260,
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+            }}
+          >
+            {/* Halo backdrop — soft tint glow. */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                {
+                  position: "absolute",
+                  width: 280,
+                  height: 280,
+                  borderRadius: 140,
+                  backgroundColor: colors.tint.primary,
+                  opacity: 0.18,
+                },
+                haloStyle,
+              ]}
             />
-          </Animated.View>
+            <Animated.View style={heroStyle}>
+              <ExpoImage
+                source={require("../../assets/images/auth2.png")}
+                style={{ width: 280, height: 220 }}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                transition={200}
+              />
+            </Animated.View>
+          </View>
 
           <Animated.View
             style={contentStyle}

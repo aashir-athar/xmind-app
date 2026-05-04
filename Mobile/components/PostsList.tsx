@@ -1,6 +1,14 @@
-import React, { memo, useCallback, useMemo, useState } from "react";
+import React, { memo, useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, RefreshControl, View } from "react-native";
-import { FlashList, type ListRenderItemInfo } from "@shopify/flash-list";
+import {
+  FlashList,
+  type FlashListRef,
+  type ListRenderItemInfo,
+} from "@shopify/flash-list";
+
+interface ViewableItem {
+  item: Post;
+}
 import { Feather } from "@expo/vector-icons";
 
 import { Button } from "@/components/ui/Button";
@@ -10,10 +18,12 @@ import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePosts } from "@/hooks/usePosts";
+import { useSessionStore } from "@/stores/useSessionStore";
 import type { Post } from "@/types";
 
 import CommentsModal from "./CommentsModal";
 import PostCard from "./PostCard";
+import PostMenu from "./PostMenu";
 
 export interface PostsListProps {
   /** When provided, a custom posts array is rendered instead of fetched feed. */
@@ -22,6 +32,8 @@ export interface PostsListProps {
   username?: string;
   /** Header rendered above the list (composer on home, banner on profile). */
   ListHeaderComponent?: React.ComponentType<unknown> | React.ReactElement | null;
+  /** Component to render when the resolved posts array is empty. */
+  ListEmptyComponent?: React.ComponentType<unknown> | React.ReactElement | null;
   /**
    * Optional refresh handler. When omitted, the list uses the internal
    * `usePosts` refetch as the pull-to-refresh action.
@@ -29,9 +41,12 @@ export interface PostsListProps {
   onRefresh?: () => Promise<unknown> | void;
   /** Drives the spinner when the parent owns the refresh state. */
   refreshing?: boolean;
+  /** Forwarded to the underlying FlashList. */
+  scrollToTopKey?: number;
 }
 
 const PAGE_BOTTOM_INSET = 140;
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
 /**
  * Feed renderer.
@@ -49,13 +64,20 @@ const PAGE_BOTTOM_INSET = 140;
  * memory every social app shares (Twitter, Facebook, Instagram). The
  * previous floating refresh button is gone — discoverability was fine,
  * but it added a layout element that fought with the tab bar.
+ *
+ * Viewability tracking: posts that cross 60% visibility are pushed into
+ * `useSessionStore.markPostsSeen` so the ranker can deprioritise them
+ * next page. The threshold is intentionally aggressive — barely-glimpsed
+ * posts are not "seen" in any meaningful sense.
  */
 function PostsListImpl({
   posts: customPosts,
   username,
   ListHeaderComponent,
+  ListEmptyComponent,
   onRefresh: externalOnRefresh,
   refreshing: externalRefreshing,
+  scrollToTopKey,
 }: PostsListProps) {
   const { colors, spacing } = useTheme();
   const { currentUser } = useCurrentUser();
@@ -75,17 +97,36 @@ function PostsListImpl({
 
   const posts = customPosts ?? fetchedPosts;
 
+  const listRef = useRef<FlashListRef<Post>>(null);
+  const markPostsSeen = useSessionStore((s) => s.markPostsSeen);
+  const recordActivity = useSessionStore((s) => s.recordActivity);
+
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [menuPostId, setMenuPostId] = useState<string | null>(null);
+
   const selectedPost = useMemo(
     () =>
       selectedPostId ? posts.find((p) => p._id === selectedPostId) ?? null : null,
     [selectedPostId, posts]
   );
 
+  const menuPost = useMemo(
+    () => (menuPostId ? posts.find((p) => p._id === menuPostId) ?? null : null),
+    [menuPostId, posts]
+  );
+
+  // Scroll-to-top trigger from the parent (e.g. tapping the Home logo).
+  React.useEffect(() => {
+    if (scrollToTopKey == null) return;
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [scrollToTopKey]);
+
   const handleLike = useCallback((postId: string) => toggleLike(postId), [toggleLike]);
   const handleDelete = useCallback((postId: string) => deletePost(postId), [deletePost]);
   const handleComment = useCallback((post: Post) => setSelectedPostId(post._id), []);
   const handleCloseComments = useCallback(() => setSelectedPostId(null), []);
+  const handleMore = useCallback((post: Post) => setMenuPostId(post._id), []);
+  const handleCloseMenu = useCallback(() => setMenuPostId(null), []);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Post>) => (
@@ -96,9 +137,17 @@ function PostsListImpl({
         onLike={handleLike}
         onComment={handleComment}
         onDelete={handleDelete}
+        onMore={handleMore}
       />
     ),
-    [checkIsLiked, currentUser, handleComment, handleDelete, handleLike]
+    [
+      checkIsLiked,
+      currentUser,
+      handleComment,
+      handleDelete,
+      handleLike,
+      handleMore,
+    ]
   );
 
   const keyExtractor = useCallback((item: Post) => item._id, []);
@@ -119,6 +168,20 @@ function PostsListImpl({
 
   const refreshing = externalRefreshing ?? isRefetching;
 
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewableItem[] }) => {
+      const ids: string[] = [];
+      for (const token of viewableItems) {
+        const id = token.item?._id;
+        if (id) ids.push(id);
+      }
+      if (ids.length) {
+        markPostsSeen(ids);
+        recordActivity();
+      }
+    }
+  ).current;
+
   const ListFooterComponent = useMemo(
     () =>
       isFetchingNextPage ? (
@@ -132,7 +195,14 @@ function PostsListImpl({
           </Text>
         </View>
       ) : null,
-    [isFetchingNextPage, hasNextPage, posts.length, spacing.lg, spacing.xl, colors.tint.primary]
+    [
+      isFetchingNextPage,
+      hasNextPage,
+      posts.length,
+      spacing.lg,
+      spacing.xl,
+      colors.tint.primary,
+    ]
   );
 
   // Loading state — skeleton stack feels like content, not a spinner.
@@ -176,6 +246,12 @@ function PostsListImpl({
   }
 
   if (!posts || posts.length === 0) {
+    if (ListEmptyComponent) {
+      const Comp = ListEmptyComponent as
+        | React.ComponentType<unknown>
+        | React.ReactElement;
+      return React.isValidElement(Comp) ? Comp : <Comp />;
+    }
     return (
       <EmptyState
         icon={<Feather name="feather" size={28} color={colors.tint.primary} />}
@@ -188,6 +264,7 @@ function PostsListImpl({
   return (
     <View style={{ flex: 1 }}>
       <FlashList<Post>
+        ref={listRef}
         data={posts}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
@@ -197,6 +274,8 @@ function PostsListImpl({
         contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: PAGE_BOTTOM_INSET }}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
+        viewabilityConfig={VIEWABILITY_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -211,6 +290,8 @@ function PostsListImpl({
       {selectedPost ? (
         <CommentsModal selectedPost={selectedPost} onClose={handleCloseComments} />
       ) : null}
+
+      <PostMenu post={menuPost} onClose={handleCloseMenu} />
     </View>
   );
 }

@@ -1,20 +1,49 @@
+/**
+ * xMind feed ranker — layered hybrid algorithm.
+ *
+ * The ranker runs as a stack of pure signal layers, each one a small
+ * function so we can unit-test in isolation later. Order matters: hard
+ * filters first so we never spend cycles scoring posts we'd hide
+ * anyway, then scoring, then a Maximal Marginal Relevance diversity
+ * pass, then a per-author cap, then a 4:1 chronological blend.
+ *
+ *   1. Hard filters         (muted, blocked, max age, low quality, "not interested")
+ *   2. Exposure decay       (seen this session → 0.4× score, not removed)
+ *   3. Topical relevance    (TF-IDF cosine vs user's interaction profile, hashtags 3×)
+ *   4. Engagement velocity  (engagement / hour, normalised per author follower count)
+ *   5. Time decay           (half-life, slowed during the user's active hours)
+ *   6. Connection strength  (follow direct + 2nd-degree follow-of-follow)
+ *   7. Quality + sentiment  (length, tag count, clickbait, all-caps + !!! penalty)
+ *   8. Cold-start fallback  (when interaction history < 5: verified + velocity + diversity)
+ *   9. MMR diversity rerank (λ=0.7, TF-IDF cosine as the diversity penalty)
+ *  10. Per-author cap       (≤ 2 posts per author after MMR)
+ *  11. Chronological blend  (1 chronological post for every 4 ranked ones)
+ *
+ * Determinism is non-negotiable. No `Math.random()` anywhere — the same
+ * inputs must produce the same output every render so React's `useMemo`
+ * actually memoises and FlashList scroll positions stay stable.
+ *
+ * Performance notes:
+ *  - We score in a single pass over the candidate set.
+ *  - The user's TF-IDF profile is a single object that's memoised at the
+ *    hook layer, so we don't rebuild it per post.
+ *  - Hot scoring path avoids per-post string allocations where possible.
+ */
+
 import { Post, User } from "@/types";
 
-/**
- * Client-side feed ranker.
- *
- * The server returns posts in chronological order; the ranker re-scores
- * them locally using engagement signals + connection strength. Why
- * client-side: it lets the UI personalise without a per-user feed table
- * on the backend, and the ranker is cheap enough (≤100 posts × O(1)
- * scoring) that we can run it on every fresh page.
- *
- * The previous version had a `Math.random()` "serendipity boost" that
- * made the ranking non-deterministic — same inputs produced different
- * orderings on every render. That breaks `useMemo`, breaks scroll
- * position when the data refreshes, and makes the feed feel jittery.
- * Removed.
- */
+import {
+  buildTfIdfIndex,
+  cosineSimilarity,
+  extractTerms,
+  type TermVector,
+  type TfIdfIndex,
+  vectorise,
+} from "./tfidf";
+
+// ───────────────────────────────────────────────────────────────────────────
+// Public types
+// ───────────────────────────────────────────────────────────────────────────
 
 export interface UserInteraction {
   userId: string;
@@ -39,25 +68,38 @@ export interface UserProfile {
 }
 
 export interface FeedRankingWeights {
-  engagementLikelihood?: number;
+  topicalRelevance?: number;
+  engagementVelocity?: number;
   recency?: number;
   connectionStrength?: number;
-  diversity?: number;
   quality?: number;
+  /** Legacy keys, kept so existing callers compile. */
+  engagementLikelihood?: number;
+  diversity?: number;
 }
 
 export interface FeedRankingConfig {
-  weights: Required<FeedRankingWeights>;
+  weights: Required<Omit<FeedRankingWeights, "engagementLikelihood" | "diversity">>;
   limits: {
     maxPostsPerAccount: number;
     maxPostsPerFeed: number;
-    adFrequency: number;
+    /** Insert one chronological post for every N ranked posts. 0 disables blending. */
+    chronologicalBlendEvery: number;
+    /** Top N candidates fed into MMR diversity rerank. */
+    mmrCandidatePool: number;
+    /** MMR lambda — 1.0 = pure relevance, 0.0 = pure diversity. */
+    mmrLambda: number;
   };
   timeDecay: {
     halfLifeHours: number;
     maxAgeHours: number;
+    /** Multiplier applied during the user's active hours (>=1 slows decay). */
+    activeHourFactor: number;
   };
-  adPosts?: Post[];
+  /** Penalty multiplier applied to posts the user has already seen this session. */
+  seenPenalty: number;
+  /** Below this many interactions we drop into "discover" mode. */
+  coldStartThreshold: number;
   trendingThreshold?: {
     minEngagement: number;
     maxAgeHours: number;
@@ -66,21 +108,26 @@ export interface FeedRankingConfig {
 
 const DEFAULT_CONFIG: FeedRankingConfig = {
   weights: {
-    engagementLikelihood: 0.4,
-    recency: 0.3,
-    connectionStrength: 0.15,
-    diversity: 0.1,
-    quality: 0.05,
+    topicalRelevance: 0.30,
+    engagementVelocity: 0.22,
+    recency: 0.20,
+    connectionStrength: 0.18,
+    quality: 0.10,
   },
   limits: {
     maxPostsPerAccount: 2,
     maxPostsPerFeed: 25,
-    adFrequency: 5,
+    chronologicalBlendEvery: 4,
+    mmrCandidatePool: 100,
+    mmrLambda: 0.7,
   },
   timeDecay: {
     halfLifeHours: 12,
     maxAgeHours: 48,
+    activeHourFactor: 1.4,
   },
+  seenPenalty: 0.4,
+  coldStartThreshold: 5,
   trendingThreshold: {
     minEngagement: 10,
     maxAgeHours: 1,
@@ -89,6 +136,10 @@ const DEFAULT_CONFIG: FeedRankingConfig = {
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+const HASHTAG_RX = /#\w+/g;
+const URL_RX = /https?:\/\/\S+/g;
+const REPETITIVE_RUN = /(.)\1{4,}/;
+const ALL_CAPS_WORD_RX = /\b[A-Z]{2,}\b/g;
 const CLICKBAIT_PHRASES = [
   "shocking",
   "you won't believe",
@@ -96,104 +147,265 @@ const CLICKBAIT_PHRASES = [
   "secret revealed",
   "this changes everything",
 ];
-const REPETITIVE_RUN = /(.)\1{4,}/;
-const URL_RX = /https?:\/\/\S+/g;
-const HASHTAG_RX = /#\w+/g;
+
+// ───────────────────────────────────────────────────────────────────────────
+// Pre-built artefacts the hook hands us. Memoise these at the call site.
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface PersonalisationContext {
+  /** TF-IDF index built from the user's recent interaction corpus. */
+  index: TfIdfIndex;
+  /** Aggregated TF-IDF vector representing the user's topical fingerprint. */
+  userVector: TermVector;
+  /** Map of authorId → number of interactions with that author (for connection). */
+  authorAffinity: Map<string, number>;
+  /** Active-hour buckets — hour-of-day → count. */
+  activeHours: Record<number, number>;
+  /** Author follower counts by id, for engagement-velocity normalisation. */
+  authorFollowerCounts: Map<string, number>;
+  /** 2nd-degree follow set: ids of people followed by people the user follows. */
+  secondDegreeFollows: Set<string>;
+}
+
+export interface NegativeFeedback {
+  notInterestedAuthorIds: ReadonlySet<string>;
+  notInterestedHashtags: ReadonlySet<string>;
+  mutedAuthorIds: ReadonlySet<string>;
+  notInterestedPostIds: ReadonlySet<string>;
+}
+
+export interface RankerExtras {
+  context: PersonalisationContext;
+  feedback: NegativeFeedback;
+  seenPostIds: ReadonlySet<string>;
+  /** Already-fetched posts associated with the user's interaction history (for TF-IDF). */
+  interactionPosts?: Post[];
+}
 
 /**
- * Pure scoring entry point. Doesn't allocate per-post explanation
- * strings, doesn't sort the input in place, doesn't introduce randomness.
+ * Build a personalisation context from a user's interaction history.
+ * Returns a stable artefact that can be passed to `rankFeedPostsAdvanced`.
+ */
+export function buildPersonalisationContext(
+  currentUser: User,
+  interactionHistory: UserInteraction[],
+  interactionPosts: Post[],
+  candidatePool: Post[],
+  options: {
+    activeHours?: Record<number, number>;
+    secondDegreeFollows?: Set<string>;
+  } = {}
+): PersonalisationContext {
+  const corpusDocs = interactionPosts.map((p) => p.content || "");
+  const index = buildTfIdfIndex(corpusDocs);
+
+  // Aggregate user vector by averaging the per-document vectors. We
+  // weight likes/comments equally — the API doesn't carry interaction
+  // type per post here; the upstream hook decides which posts to feed in.
+  const aggWeights = new Map<string, number>();
+  let aggDocs = 0;
+  for (const doc of corpusDocs) {
+    const v = vectorise(doc, index);
+    if (v.weights.size === 0) continue;
+    aggDocs += 1;
+    for (const [term, w] of v.weights) {
+      aggWeights.set(term, (aggWeights.get(term) ?? 0) + w);
+    }
+  }
+  let normSq = 0;
+  if (aggDocs > 0) {
+    for (const [term, w] of aggWeights) {
+      const avg = w / aggDocs;
+      aggWeights.set(term, avg);
+      normSq += avg * avg;
+    }
+  }
+  const userVector: TermVector = { weights: aggWeights, norm: Math.sqrt(normSq) };
+
+  // Author affinity — interactions per author from history.
+  const authorAffinity = new Map<string, number>();
+  for (const interaction of interactionHistory) {
+    if (!interaction.userId) continue;
+    authorAffinity.set(
+      interaction.userId,
+      (authorAffinity.get(interaction.userId) ?? 0) + 1
+    );
+  }
+
+  // Author follower counts — derived from the candidate pool itself
+  // (every candidate carries `user.followers`). Cheap and avoids extra
+  // round trips. Falls back to 0 when missing.
+  const authorFollowerCounts = new Map<string, number>();
+  for (const post of candidatePool) {
+    if (!post.user?._id) continue;
+    if (authorFollowerCounts.has(post.user._id)) continue;
+    const followerCount = post.user.followers?.length ?? 0;
+    authorFollowerCounts.set(post.user._id, followerCount);
+  }
+
+  return {
+    index,
+    userVector,
+    authorAffinity,
+    activeHours: options.activeHours ?? {},
+    authorFollowerCounts,
+    secondDegreeFollows: options.secondDegreeFollows ?? new Set<string>(),
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Public ranker entry points
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Advanced ranker. Pass a precomputed `extras` object — the hook layer
+ * memoises it so this function only does scoring work, never index work.
+ */
+export function rankFeedPostsAdvanced(
+  posts: Post[],
+  currentUser: User,
+  extras: RankerExtras,
+  configOverride?: Partial<FeedRankingConfig>
+): Post[] {
+  if (!posts.length) return [];
+  const config = mergeConfig(configOverride);
+
+  // ── Layer 1 — hard filters ───────────────────────────────────────────────
+  const filtered = applyHardFilters(posts, currentUser, extras.feedback, config);
+  if (!filtered.length) return [];
+
+  const interactionCount = extras.context.authorAffinity.size;
+  const isColdStart = interactionCount < config.coldStartThreshold;
+
+  // ── Layers 2–8 — scoring ─────────────────────────────────────────────────
+  const scored: ScoredPost[] = filtered.map((post) => {
+    const score = isColdStart
+      ? scoreColdStart(post, currentUser, config)
+      : scorePost(post, currentUser, extras, config);
+    const exposurePenalty = extras.seenPostIds.has(post._id)
+      ? config.seenPenalty
+      : 1;
+    return { post, score: score * exposurePenalty };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  // ── Layer 9 — MMR diversity rerank on the top N ─────────────────────────
+  const pool = scored.slice(0, config.limits.mmrCandidatePool);
+  const reranked = mmrRerank(pool, extras.context.index, config.limits.mmrLambda);
+
+  // ── Layer 10 — per-author cap ───────────────────────────────────────────
+  const capped: ScoredPost[] = [];
+  const authorCounts = new Map<string, number>();
+  for (const item of reranked) {
+    const authorId = item.post.user._id;
+    const count = authorCounts.get(authorId) ?? 0;
+    if (count >= config.limits.maxPostsPerAccount) continue;
+    capped.push(item);
+    authorCounts.set(authorId, count + 1);
+    if (capped.length >= config.limits.maxPostsPerFeed) break;
+  }
+
+  // ── Layer 11 — chronological blend ──────────────────────────────────────
+  if (config.limits.chronologicalBlendEvery <= 0) {
+    return capped.map((s) => s.post);
+  }
+
+  const chronological = [...filtered].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  return blendChronological(
+    capped.map((s) => s.post),
+    chronological,
+    config.limits.chronologicalBlendEvery,
+    config.limits.maxPostsPerFeed
+  );
+}
+
+/**
+ * Backwards-compatible entry point. Older call sites pass interaction
+ * history as a flat array; we synthesise an empty personalisation
+ * context so the basic recency / engagement signals still apply.
  */
 export function rankFeedPosts(
   posts: Post[],
   currentUser: User,
   userInteractions: UserInteraction[] = [],
-  configOverride?: Partial<FeedRankingConfig>
+  configOverride?: Partial<FeedRankingConfig>,
+  extras?: Partial<RankerExtras>
 ): Post[] {
-  if (!posts.length) return [];
-
   const config = mergeConfig(configOverride);
-  const profile: UserProfile = {
-    userId: currentUser._id,
-    interests: [],
-    followedAccounts: currentUser.following ?? [],
-    blockedAccounts: [],
-    interactionHistory: userInteractions,
-    preferences: {
-      contentTypes: ["text", "image", "video"],
-      topics: [],
-      mutedAccounts: [],
-    },
+  const context: PersonalisationContext = extras?.context ?? {
+    index: buildTfIdfIndex([]),
+    userVector: { weights: new Map(), norm: 0 },
+    authorAffinity: aggregateAffinity(userInteractions),
+    activeHours: {},
+    authorFollowerCounts: collectFollowerCounts(posts),
+    secondDegreeFollows: new Set<string>(),
   };
-
-  const filtered = filterPosts(posts, profile, config);
-  const scored = filtered.map((post) => ({ post, score: scorePost(post, profile, currentUser, config) }));
-  scored.sort((a, b) => b.score - a.score);
-
-  // Cap per-author so a single chatty user doesn't dominate the feed.
-  const seenAuthors = new Map<string, number>();
-  const limited: PostScore[] = [];
-  for (const item of scored) {
-    const authorId = item.post.user._id;
-    const count = seenAuthors.get(authorId) ?? 0;
-    if (count >= config.limits.maxPostsPerAccount) continue;
-    limited.push(item);
-    seenAuthors.set(authorId, count + 1);
-    if (limited.length >= config.limits.maxPostsPerFeed) break;
-  }
-
-  // Optional ad insertion — only fires when the caller passes ads in.
-  if (!config.adPosts?.length) return limited.map((s) => s.post);
-  return insertAds(limited.map((s) => s.post), config);
+  const fullExtras: RankerExtras = {
+    context,
+    feedback: extras?.feedback ?? {
+      notInterestedAuthorIds: new Set(),
+      notInterestedHashtags: new Set(),
+      mutedAuthorIds: new Set(),
+      notInterestedPostIds: new Set(),
+    },
+    seenPostIds: extras?.seenPostIds ?? new Set(),
+    interactionPosts: extras?.interactionPosts,
+  };
+  return rankFeedPostsAdvanced(posts, currentUser, fullExtras, config);
 }
 
 /**
- * Lighter ranker: recency-weighted engagement velocity. Used as the
- * fallback path when the advanced ranker throws or when the caller
- * explicitly asks for it.
+ * Cheap fallback — sorts by recency-weighted engagement velocity. Used
+ * when the advanced ranker throws or when the caller explicitly opts out.
  */
 export function simpleRankPosts(posts: Post[]): Post[] {
   return [...posts].sort((a, b) => velocity(b) - velocity(a));
 }
 
-interface PostScore {
-  post: Post;
-  score: number;
-}
+// ───────────────────────────────────────────────────────────────────────────
+// Layer 1 — hard filters
+// ───────────────────────────────────────────────────────────────────────────
 
-function mergeConfig(override?: Partial<FeedRankingConfig>): FeedRankingConfig {
-  return {
-    ...DEFAULT_CONFIG,
-    ...override,
-    weights: { ...DEFAULT_CONFIG.weights, ...(override?.weights ?? {}) },
-    limits: { ...DEFAULT_CONFIG.limits, ...(override?.limits ?? {}) },
-    timeDecay: { ...DEFAULT_CONFIG.timeDecay, ...(override?.timeDecay ?? {}) },
-    trendingThreshold: {
-      ...(DEFAULT_CONFIG.trendingThreshold ?? { minEngagement: 10, maxAgeHours: 1 }),
-      ...(override?.trendingThreshold ?? {}),
-    },
-  };
-}
-
-function filterPosts(posts: Post[], profile: UserProfile, config: FeedRankingConfig): Post[] {
+export function applyHardFilters(
+  posts: Post[],
+  currentUser: User,
+  feedback: NegativeFeedback,
+  config: FeedRankingConfig
+): Post[] {
   const maxAgeMs = config.timeDecay.maxAgeHours * HOUR_MS;
-  const muted = new Set([...profile.preferences.mutedAccounts, ...profile.blockedAccounts]);
   const now = Date.now();
+  const muted = feedback.mutedAuthorIds;
+  const notInterestedAuthor = feedback.notInterestedAuthorIds;
+  const notInterestedTags = feedback.notInterestedHashtags;
+  const notInterestedPost = feedback.notInterestedPostIds;
 
   return posts.filter((post) => {
+    if (!post?._id || !post.user?._id) return false;
+    if (post.user._id === currentUser._id) return false;
     if (muted.has(post.user._id)) return false;
+    if (notInterestedAuthor.has(post.user._id)) return false;
+    if (notInterestedPost.has(post._id)) return false;
     if (now - new Date(post.createdAt).getTime() > maxAgeMs) return false;
     if (isLowQuality(post)) return false;
+    if (notInterestedTags.size > 0) {
+      const tags = (post.content ?? "").toLowerCase().match(HASHTAG_RX) ?? [];
+      for (const tag of tags) {
+        if (notInterestedTags.has(tag)) return false;
+      }
+    }
     return true;
   });
 }
 
-function isLowQuality(post: Post): boolean {
+export function isLowQuality(post: Post): boolean {
   const c = post.content ?? "";
-  if (c.length < 5) return true;
+  if (!c && !post.image) return true;
+  if (c && c.length < 5 && !post.image) return true;
 
-  const hashtags = c.match(HASHTAG_RX) ?? [];
-  if (hashtags.length > 8) return true;
+  const tags = c.match(HASHTAG_RX) ?? [];
+  if (tags.length > 8) return true;
 
   const upperRatio = c.replace(/[^A-Z]/g, "").length / Math.max(c.length, 1);
   if (upperRatio > 0.7 && c.length > 20) return true;
@@ -204,118 +416,277 @@ function isLowQuality(post: Post): boolean {
   return false;
 }
 
-function scorePost(
+// ───────────────────────────────────────────────────────────────────────────
+// Scoring layers
+// ───────────────────────────────────────────────────────────────────────────
+
+interface ScoredPost {
+  post: Post;
+  score: number;
+}
+
+export function scorePost(
   post: Post,
-  profile: UserProfile,
   currentUser: User,
+  extras: RankerExtras,
   config: FeedRankingConfig
 ): number {
   const w = config.weights;
   return (
-    w.engagementLikelihood * engagementLikelihood(post, profile) +
-    w.recency * recencyScore(post, config) +
-    w.connectionStrength * connectionStrength(post, profile, currentUser) +
-    w.diversity * diversityBoost(post, profile) +
+    w.topicalRelevance * topicalRelevance(post, extras.context) +
+    w.engagementVelocity * engagementVelocity(post, extras.context) +
+    w.recency * recency(post, extras.context.activeHours, config) +
+    w.connectionStrength * connectionStrength(post, currentUser, extras.context) +
     w.quality * qualityScore(post)
   );
 }
 
-function engagementLikelihood(post: Post, profile: UserProfile): number {
-  let score = 0;
-
-  if (profile.interests.length > 0) {
-    const interestSet = new Set(profile.interests.map((i) => i.toLowerCase()));
-    const words = (post.content ?? "").toLowerCase().split(/\s+/);
-    let matches = 0;
-    for (const w of words) if (w.length > 3 && interestSet.has(w)) matches++;
-    const ratio = matches / interestSet.size;
-    score += Math.min(ratio * 0.4, 0.4);
-  }
-
-  const authorInteractions = profile.interactionHistory.filter((i) => i.userId === post.user._id).length;
-  const totalInteractions = Math.max(profile.interactionHistory.length, 1);
-  const rate = authorInteractions / totalInteractions;
-  score += Math.min(rate * 0.3, 0.3);
-
-  score += Math.min(velocity(post) * 0.1, 0.2);
-  return Math.min(score, 1);
+/** Cold-start scorer — verified > velocity > newness. No personal signals. */
+export function scoreColdStart(
+  post: Post,
+  _currentUser: User,
+  config: FeedRankingConfig
+): number {
+  const verified = post.user.verified ? 0.4 : 0;
+  const velocityScore = Math.min(velocity(post) * 0.05, 0.3);
+  const recencyScore = recency(post, {}, config) * 0.3;
+  return verified + velocityScore + recencyScore;
 }
 
-function recencyScore(post: Post, config: FeedRankingConfig): number {
+// ── Layer 3 — topical relevance ───────────────────────────────────────────
+export function topicalRelevance(
+  post: Post,
+  ctx: PersonalisationContext
+): number {
+  if (ctx.userVector.norm === 0) return 0;
+  const postVector = vectorise(post.content ?? "", ctx.index);
+  return cosineSimilarity(postVector, ctx.userVector);
+}
+
+// ── Layer 4 — engagement velocity (normalised per author) ─────────────────
+export function engagementVelocity(
+  post: Post,
+  ctx: PersonalisationContext
+): number {
+  const v = velocity(post);
+  if (v === 0) return 0;
+  const followers = ctx.authorFollowerCounts.get(post.user._id) ?? 0;
+  // Normalise: a post outpacing the author's follower count is exceptional.
+  // We use log so the curve flattens and a viral spike doesn't dominate.
+  const expected = Math.max(1, Math.log10(followers + 10));
+  const ratio = v / expected;
+  return Math.min(ratio / 4, 1);
+}
+
+// ── Layer 5 — time decay (timezone aware) ─────────────────────────────────
+export function recency(
+  post: Post,
+  activeHours: Record<number, number>,
+  config: FeedRankingConfig
+): number {
   const ageHours = (Date.now() - new Date(post.createdAt).getTime()) / HOUR_MS;
-  let decay = 1 / (1 + ageHours / config.timeDecay.halfLifeHours);
+  const postHour = new Date(post.createdAt).getHours();
+  const isInActiveWindow = !!activeHours[postHour] && activeHours[postHour] > 0;
+
+  // Slow decay during the user's active hours.
+  const halfLife = isInActiveWindow
+    ? config.timeDecay.halfLifeHours * config.timeDecay.activeHourFactor
+    : config.timeDecay.halfLifeHours;
+
+  let decay = 1 / (1 + ageHours / halfLife);
   if (ageHours > config.timeDecay.maxAgeHours) decay *= 0.5;
 
+  // Trending bonus — recent + already getting engagement.
   const trending = config.trendingThreshold;
-  const engagement = (post.likes?.length ?? 0) + (post.comments?.length ?? 0);
+  const engagement = (post.likes?.length ?? 0) + (post.commentCount ?? post.comments?.length ?? 0);
   if (trending && ageHours < trending.maxAgeHours && engagement > trending.minEngagement) {
     decay = Math.min(decay + 0.2, 1);
   }
   return decay;
 }
 
-function connectionStrength(post: Post, profile: UserProfile, currentUser: User): number {
+// ── Layer 6 — connection strength ─────────────────────────────────────────
+export function connectionStrength(
+  post: Post,
+  currentUser: User,
+  ctx: PersonalisationContext
+): number {
   let score = 0;
-  if (profile.followedAccounts.includes(post.user._id)) score += 0.5;
-  if (post.user.followers?.includes(currentUser._id)) score += 0.2;
+  const following = currentUser.following ?? [];
+  if (following.includes(post.user._id)) score += 0.5;
+  if (post.user.followers?.includes(currentUser._id)) score += 0.15;
+  if (ctx.secondDegreeFollows.has(post.user._id)) score += 0.3;
 
-  const interactions = profile.interactionHistory.filter((i) => i.userId === post.user._id).length;
-  const rate = interactions / Math.max(profile.interactionHistory.length, 1);
-  score += Math.min(rate * 0.3, 0.3);
+  const interactions = ctx.authorAffinity.get(post.user._id) ?? 0;
+  const totalInteractions = sumValues(ctx.authorAffinity);
+  if (totalInteractions > 0) {
+    const rate = interactions / totalInteractions;
+    score += Math.min(rate * 0.3, 0.3);
+  }
   return Math.min(score, 1);
 }
 
-function diversityBoost(post: Post, profile: UserProfile): number {
-  let score = 0;
-  const recent = profile.interactionHistory.filter((i) => Date.now() - i.timestamp < DAY_MS);
-  const recentAuthors = new Set(recent.map((i) => i.userId));
-  if (!recentAuthors.has(post.user._id)) score += 0.3;
-
-  const type: "text" | "image" | "video" = post.image ? "image" : "text";
-  if (!profile.preferences.contentTypes.includes(type)) score += 0.2;
-  return Math.min(score, 1);
-}
-
-function qualityScore(post: Post): number {
+// ── Layer 7 — quality + sentiment proxy ───────────────────────────────────
+export function qualityScore(post: Post): number {
   let score = 0.5;
   if (post.user.verified) score += 0.2;
 
-  const len = (post.content ?? "").length;
+  const c = post.content ?? "";
+  const len = c.length;
   if (len > 50 && len < 500) score += 0.1;
-  else if (len < 10) score -= 0.2;
+  else if (len < 10 && !post.image) score -= 0.2;
   else if (len > 1000) score -= 0.1;
 
-  const tags = (post.content ?? "").match(HASHTAG_RX) ?? [];
+  const tags = c.match(HASHTAG_RX) ?? [];
   if (tags.length > 0 && tags.length <= 3) score += 0.1;
   else if (tags.length > 5) score -= 0.2;
 
-  const lower = (post.content ?? "").toLowerCase();
+  // Sentiment proxy — shouting + clickbait are common low-signal markers.
+  const allCapsRuns = c.match(ALL_CAPS_WORD_RX) ?? [];
+  let consecutiveCaps = 0;
+  for (let i = 1; i < allCapsRuns.length; i++) {
+    consecutiveCaps = Math.max(consecutiveCaps, 2);
+  }
+  if (allCapsRuns.length > 2 || consecutiveCaps >= 2) score -= 0.2;
+
+  const exclamations = (c.match(/!/g) ?? []).length;
+  if (exclamations > 3) score -= 0.2;
+
+  const lower = c.toLowerCase();
   if (CLICKBAIT_PHRASES.some((p) => lower.includes(p))) score -= 0.3;
+
   return Math.max(0, Math.min(score, 1));
 }
 
-function velocity(post: Post): number {
+// ───────────────────────────────────────────────────────────────────────────
+// Layer 9 — Maximal Marginal Relevance
+// ───────────────────────────────────────────────────────────────────────────
+
+export function mmrRerank(
+  scored: ScoredPost[],
+  index: TfIdfIndex,
+  lambda: number
+): ScoredPost[] {
+  if (scored.length <= 2) return scored;
+
+  // Pre-vectorise once per post.
+  const vectors = scored.map((s) => ({
+    item: s,
+    vector: vectorise(s.post.content ?? "", index),
+  }));
+
+  const selected: typeof vectors = [];
+  const remaining = [...vectors];
+
+  while (remaining.length > 0) {
+    let bestIdx = 0;
+    let bestMmr = -Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const candidate = remaining[i];
+      if (!candidate) continue;
+
+      let maxSim = 0;
+      for (const sel of selected) {
+        const sim = cosineSimilarity(candidate.vector, sel.vector);
+        if (sim > maxSim) maxSim = sim;
+      }
+      const mmr = lambda * candidate.item.score - (1 - lambda) * maxSim;
+      if (mmr > bestMmr) {
+        bestMmr = mmr;
+        bestIdx = i;
+      }
+    }
+    const chosen = remaining.splice(bestIdx, 1)[0];
+    if (chosen) selected.push(chosen);
+  }
+
+  return selected.map((v) => v.item);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Layer 11 — chronological blend
+// ───────────────────────────────────────────────────────────────────────────
+
+export function blendChronological(
+  ranked: Post[],
+  chronological: Post[],
+  every: number,
+  cap: number
+): Post[] {
+  if (every <= 0) return ranked.slice(0, cap);
+
+  const seen = new Set(ranked.map((p) => p._id));
+  const queue = chronological.filter((p) => !seen.has(p._id));
+  const out: Post[] = [];
+
+  for (let i = 0; i < ranked.length && out.length < cap; i++) {
+    const post = ranked[i];
+    if (post) out.push(post);
+    // Insert chronological filler after every Nth ranked post.
+    if (out.length > 0 && out.length % every === 0 && queue.length > 0) {
+      const filler = queue.shift();
+      if (filler && out.length < cap) out.push(filler);
+    }
+  }
+  return out;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────────────────────────────────
+
+export function velocity(post: Post): number {
   const ageHours = (Date.now() - new Date(post.createdAt).getTime()) / HOUR_MS;
-  const engagement = (post.likes?.length ?? 0) + (post.comments?.length ?? 0);
+  const engagement =
+    (post.likes?.length ?? 0) +
+    (post.commentCount ?? post.comments?.length ?? 0);
   return engagement / (ageHours + 1);
 }
 
-function insertAds(organic: Post[], config: FeedRankingConfig): Post[] {
-  const ads = config.adPosts ?? [];
-  if (!ads.length) return organic;
-
-  const out: Post[] = [];
-  let adIndex = 0;
-  organic.forEach((post, i) => {
-    if ((i + 1) % config.limits.adFrequency === 0 && adIndex < ads.length) {
-      const ad = ads[adIndex++];
-      if (ad) out.push(ad);
-    }
-    out.push(post);
-  });
-  while (adIndex < ads.length && out.length < config.limits.maxPostsPerFeed) {
-    const ad = ads[adIndex++];
-    if (ad) out.push(ad);
-  }
-  return out.slice(0, config.limits.maxPostsPerFeed);
+function sumValues(map: Map<string, number>): number {
+  let total = 0;
+  for (const value of map.values()) total += value;
+  return total;
 }
+
+function aggregateAffinity(
+  interactions: UserInteraction[]
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const i of interactions) {
+    if (!i.userId) continue;
+    out.set(i.userId, (out.get(i.userId) ?? 0) + 1);
+  }
+  return out;
+}
+
+function collectFollowerCounts(posts: Post[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const post of posts) {
+    if (!post.user?._id || out.has(post.user._id)) continue;
+    out.set(post.user._id, post.user.followers?.length ?? 0);
+  }
+  return out;
+}
+
+function mergeConfig(override?: Partial<FeedRankingConfig>): FeedRankingConfig {
+  if (!override) return DEFAULT_CONFIG;
+  return {
+    ...DEFAULT_CONFIG,
+    ...override,
+    weights: { ...DEFAULT_CONFIG.weights, ...(override.weights ?? {}) } as FeedRankingConfig["weights"],
+    limits: { ...DEFAULT_CONFIG.limits, ...(override.limits ?? {}) },
+    timeDecay: { ...DEFAULT_CONFIG.timeDecay, ...(override.timeDecay ?? {}) },
+    seenPenalty: override.seenPenalty ?? DEFAULT_CONFIG.seenPenalty,
+    coldStartThreshold:
+      override.coldStartThreshold ?? DEFAULT_CONFIG.coldStartThreshold,
+    trendingThreshold: {
+      ...(DEFAULT_CONFIG.trendingThreshold ?? { minEngagement: 10, maxAgeHours: 1 }),
+      ...(override.trendingThreshold ?? {}),
+    },
+  };
+}
+
+// Re-export the term extraction helper so screens can compute token sets
+// for the trending rail without re-implementing the regex set.
+export { extractTerms };

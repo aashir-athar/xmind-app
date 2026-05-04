@@ -4,7 +4,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
 import { postApi, useApiClient, type PostsPayload } from "@/utils/api";
 import type { Post, User } from "@/types";
@@ -59,7 +59,16 @@ export const usePosts = (username?: string) => {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 
-  const posts: Post[] = data?.pages.flatMap((page) => page.posts) ?? [];
+  // Memoise the flattened list. Without this, every render returns a
+  // brand-new array reference, which cascades through every downstream
+  // useMemo (search, ranking, suggested users) and creates an
+  // infinite-loop hazard in any consumer that mirrors the value into
+  // useState. Keyed on the underlying pages array — TanStack guarantees
+  // a new pages reference only when the cache actually changes.
+  const posts: Post[] = useMemo(
+    () => data?.pages.flatMap((page) => page.posts) ?? EMPTY_POSTS,
+    [data?.pages]
+  );
 
   // ── Like toggle (optimistic) ───────────────────────────────────────────
   const likePostMutation = useMutation({
@@ -147,6 +156,10 @@ function readViewerIdFromCache(queryClient: ReturnType<typeof useQueryClient>): 
   const cached = queryClient.getQueryData<User | null>(["authUser"]);
   return cached?._id ?? null;
 }
+
+// Stable empty-array sentinel so the `posts` reference doesn't churn while
+// the first page is still loading.
+const EMPTY_POSTS: Post[] = [];
 
 function toggleLikeFor(post: Post, viewerId: string): Post {
   const likes = post.likes ?? [];

@@ -1,10 +1,11 @@
 import React, { memo, useCallback } from "react";
 import { Pressable, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 
 import { Avatar } from "@/components/ui/Avatar";
 import { Text } from "@/components/ui/Text";
+import { VerifiedBadge } from "@/components/ui/VerifiedBadge";
 import { useTheme } from "@/hooks/useTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import type { User } from "@/types";
@@ -52,14 +53,7 @@ function UserSearchResultImpl({ user }: UserSearchResultProps) {
           <Text variant="subtitle" tone="primary" numberOfLines={1}>
             {user.firstName} {user.lastName}
           </Text>
-          {user.verified ? (
-            <View
-              className="w-[16px] h-[16px] rounded-full items-center justify-center"
-              style={{ backgroundColor: colors.tint.primary }}
-            >
-              <MaterialCommunityIcons name="check" size={10} color={colors.text.onTint} />
-            </View>
-          ) : null}
+          {user.verified ? <VerifiedBadge size={14} /> : null}
         </View>
         <Text variant="bodySm" tone="tertiary">
           @{user.username}

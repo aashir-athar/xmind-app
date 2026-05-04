@@ -2,7 +2,6 @@ import React, { memo, useCallback } from "react";
 import {
   ActionSheetIOS,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -10,6 +9,7 @@ import {
   ScrollView,
   View,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -166,10 +166,11 @@ function EditProfileModalImpl({
                   }}
                 >
                   {selectedBannerImage || formData.bannerImage ? (
-                    <Image
+                    <ExpoImage
                       source={{ uri: selectedBannerImage || formData.bannerImage }}
                       style={{ width: "100%", height: "100%" }}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
                     />
                   ) : (
                     <Feather name="image" size={28} color={colors.text.tertiary} />
@@ -210,10 +211,11 @@ function EditProfileModalImpl({
                     }}
                   >
                     {selectedProfileImage || formData.profilePicture ? (
-                      <Image
+                      <ExpoImage
                         source={{ uri: selectedProfileImage || formData.profilePicture }}
                         style={{ width: 96, height: 96 }}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
                       />
                     ) : (
                       <Feather name="user" size={28} color={colors.text.tertiary} />
