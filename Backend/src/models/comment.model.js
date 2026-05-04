@@ -23,12 +23,26 @@ const commentSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    /**
+     * Parent comment id when this comment is a reply. `null` for
+     * top-level comments. Reply nesting is one level deep — a reply to
+     * a reply is treated as another reply to the same parent so the
+     * thread doesn't drift into deep recursion.
+     */
+    parent: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true }
 );
 
 // Comment list per post is the only read pattern outside admin tools.
 commentSchema.index({ post: 1, createdAt: -1 });
+// Reply lookup — used when grouping replies under each parent.
+commentSchema.index({ parent: 1, createdAt: 1 });
 
 const Comment = mongoose.model("Comment", commentSchema);
 

@@ -225,8 +225,19 @@ function PostCardImpl({
         );
       }
       if (mentionMatch) {
+        const handle = mentionMatch[0].slice(1).toLowerCase();
         return (
-          <Text key={`t-${i}`} tone="accent" weight="600">
+          <Text
+            key={`t-${i}`}
+            tone="accent"
+            weight="600"
+            onPress={() =>
+              router.push({
+                pathname: "/user-profile",
+                params: { userId: "", username: handle },
+              })
+            }
+          >
             {token}
           </Text>
         );
