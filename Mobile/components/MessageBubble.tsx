@@ -28,6 +28,8 @@ export interface MessageBubbleProps {
   showTimestamp?: boolean;
   /** Triggered when the user taps a failed message's retry pill. */
   onRetry?: (message: ChatMessage) => void;
+  /** Other participant id — used to decide if THEY have read the message. */
+  otherParticipantId?: string | null;
 }
 
 function MessageBubbleImpl({
@@ -36,9 +38,28 @@ function MessageBubbleImpl({
   grouped,
   showTimestamp,
   onRetry,
+  otherParticipantId,
 }: MessageBubbleProps) {
   const { colors, spacing, radii } = useTheme();
   const handleRetry = useCallback(() => onRetry?.(message), [message, onRetry]);
+
+  /**
+   * Receipt state — WhatsApp's tick conventions:
+   *  - pending: clock (still being sent)
+   *  - sent:    single check (server has it)
+   *  - read:    double check, blue tint (other participant has read it)
+   *
+   * "Delivered" (gray double check) requires a per-participant
+   *  last-fetched timestamp we don't track yet; once a deliveredBy field
+   *  lands on the server, the renderer drops in here without screen
+   *  changes.
+   */
+  const receipt: "pending" | "sent" | "read" = message.pending
+    ? "pending"
+    : otherParticipantId &&
+      (message.readBy ?? []).includes(otherParticipantId)
+    ? "read"
+    : "sent";
 
   const bubbleColor = isMine ? colors.chat.outgoingBg : colors.chat.incomingBg;
   const textColor = isMine ? colors.chat.outgoingText : colors.chat.incomingText;
@@ -98,12 +119,27 @@ function MessageBubbleImpl({
               alignSelf: isMine ? "flex-end" : "flex-start",
             }}
           >
-            {message.pending ? (
-              <Feather name="clock" size={10} color={colors.chat.timestamp} />
-            ) : null}
             <Text variant="caption" tone="tertiary">
               {formatDate(message.createdAt)}
             </Text>
+            {/* Receipt ticks — only on outgoing messages. */}
+            {isMine ? (
+              receipt === "pending" ? (
+                <Feather name="clock" size={11} color={colors.chat.timestamp} />
+              ) : receipt === "read" ? (
+                <Feather
+                  name="check-circle"
+                  size={12}
+                  color={colors.tint.accent}
+                />
+              ) : (
+                <Feather
+                  name="check"
+                  size={12}
+                  color={colors.chat.timestamp}
+                />
+              )
+            ) : null}
           </View>
         ) : null}
 
@@ -143,6 +179,8 @@ export const MessageBubble = memo(
     prev.message.body === next.message.body &&
     prev.message.pending === next.message.pending &&
     prev.message.failed === next.message.failed &&
+    (prev.message.readBy?.length ?? 0) === (next.message.readBy?.length ?? 0) &&
+    prev.otherParticipantId === next.otherParticipantId &&
     prev.isMine === next.isMine &&
     prev.grouped === next.grouped &&
     prev.showTimestamp === next.showTimestamp

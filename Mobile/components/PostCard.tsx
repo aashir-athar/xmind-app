@@ -27,7 +27,6 @@ import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   type GestureResponderEvent,
-  Share,
   StyleSheet,
   View,
 } from "react-native";
@@ -54,6 +53,7 @@ import { formatDate, formatNumber } from "@/utils/formatter";
 import type { Post, User } from "@/types";
 
 import ImageModal from "./ImageModal";
+import ShareToChatSheet from "./ShareToChatSheet";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
 import CustomAlert from "./CustomAlert";
 
@@ -82,6 +82,7 @@ function PostCardImpl({
     useCustomAlert();
 
   const [imageOpen, setImageOpen] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const isOwn = !!currentUser && post.user._id === currentUser._id;
   const commentCount = post.commentCount ?? post.comments?.length ?? 0;
   const likeCount = post.likes?.length ?? 0;
@@ -175,23 +176,13 @@ function PostCardImpl({
     }
   }, [onMore, post]);
 
-  // Share — uses React Native's native share sheet so iOS / Android
-  // both get the system experience (Messages, AirDrop, WhatsApp, etc.).
-  const handleShare = useCallback(async () => {
+  // Share opens an in-app friend picker (the IG / Twitter pattern). The
+  // sheet itself has a "Share elsewhere" footer that fans out to the
+  // OS share sheet for users who want WhatsApp / Messages / AirDrop.
+  const handleShare = useCallback(() => {
     Haptics.selectionAsync().catch(() => undefined);
-    try {
-      const author = `@${post.user.username}`;
-      const preview = post.content
-        ? post.content.length > 140
-          ? `${post.content.slice(0, 140)}…`
-          : post.content
-        : "";
-      const message = preview ? `${author}: ${preview}` : `${author} on xMind`;
-      await Share.share({ message, title: "Share post" });
-    } catch {
-      // User dismissed — non-error.
-    }
-  }, [post.content, post.user.username]);
+    setShareSheetOpen(true);
+  }, []);
 
   // Bookmarks — local-first via Zustand + AsyncStorage. The contract
   // (toggle, isBookmarked) lets a future server-side bookmarks API drop
@@ -477,6 +468,11 @@ function PostCardImpl({
         onClose={() => setImageOpen(false)}
         imageUrl={post.image || ""}
         imageTitle="Post image"
+      />
+
+      <ShareToChatSheet
+        post={shareSheetOpen ? post : null}
+        onClose={() => setShareSheetOpen(false)}
       />
 
       {alertConfig ? (

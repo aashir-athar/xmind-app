@@ -136,10 +136,11 @@ export default function ChatThreadScreen() {
           grouped={grouped}
           showTimestamp={showTimestamp}
           onRetry={item.failed ? handleRetry : undefined}
+          otherParticipantId={other?._id ?? null}
         />
       );
     },
-    [currentUser?._id, handleRetry, messages]
+    [currentUser?._id, handleRetry, messages, other?._id]
   );
 
   const keyExtractor = useCallback(

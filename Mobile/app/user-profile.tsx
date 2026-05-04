@@ -51,6 +51,10 @@ export default function UserProfileScreen() {
   const isOwnProfile = !!user && !!currentUser && user._id === currentUser._id;
 
   const isFollowing = !!user && (currentUser?.following?.includes(user._id) ?? false);
+  const isFollowedBy = !!user && (currentUser?.followers?.includes(user._id) ?? false);
+  // "Friend" = mutual follow. Surfaced both as a label on the Follow
+  // button and as a small Friends badge under the handle.
+  const isFriend = isFollowing && isFollowedBy;
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -186,7 +190,7 @@ export default function UserProfileScreen() {
                   onPress={handleMessage}
                 />
                 <Button
-                  label={isFollowing ? "Following" : "Follow"}
+                  label={isFriend ? "Friends" : isFollowing ? "Following" : "Follow"}
                   variant={isFollowing ? "secondary" : "primary"}
                   size="sm"
                   loading={isFollowLoading}
@@ -202,9 +206,40 @@ export default function UserProfileScreen() {
             </Text>
             {user.verified ? <VerifiedBadge size={18} /> : null}
           </View>
-          <Text variant="bodySm" tone="secondary" className="mt-[2px]">
-            @{user.username}
-          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 2,
+            }}
+          >
+            <Text variant="bodySm" tone="secondary">
+              @{user.username}
+            </Text>
+            {isFriend ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 999,
+                  backgroundColor: colors.tint.primary + "1A",
+                }}
+              >
+                <Feather name="users" size={11} color={colors.tint.primary} />
+                <Text variant="caption" tone="tint" weight="700">
+                  Friends
+                </Text>
+              </View>
+            ) : isFollowedBy ? (
+              <Text variant="caption" tone="tertiary" weight="700">
+                Follows you
+              </Text>
+            ) : null}
+          </View>
 
           {user.bio ? (
             <Text variant="body" tone="primary" className="mt-md">
