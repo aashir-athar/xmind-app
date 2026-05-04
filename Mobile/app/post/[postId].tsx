@@ -44,6 +44,7 @@ import { useCommentsForPost } from "@/hooks/useCommentsForPost";
 import { useCommentLike } from "@/hooks/useCommentLike";
 import { useComments } from "@/hooks/useComments";
 import { usePosts } from "@/hooks/usePosts";
+import { groupComments } from "@/utils/commentGrouping";
 import { postApi, useApiClient } from "@/utils/api";
 import { formatDate } from "@/utils/formatter";
 import type { Comment, Post } from "@/types";
@@ -76,9 +77,17 @@ export default function PostDetailScreen() {
 
   const { comments, isLoading: commentsLoading } = useCommentsForPost(postId);
   const { toggleLike: toggleCommentLike } = useCommentLike(postId ?? null);
-  const { commentText, setCommentText, createComment, isCreatingComment } =
-    useComments();
+  const {
+    commentText,
+    setCommentText,
+    createComment,
+    isCreatingComment,
+    replyTarget,
+    setReplyTarget,
+    cancelReply,
+  } = useComments();
   const [menuOpen, setMenuOpen] = useState(false);
+  const threads = useMemo(() => groupComments(comments), [comments]);
 
   // Local handlers — wire the post-card actions through the same mutations
   // the feed uses so a like / delete keeps the cache coherent everywhere.
@@ -222,91 +231,30 @@ export default function PostDetailScreen() {
               />
             ) : (
               <View style={{ paddingHorizontal: spacing.lg }}>
-                {comments.map((c: Comment) => {
-                  const liked =
-                    !!currentUser?._id && (c.likes ?? []).includes(currentUser._id);
-                  const likeCount = c.likes?.length ?? 0;
-                  return (
-                    <View
-                      key={c._id}
-                      style={{
-                        flexDirection: "row",
-                        gap: spacing.md,
-                        paddingVertical: spacing.sm,
-                      }}
-                    >
-                      <Avatar
-                        source={c.user.profilePicture}
-                        name={`${c.user.firstName} ${c.user.lastName}`}
-                        size={36}
-                      />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: spacing.xs,
-                          }}
-                        >
-                          <Text
-                            variant="label"
-                            tone="primary"
-                            numberOfLines={1}
-                            weight="700"
-                          >
-                            {c.user.firstName} {c.user.lastName}
-                          </Text>
-                          {c.user.verified ? <VerifiedBadge size={12} /> : null}
-                          <Text variant="caption" tone="tertiary">
-                            · {formatDate(c.createdAt)}
-                          </Text>
-                        </View>
-                        <Text
-                          variant="body"
-                          tone="primary"
-                          style={{ marginTop: 2 }}
-                        >
-                          {c.content}
-                        </Text>
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: spacing.lg,
-                            marginTop: 6,
-                          }}
-                        >
-                          <Pressable
-                            onPress={() => toggleCommentLike(c._id)}
-                            hitSlop={6}
-                            accessibilityRole="button"
-                            accessibilityLabel={liked ? "Unlike comment" : "Like comment"}
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            <Feather
-                              name="heart"
-                              size={14}
-                              color={liked ? colors.tint.danger : colors.text.tertiary}
-                            />
-                            {likeCount > 0 ? (
-                              <Text
-                                variant="caption"
-                                tone={liked ? "danger" : "tertiary"}
-                                weight="600"
-                              >
-                                {likeCount}
-                              </Text>
-                            ) : null}
-                          </Pressable>
-                        </View>
+                {threads.map(({ root, replies }) => (
+                  <View key={root._id}>
+                    <DetailCommentRow
+                      comment={root}
+                      currentUserId={currentUser?._id ?? null}
+                      onLike={() => toggleCommentLike(root._id)}
+                      onReply={() => setReplyTarget(root)}
+                    />
+                    {replies.length > 0 ? (
+                      <View style={{ paddingLeft: 48 }}>
+                        {replies.map((r) => (
+                          <DetailCommentRow
+                            key={r._id}
+                            comment={r}
+                            currentUserId={currentUser?._id ?? null}
+                            onLike={() => toggleCommentLike(r._id)}
+                            onReply={() => setReplyTarget(root)}
+                            compact
+                          />
+                        ))}
                       </View>
-                    </View>
-                  );
-                })}
+                    ) : null}
+                  </View>
+                ))}
               </View>
             )}
           </ScrollView>
@@ -314,6 +262,47 @@ export default function PostDetailScreen() {
 
         {post ? (
           <SafeAreaView edges={["bottom"]}>
+            {/* Replying-to pill — surfaced as soon as a CommentRow's
+                Reply button is tapped. Tapping the x cancels. */}
+            {replyTarget ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingHorizontal: spacing.lg,
+                  paddingVertical: spacing.xs + 2,
+                  backgroundColor: colors.surface.secondary,
+                  borderTopWidth: 0.5,
+                  borderTopColor: colors.border.subtle,
+                  gap: spacing.sm,
+                }}
+              >
+                <Feather
+                  name="corner-up-left"
+                  size={14}
+                  color={colors.tint.primary}
+                />
+                <Text
+                  variant="caption"
+                  tone="secondary"
+                  style={{ flex: 1 }}
+                >
+                  Replying to{" "}
+                  <Text variant="caption" tone="tint" weight="800">
+                    @{replyTarget.user.username}
+                  </Text>
+                </Text>
+                <Pressable
+                  onPress={cancelReply}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel reply"
+                >
+                  <Feather name="x" size={14} color={colors.text.tertiary} />
+                </Pressable>
+              </View>
+            ) : null}
+
             <View
               style={{
                 flexDirection: "row",
@@ -348,7 +337,11 @@ export default function PostDetailScreen() {
                 <TextInput
                   value={commentText}
                   onChangeText={setCommentText}
-                  placeholder={`Reply to @${post.user.username}`}
+                  placeholder={
+                    replyTarget
+                      ? `Reply to @${replyTarget.user.username}`
+                      : `Reply to @${post.user.username}`
+                  }
                   placeholderTextColor={colors.text.tertiary}
                   multiline
                   style={{
@@ -398,6 +391,119 @@ export default function PostDetailScreen() {
           setMenuOpen(false);
         }}
       />
+    </View>
+  );
+}
+
+interface DetailCommentRowProps {
+  comment: Comment;
+  currentUserId: string | null;
+  onLike: () => void;
+  onReply: () => void;
+  compact?: boolean;
+}
+
+function DetailCommentRow({
+  comment,
+  currentUserId,
+  onLike,
+  onReply,
+  compact,
+}: DetailCommentRowProps) {
+  const { colors, spacing } = useTheme();
+  const liked =
+    !!currentUserId && (comment.likes ?? []).includes(currentUserId);
+  const likeCount = comment.likes?.length ?? 0;
+  const avatarSize = compact ? 28 : 36;
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        gap: spacing.md,
+        paddingVertical: spacing.sm,
+      }}
+    >
+      <Avatar
+        source={comment.user.profilePicture}
+        name={`${comment.user.firstName} ${comment.user.lastName}`}
+        size={avatarSize}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.xs,
+          }}
+        >
+          <Text variant="label" tone="primary" weight="700" numberOfLines={1}>
+            {comment.user.firstName} {comment.user.lastName}
+          </Text>
+          {comment.user.verified ? <VerifiedBadge size={12} /> : null}
+          <Text variant="caption" tone="tertiary">
+            · {formatDate(comment.createdAt)}
+          </Text>
+        </View>
+        <Text variant="body" tone="primary" style={{ marginTop: 2 }}>
+          {comment.content}
+        </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing.lg,
+            marginTop: 6,
+          }}
+        >
+          <Pressable
+            onPress={onLike}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? "Unlike comment" : "Like comment"}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Feather
+              name="heart"
+              size={14}
+              color={liked ? colors.tint.danger : colors.text.tertiary}
+            />
+            {likeCount > 0 ? (
+              <Text
+                variant="caption"
+                tone={liked ? "danger" : "tertiary"}
+                weight="600"
+              >
+                {likeCount}
+              </Text>
+            ) : null}
+          </Pressable>
+          <Pressable
+            onPress={onReply}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Reply to comment"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Feather
+              name="corner-up-left"
+              size={13}
+              color={colors.text.tertiary}
+            />
+            <Text variant="caption" tone="tertiary" weight="600">
+              Reply
+            </Text>
+          </Pressable>
+        </View>
+      </View>
     </View>
   );
 }

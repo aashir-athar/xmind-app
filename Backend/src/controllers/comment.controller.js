@@ -9,9 +9,15 @@ import Notification from "../models/notification.model.js";
 export const getComments = asyncHandler(async (req, res) => {
   const { postId } = req.params;
 
+  // Top-level + replies are returned in one shot; the client groups
+  // them by `parent`. Sort top-level by recency so the latest top-level
+  // comment surfaces first; the client handles reply ordering inside
+  // each thread (oldest-first inside a thread reads more naturally
+  // than newest-first does).
   const comments = await Comment.find({ post: postId })
     .sort({ createdAt: -1 })
-    .populate("user", "username firstName lastName profilePicture");
+    .populate("user", "username firstName lastName profilePicture verified")
+    .lean();
 
   res.status(200).json({ comments });
 });
@@ -19,7 +25,7 @@ export const getComments = asyncHandler(async (req, res) => {
 export const createComment = asyncHandler(async (req, res) => {
   const { userId } = getAuth(req);
   const { postId } = req.params;
-  const { content } = req.body;
+  const { content, parentId } = req.body;
 
   if (!content || content.trim() === "") {
     return res.status(400).json({ error: "Comment content is required" });
@@ -28,29 +34,65 @@ export const createComment = asyncHandler(async (req, res) => {
   const user = await User.findOne({ clerkId: userId });
   const post = await Post.findById(postId);
 
-  if (!user || !post) return res.status(404).json({ error: "User or post not found" });
+  if (!user || !post)
+    return res.status(404).json({ error: "User or post not found" });
+
+  // Reply path — flatten "reply to a reply" into a reply on the
+  // original parent so the thread doesn't drift into deep recursion.
+  // Notify the parent comment's author when the reply is by someone else.
+  let resolvedParentId = null;
+  let parentAuthorId = null;
+  if (parentId) {
+    if (!mongoose.isValidObjectId(parentId)) {
+      return res.status(400).json({ error: "Invalid parent id" });
+    }
+    const parent = await Comment.findById(parentId).select("post parent user").lean();
+    if (!parent) {
+      return res.status(404).json({ error: "Parent comment not found" });
+    }
+    if (String(parent.post) !== String(postId)) {
+      return res.status(400).json({ error: "Parent belongs to a different post" });
+    }
+    // If the "parent" is itself a reply, hoist to its parent so we keep
+    // the depth at one level.
+    resolvedParentId = parent.parent ?? parent._id;
+    parentAuthorId = parent.user;
+  }
 
   const comment = await Comment.create({
     user: user._id,
     post: postId,
     content,
+    parent: resolvedParentId,
   });
 
-  // link the comment to the post
+  // Link the comment to the post for backwards compatibility — the
+  // legacy Post.comments array is still used by the size projection in
+  // the feed.
   await Post.findByIdAndUpdate(postId, {
     $push: { comments: comment._id },
   });
 
-  // create notification if not commenting on own post
+  // Notify the post author (top-level) or the parent comment author
+  // (reply). Skip self-notifications.
+  const notifyTargets = new Set();
   if (post.user.toString() !== user._id.toString()) {
-    await Notification.create({
-      from: user._id,
-      to: post.user,
-      type: "comment",
-      post: postId,
-      comment: comment._id,
-    });
+    notifyTargets.add(post.user.toString());
   }
+  if (parentAuthorId && parentAuthorId.toString() !== user._id.toString()) {
+    notifyTargets.add(parentAuthorId.toString());
+  }
+  await Promise.all(
+    Array.from(notifyTargets).map((to) =>
+      Notification.create({
+        from: user._id,
+        to,
+        type: "comment",
+        post: postId,
+        comment: comment._id,
+      }).catch((err) => console.error("[comment] notification error:", err))
+    )
+  );
 
   res.status(201).json({ comment });
 });

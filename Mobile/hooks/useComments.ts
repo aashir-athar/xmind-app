@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   useMutation,
   useQueryClient,
@@ -10,15 +10,19 @@ import { useCustomAlert } from "@/hooks/useCustomAlert";
 import type { Comment, Post } from "@/types";
 
 /**
- * Comment composer + delete actions.
+ * Comment composer + delete actions + reply targeting.
  *
- * On send: optimistically appends the new comment to every cached page
- * of `["posts"]` so the modal shows the reply instantly. Backend response
- * replaces the stub once it lands. On error we roll back and surface
- * the alert.
+ * `replyTarget` is the comment the user has chosen to reply to. When
+ * present, the next `createComment(postId)` call sends with `parentId`
+ * set to the target's id. The composer surfaces a "Replying to
+ * @username" hint above the input so the user can confirm or cancel.
+ *
+ * On send: invalidates the posts feed (commentCount changes) and the
+ * `["comments", postId]` cache so the new reply appears.
  */
 export const useComments = () => {
   const [commentText, setCommentText] = useState("");
+  const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
   const api = useApiClient();
   const queryClient = useQueryClient();
 
@@ -29,14 +33,26 @@ export const useComments = () => {
   });
 
   const createCommentMutation = useMutation({
-    mutationFn: async ({ postId, content }: { postId: string; content: string }) => {
-      const response = await commentApi.createComment<Comment>(api, postId, content);
+    mutationFn: async ({
+      postId,
+      content,
+      parentId,
+    }: {
+      postId: string;
+      content: string;
+      parentId?: string | null;
+    }) => {
+      const response = await commentApi.createComment<Comment>(
+        api,
+        postId,
+        content,
+        parentId
+      );
       return response.data.comment;
     },
     onSuccess: (_data, variables) => {
       setCommentText("");
-      // Refresh the post feed (commentCount changes) and the per-post
-      // comment cache the modal reads from.
+      setReplyTarget(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["comments", variables.postId] });
     },
@@ -52,7 +68,9 @@ export const useComments = () => {
     },
     onMutate: async (commentId) => {
       await queryClient.cancelQueries({ queryKey: ["posts"] });
-      const previous = queryClient.getQueryData<InfiniteData<PostsPayload<Post>>>(["posts"]);
+      const previous = queryClient.getQueryData<InfiniteData<PostsPayload<Post>>>([
+        "posts",
+      ]);
       queryClient.setQueryData<InfiniteData<PostsPayload<Post>>>(["posts"], (old) => {
         if (!old) return old;
         return {
@@ -73,34 +91,46 @@ export const useComments = () => {
       showError("Couldn't delete", "We couldn't remove that reply. Try once more.");
     },
     onSuccess: () => {
-      // The ["comments", postId] cache is keyed by postId which the
-      // mutation no longer carries by the time it returns; invalidate
-      // every comments cache to be safe (cheap — modal-scope only).
       queryClient.invalidateQueries({ queryKey: ["comments"] });
     },
   });
 
-  const createComment = (postId: string) => {
-    if (!commentText.trim()) {
-      showInfo("Reply is empty", "Type something before sending.");
-      return;
-    }
-    createCommentMutation.mutate({ postId, content: commentText.trim() });
-  };
+  const createComment = useCallback(
+    (postId: string) => {
+      if (!commentText.trim()) {
+        showInfo("Reply is empty", "Type something before sending.");
+        return;
+      }
+      createCommentMutation.mutate({
+        postId,
+        content: commentText.trim(),
+        parentId: replyTarget?._id ?? null,
+      });
+    },
+    [commentText, createCommentMutation, replyTarget?._id, showInfo]
+  );
 
-  const deleteComment = (commentId: string) => {
-    showDeleteConfirmation(
-      "Delete this reply?",
-      "It won't undo it for people who've already seen it.",
-      () => deleteCommentMutation.mutate(commentId)
-    );
-  };
+  const deleteComment = useCallback(
+    (commentId: string) => {
+      showDeleteConfirmation(
+        "Delete this reply?",
+        "It won't undo it for people who've already seen it.",
+        () => deleteCommentMutation.mutate(commentId)
+      );
+    },
+    [deleteCommentMutation, showDeleteConfirmation]
+  );
+
+  const cancelReply = useCallback(() => setReplyTarget(null), []);
 
   return {
     commentText,
     setCommentText,
     createComment,
     deleteComment,
+    replyTarget,
+    setReplyTarget,
+    cancelReply,
     isCreatingComment: createCommentMutation.isPending,
     isDeletingComment: deleteCommentMutation.isPending,
   };

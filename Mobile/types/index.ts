@@ -26,6 +26,8 @@ export interface Comment {
   user: User;
   /** User ids that have liked this comment. */
   likes?: string[];
+  /** Parent comment id when this is a reply; null/undefined for top-level. */
+  parent?: string | null;
 }
 
 export interface Post {
