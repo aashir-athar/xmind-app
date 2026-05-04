@@ -31,6 +31,11 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Inbox query pulls a user's notifications newest-first.
+notificationSchema.index({ to: 1, createdAt: -1 });
+// Cleanup query when a post is deleted.
+notificationSchema.index({ post: 1 });
+
 const Notification = mongoose.model("Notification", notificationSchema);
 
 export default Notification;

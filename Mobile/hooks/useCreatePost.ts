@@ -1,8 +1,32 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
-import { useApiClient } from "../utils/api";
+
+import { postApi, useApiClient } from "@/utils/api";
 import { useCustomAlert } from "@/hooks/useCustomAlert";
+import type { Post } from "@/types";
+
+const MIME_FOR_EXT: Record<string, string> = {
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+};
+
+function buildImagePart(uri: string) {
+  const parts = uri.split(".");
+  const ext = (parts[parts.length - 1] ?? "jpg").toLowerCase();
+  const mimeType = MIME_FOR_EXT[ext] ?? "image/jpeg";
+  const normalizedExt = mimeType.split("/")[1] ?? "jpeg";
+  return {
+    uri,
+    name: `image.${normalizedExt}`,
+    type: mimeType,
+    // The cast satisfies React Native's FormData polyfill, which accepts
+    // a `{ uri, name, type }` object as a Blob-like value.
+  } as unknown as Blob;
+}
 
 export const useCreatePost = () => {
   const [content, setContent] = useState("");
@@ -18,37 +42,20 @@ export const useCreatePost = () => {
   const createPostMutation = useMutation({
     mutationFn: async (postData: { content: string; imageUri?: string }) => {
       const formData = new FormData();
-
       if (postData.content) formData.append("content", postData.content);
-
       if (postData.imageUri) {
-        const uriParts = postData.imageUri.split(".");
-        const fileType = uriParts[uriParts.length - 1].toLowerCase();
-
-        const mimeTypeMap: Record<string, string> = {
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-        };
-        const mimeType = mimeTypeMap[fileType] || "image/jpeg";
-        const normalizedExt = mimeType.split("/")[1]; // e.g., "jpeg", "png"
-
-        formData.append("image", {
-          uri: postData.imageUri,
-          name: `image.${normalizedExt}`,
-          type: mimeType,
-        } as any);
+        formData.append("image", buildImagePart(postData.imageUri));
       }
-
-      return api.post("/posts", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await postApi.createPost<Post>(api, formData);
+      return response.data.post;
     },
     onSuccess: () => {
       setContent("");
       setSelectedImage(null);
+      // Invalidate all feed shapes — home + this user's profile feed.
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      showSuccess("Posted", "Your thought is live in the feed.");
+      queryClient.invalidateQueries({ queryKey: ["userPosts"] });
+      showSuccess("Posted", "Your post is live in the feed.");
     },
     onError: () => {
       showError(

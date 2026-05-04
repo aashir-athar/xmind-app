@@ -12,4 +12,10 @@ export const ENV = {
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   ARCJET_KEY: process.env.ARCJET_KEY,
+  /**
+   * Comma-separated allow-list for browser-origin requests in production.
+   * The mobile app doesn't send an Origin header, so it's never filtered;
+   * this only restricts web clients (e.g. a future admin dashboard).
+   */
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
 };

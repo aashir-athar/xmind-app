@@ -155,7 +155,6 @@ export default function MessagesScreen() {
             paddingBottom: 140 + insets.bottom,
           }}
           showsVerticalScrollIndicator={false}
-          removeClippedSubviews
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

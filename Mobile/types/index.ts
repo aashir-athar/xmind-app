@@ -33,7 +33,14 @@ export interface Post {
   createdAt: string;
   user: User;
   likes: string[];
-  comments: Comment[];
+  /**
+   * Full comment list. Present on detail/comments-modal payloads but the
+   * paginated feed endpoint omits it (it ships `commentCount` instead so
+   * each feed page stays small).
+   */
+  comments?: Comment[];
+  /** Server-side count, used by the feed list when `comments` is absent. */
+  commentCount?: number;
 }
 
 export type NotificationType = "like" | "comment" | "follow";

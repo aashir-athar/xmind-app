@@ -1,23 +1,20 @@
 import { useMemo } from "react";
+
 import { usePosts } from "./usePosts";
 import { useCurrentUser } from "./useCurrentUser";
-import { Post, User } from "@/types";
 import {
   rankFeedPosts,
   simpleRankPosts,
-  FeedRankingAlgorithm,
-} from "../utils/feedRanking";
+  type FeedRankingWeights,
+} from "@/utils/feedRanking";
 
-interface UseFeedRankingOptions {
+export interface UseFeedRankingOptions {
+  /** When true, runs the multi-factor ranker; otherwise sorts by recency-weighted velocity. */
   useAdvancedAlgorithm?: boolean;
+  /** Page-size cap. The server already paginates, this is a UI safety cap. */
   maxPosts?: number;
-  customWeights?: {
-    engagementLikelihood?: number;
-    recency?: number;
-    connectionStrength?: number;
-    diversity?: number;
-    quality?: number;
-  };
+  /** Optional weight overrides; pass a stable reference. */
+  customWeights?: FeedRankingWeights;
 }
 
 const DEFAULT_WEIGHTS = {
@@ -26,187 +23,81 @@ const DEFAULT_WEIGHTS = {
   connectionStrength: 0.15,
   diversity: 0.1,
   quality: 0.05,
-} as const;
+} as const satisfies FeedRankingWeights;
 
+/**
+ * Feed-ranking hook. Wraps `usePosts` and applies the client-side ranker
+ * over the fetched page. The previous version recomputed on every Home
+ * render because the options object was rebuilt inline at the call site
+ * — including a fresh `customWeights` object — which broke the `useMemo`
+ * dependency check. We now memoise the weights with stable structural
+ * keys so the ranker only re-runs when the inputs really change.
+ */
 export const useFeedRanking = (options: UseFeedRankingOptions = {}) => {
-  const { useAdvancedAlgorithm = true, maxPosts = 20, customWeights } = options;
-  const weights = { ...DEFAULT_WEIGHTS, ...(customWeights ?? {}) };
+  const useAdvancedAlgorithm = options.useAdvancedAlgorithm ?? true;
+  const maxPosts = options.maxPosts ?? 25;
+  const customWeights = options.customWeights;
 
-  const { posts, isLoading, error, refetch } = usePosts();
+  // Stable signature for the weights object: derive a string key so the
+  // memoised `weights` only changes when the numbers change, not when the
+  // parent re-renders.
+  const weightsKey = useMemo(() => {
+    if (!customWeights) return "default";
+    return [
+      customWeights.engagementLikelihood ?? DEFAULT_WEIGHTS.engagementLikelihood,
+      customWeights.recency ?? DEFAULT_WEIGHTS.recency,
+      customWeights.connectionStrength ?? DEFAULT_WEIGHTS.connectionStrength,
+      customWeights.diversity ?? DEFAULT_WEIGHTS.diversity,
+      customWeights.quality ?? DEFAULT_WEIGHTS.quality,
+    ].join("|");
+  }, [
+    customWeights?.engagementLikelihood,
+    customWeights?.recency,
+    customWeights?.connectionStrength,
+    customWeights?.diversity,
+    customWeights?.quality,
+  ]);
+
+  const weights = useMemo<Required<FeedRankingWeights>>(
+    () => ({ ...DEFAULT_WEIGHTS, ...(customWeights ?? {}) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weightsKey]
+  );
+
+  const { posts, isLoading, error, refetch, isRefetching, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    usePosts();
   const { currentUser } = useCurrentUser();
 
-  // Rank posts using the algorithm
   const rankedPosts = useMemo(() => {
-    if (!posts || !currentUser || posts.length === 0) {
-      return [];
-    }
+    if (!posts || posts.length === 0) return [];
+    if (!currentUser) return posts.slice(0, maxPosts);
 
     try {
       if (useAdvancedAlgorithm) {
-        // Use the advanced feed ranking algorithm
-        const ranked = rankFeedPosts(posts, currentUser, [], {
+        return rankFeedPosts(posts, currentUser, [], {
           weights,
           limits: {
             maxPostsPerFeed: maxPosts,
             maxPostsPerAccount: 2,
             adFrequency: 5,
           },
-        });
-
-        // Limit to maxPosts
-        return ranked.slice(0, maxPosts);
-      } else {
-        // Use simple ranking for better performance
-        const simpleRanked = simpleRankPosts([...posts]);
-        return simpleRankPosts([...posts]).slice(0, maxPosts);
+        }).slice(0, maxPosts);
       }
-    } catch (error) {
-      console.error("Feed ranking error:", error);
-      // Fallback to simple ranking if advanced algorithm fails
+      return simpleRankPosts(posts).slice(0, maxPosts);
+    } catch (rankError) {
+      if (__DEV__) console.error("[feedRanking] error:", rankError);
       return simpleRankPosts(posts).slice(0, maxPosts);
     }
-  }, [posts, currentUser, useAdvancedAlgorithm, maxPosts, customWeights]);
-
-  // Get ranking breakdown for debugging/analytics
-  const getRankingBreakdown = () => {
-    if (!posts || !currentUser || posts.length === 0) {
-      return [];
-    }
-
-    try {
-      // Create a basic user profile for the algorithm
-      const userProfile = {
-        userId: currentUser._id,
-        interests: [] as string[],
-        followedAccounts: currentUser.following || [],
-        interactionHistory: [] as never[],
-        preferences: {
-          contentTypes: ["text", "image"] as ("text" | "image" | "video")[],
-          topics: [] as string[],
-          mutedAccounts: [] as string[],
-        },
-        blockedAccounts: [] as string[],
-      };
-
-      const algorithm = new FeedRankingAlgorithm(userProfile, currentUser, {
-        weights,
-        limits: {
-          maxPostsPerFeed: maxPosts,
-          maxPostsPerAccount: 2,
-          adFrequency: 5,
-        },
-      });
-
-      return algorithm.getRankingBreakdown(posts);
-    } catch (error) {
-      console.error("Ranking breakdown error:", error);
-      return [];
-    }
-  };
-
-  // Get feed statistics
-  const feedStats = useMemo(() => {
-    if (!rankedPosts || rankedPosts.length === 0) {
-      return {
-        totalPosts: 0,
-        contentTypes: { text: 0, image: 0, video: 0 },
-        averageEngagement: 0,
-        topAuthors: [],
-        timeRange: { oldest: null, newest: null },
-      };
-    }
-
-    const contentTypes = rankedPosts.reduce(
-      (acc, post) => {
-        if (post.image) {
-          acc.image++;
-        } else {
-          acc.text++;
-        }
-        return acc;
-      },
-      { text: 0, image: 0, video: 0 }
-    );
-
-    const totalEngagement = rankedPosts.reduce(
-      (sum, post) => sum + post.likes.length + post.comments.length,
-      0
-    );
-
-    const averageEngagement = totalEngagement / rankedPosts.length;
-
-    const authorCounts = rankedPosts.reduce(
-      (acc, post) => {
-        acc[post.user._id] = (acc[post.user._id] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    const topAuthors = Object.entries(authorCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 5)
-      .map(([userId, count]) => {
-        const user = rankedPosts.find((p) => p.user._id === userId)?.user;
-        return { user, count };
-      });
-
-    const timestamps = rankedPosts.map((post) =>
-      new Date(post.createdAt).getTime()
-    );
-    const timeRange = {
-      oldest: timestamps.length > 0 ? new Date(Math.min(...timestamps)) : null,
-      newest: timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null,
-    };
-
-    return {
-      totalPosts: rankedPosts.length,
-      contentTypes,
-      averageEngagement: Math.round(averageEngagement * 100) / 100,
-      topAuthors,
-      timeRange,
-    };
-  }, [rankedPosts]);
+  }, [posts, currentUser, useAdvancedAlgorithm, maxPosts, weights]);
 
   return {
-    // Ranked posts
     posts: rankedPosts,
-
-    // Original posts (unranked)
-    originalPosts: posts,
-
-    // Loading and error states
     isLoading,
     error,
     refetch,
-
-    // Feed statistics
-    feedStats,
-
-    // Utility functions
-    getRankingBreakdown,
-
-    // Algorithm options
-    algorithmType: useAdvancedAlgorithm ? "advanced" : "simple",
+    isRefetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   };
-};
-
-// Convenience hook for simple use cases
-export const useSimpleFeedRanking = (maxPosts: number = 20) => {
-  return useFeedRanking({
-    useAdvancedAlgorithm: false,
-    maxPosts,
-  });
-};
-
-// Hook for advanced feed ranking with custom weights
-export const useAdvancedFeedRanking = (
-  maxPosts: number = 20,
-  customWeights?: UseFeedRankingOptions["customWeights"]
-) => {
-  return useFeedRanking({
-    useAdvancedAlgorithm: true,
-    maxPosts,
-    customWeights,
-  });
 };

@@ -1,14 +1,40 @@
-import axios, { AxiosInstance } from "axios";
+import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { useAuth } from "@clerk/clerk-expo";
+import { useMemo } from "react";
 
+/**
+ * Resolved API base URL.
+ *
+ * Production / preview pulls from `EXPO_PUBLIC_API_URL` so the same JS
+ * bundle can target staging and prod without a rebuild. The hard-coded
+ * fallback is the deployed Vercel function.
+ *
+ * On a physical device, `localhost` will not resolve — use the LAN IP
+ * (e.g. `http://192.168.x.x:5001/api`) when developing against a local
+ * backend.
+ */
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   "https://x-clone-react-native-seven.vercel.app/api";
-// Note: localhost will not resolve from a physical device — use the
-// machine's LAN IP (e.g. http://192.168.x.x:5001/api) when testing on hardware.
-// const API_BASE_URL = "http://localhost:5001/api";
 
-// this will basically create an authenticated api, pass the token into our headers
+/**
+ * Augment Axios's request config with our retry flag without leaking
+ * `any` into the call sites.
+ */
+type RetryableRequestConfig = AxiosRequestConfig & { _retry?: boolean };
+
+/**
+ * Builds a configured Axios instance bound to a Clerk token getter.
+ *
+ * Single source of truth for:
+ *  - base URL + default headers
+ *  - bearer-token attachment
+ *  - one-shot refresh + retry on 401
+ *  - one-shot retry on Arcjet "bot" 403 (their first-request edge case)
+ *
+ * Logging only fires in development. In production the interceptors
+ * are silent — no console churn on the JS thread during scroll.
+ */
 export const createApiClient = (
   getToken: () => Promise<string | null>
 ): AxiosInstance => {
@@ -19,76 +45,71 @@ export const createApiClient = (
       Accept: "application/json",
       "Accept-Language": "en-US,en;q=0.9",
     },
+    timeout: 15_000,
   });
 
-  // In api.ts, update the request interceptor
   api.interceptors.request.use(async (config) => {
     try {
       const token = await getToken();
-      console.log(
-        `Request to ${config.url}: Token ${token ? "present" : "missing"}`
-      );
-
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        console.warn(`No token available for ${config.url}`);
+      } else if (__DEV__) {
+        console.warn(`[api] no token for ${config.url}`);
       }
     } catch (error) {
-      console.error("Error getting token:", error);
+      if (__DEV__) console.error("[api] token error:", error);
     }
     return config;
   });
 
-  // Update response interceptor
   api.interceptors.response.use(
-    (response) => {
-      console.log("API Response:", {
-        status: response.status,
-        url: response.config.url,
-      });
-      return response;
-    },
-    async (error) => {
-      const originalRequest = error.config;
+    (response) => response,
+    async (error: AxiosError) => {
+      const originalRequest = error.config as RetryableRequestConfig | undefined;
 
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      // 401 → wait briefly for Clerk to refresh, then retry once.
+      if (
+        originalRequest &&
+        !originalRequest._retry &&
+        error.response?.status === 401
+      ) {
         originalRequest._retry = true;
-        console.log("401 detected, waiting and retrying...");
-
-        // Wait a moment for session to stabilize
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
+        await new Promise((resolve) => setTimeout(resolve, 800));
         try {
           const newToken = await getToken();
           if (newToken) {
-            console.log("New token obtained, retrying request");
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            originalRequest.headers = {
+              ...(originalRequest.headers ?? {}),
+              Authorization: `Bearer ${newToken}`,
+            };
             return api(originalRequest);
-          } else {
-            console.log("Still no token available after retry");
           }
         } catch (tokenError) {
-          console.error("Error getting new token:", tokenError);
+          if (__DEV__) console.error("[api] refresh failed:", tokenError);
         }
       }
 
+      // Arcjet sometimes flags the very first request from a fresh device
+      // as a bot. Retry once after a short wait — subsequent requests pass.
+      const data = error.response?.data as { error?: string } | undefined;
       if (
+        originalRequest &&
+        !originalRequest._retry &&
         error.response?.status === 403 &&
-        error.response?.data?.error === "Bot access denied"
+        data?.error === "Bot access denied"
       ) {
-        if (!originalRequest._retry) {
-          originalRequest._retry = true;
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          return api(originalRequest);
-        }
+        originalRequest._retry = true;
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        return api(originalRequest);
       }
 
-      console.error("API Error:", {
-        status: error.response?.status,
-        message: error.response?.data?.message,
-        url: error.config?.url,
-      });
+      if (__DEV__) {
+        console.error("[api] error", {
+          status: error.response?.status,
+          url: error.config?.url,
+          message: (error.response?.data as { message?: string })?.message,
+        });
+      }
       return Promise.reject(error);
     }
   );
@@ -96,104 +117,164 @@ export const createApiClient = (
   return api;
 };
 
+/**
+ * Hook — returns a stable Axios instance for the current Clerk session.
+ *
+ * Why this exists:
+ *  Earlier, every component calling `useApiClient()` built a fresh
+ *  Axios instance on every render and re-registered interceptors. On the
+ *  Home screen alone that meant dozens of throwaway clients per second
+ *  during scroll. We now memoise on `getToken` (stable across renders
+ *  while the session is the same) so the whole app shares one client
+ *  for the lifetime of the session.
+ */
 export const useApiClient = (): AxiosInstance => {
   const { getToken } = useAuth();
-  return createApiClient(getToken);
+  return useMemo(() => createApiClient(getToken), [getToken]);
 };
 
-// Add these functions to your existing api.ts file
+// Typed helpers — every call site reads as a verb-on-domain instead of a
+// stringly-typed URL, which kept the screens free of literal endpoints.
 
-// User API functions for profile management
+/** Generic Axios response with a typed `data` payload. */
+type ApiResponse<T> = Promise<AxiosResponse<T>>;
+
+export interface UserPayload<T> {
+  user: T;
+}
+export interface UsersPayload<T> {
+  users: T[];
+}
+export interface PostsPayload<T> {
+  posts: T[];
+  /** Cursor for the next page (createdAt ISO string). Absent on the last page. */
+  nextCursor?: string | null;
+}
+export interface PostPayload<T> {
+  post: T;
+}
+export interface CommentsPayload<T> {
+  comments: T[];
+}
+export interface CommentPayload<T> {
+  comment: T;
+}
+export interface NotificationsPayload<T> {
+  notifications: T[];
+}
+export interface UsernameAvailability {
+  available: boolean;
+  message: string;
+}
+
 export const userApi = {
-  // Get current user
-  getCurrentUser: (api: any) => api.get("/users/me"),
+  getCurrentUser: <U>(api: AxiosInstance): ApiResponse<UserPayload<U>> =>
+    api.get("/users/me"),
 
-  // Get user profile by username
-  getUserProfile: (api: any, username: string) =>
-    api.get(`/users/profile/${username}`),
+  getUserProfile: <U>(api: AxiosInstance, username: string): ApiResponse<UserPayload<U>> =>
+    api.get(`/users/profile/${encodeURIComponent(username)}`),
 
-  // Update profile with images (same structure as posts)
-  updateProfile: (api: any, profileData: FormData) =>
+  updateProfile: <U>(api: AxiosInstance, profileData: FormData): ApiResponse<UserPayload<U>> =>
     api.post("/users/profile", profileData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
-  // Update username separately
-  updateUsername: (api: any, username: string) =>
+  updateUsername: <U>(api: AxiosInstance, username: string): ApiResponse<UserPayload<U>> =>
     api.put("/users/username", { username }),
 
-  // Check username availability
-  checkUsernameAvailability: (api: any, username: string) =>
-    api.get(`/users/check-username/${username}`),
+  checkUsernameAvailability: (
+    api: AxiosInstance,
+    username: string
+  ): ApiResponse<UsernameAvailability> =>
+    api.get(`/users/check-username/${encodeURIComponent(username)}`),
 
-  // Follow/unfollow user
-  followUser: (api: any, targetUserId: string) =>
-    api.post(`/users/follow/${targetUserId}`),
+  followUser: (api: AxiosInstance, targetUserId: string): ApiResponse<{ message: string }> =>
+    api.post(`/users/follow/${encodeURIComponent(targetUserId)}`),
 
-  // Auto-verification
-  autoVerifyUser: (api: any) => api.post("/users/verify"),
+  autoVerifyUser: <U>(api: AxiosInstance): ApiResponse<UserPayload<U>> =>
+    api.post("/users/verify"),
 
-  // Toggle verification (admin)
-  toggleVerification: (api: any, targetUserId: string) =>
-    api.post(`/users/verify/${targetUserId}`),
+  toggleVerification: <U>(
+    api: AxiosInstance,
+    targetUserId: string
+  ): ApiResponse<UserPayload<U>> =>
+    api.post(`/users/verify/${encodeURIComponent(targetUserId)}`),
 
-  // Sync user data
-  syncUser: (api: any) => api.post("/users/sync"),
+  syncUser: <U>(api: AxiosInstance): ApiResponse<UserPayload<U>> =>
+    api.post("/users/sync"),
 };
 
-// Post API functions (if not already present)
+export interface GetPostsOptions {
+  /** ISO timestamp of the oldest post already loaded — used as cursor. */
+  cursor?: string | null;
+  /** Page size (server clamps to 1–50). */
+  limit?: number;
+}
+
 export const postApi = {
-  // Get all posts
-  getPosts: (api: any) => api.get("/posts"),
+  getPosts: <P>(api: AxiosInstance, opts: GetPostsOptions = {}): ApiResponse<PostsPayload<P>> =>
+    api.get("/posts", {
+      params: { cursor: opts.cursor ?? undefined, limit: opts.limit ?? undefined },
+    }),
 
-  // Get post by ID
-  getPost: (api: any, postId: string) => api.get(`/posts/${postId}`),
+  getPost: <P>(api: AxiosInstance, postId: string): ApiResponse<PostPayload<P>> =>
+    api.get(`/posts/${encodeURIComponent(postId)}`),
 
-  // Get user posts
-  getUserPosts: (api: any, username: string) =>
-    api.get(`/posts/user/${username}`),
+  getUserPosts: <P>(
+    api: AxiosInstance,
+    username: string,
+    opts: GetPostsOptions = {}
+  ): ApiResponse<PostsPayload<P>> =>
+    api.get(`/posts/user/${encodeURIComponent(username)}`, {
+      params: { cursor: opts.cursor ?? undefined, limit: opts.limit ?? undefined },
+    }),
 
-  // Create post with image (same structure as profile update)
-  createPost: (api: any, postData: FormData) =>
+  createPost: <P>(api: AxiosInstance, postData: FormData): ApiResponse<PostPayload<P>> =>
     api.post("/posts", postData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
-  // Like/unlike post
-  likePost: (api: any, postId: string) => api.post(`/posts/${postId}/like`),
+  likePost: (
+    api: AxiosInstance,
+    postId: string
+  ): ApiResponse<{ liked: boolean; likeCount: number }> =>
+    api.post(`/posts/${encodeURIComponent(postId)}/like`),
 
-  // Delete post
-  deletePost: (api: any, postId: string) => api.delete(`/posts/${postId}`),
+  deletePost: (api: AxiosInstance, postId: string): ApiResponse<{ message: string }> =>
+    api.delete(`/posts/${encodeURIComponent(postId)}`),
 };
 
-// Comment API functions (if not already present)
 export const commentApi = {
-  // Create comment
-  createComment: (api: any, postId: string, content: string) =>
-    api.post("/comments", { postId, content }),
+  createComment: <C>(
+    api: AxiosInstance,
+    postId: string,
+    content: string
+  ): ApiResponse<CommentPayload<C>> =>
+    api.post(`/comments/post/${encodeURIComponent(postId)}`, { content }),
 
-  // Delete comment
-  deleteComment: (api: any, commentId: string) =>
-    api.delete(`/comments/${commentId}`),
+  deleteComment: (
+    api: AxiosInstance,
+    commentId: string
+  ): ApiResponse<{ message: string }> =>
+    api.delete(`/comments/${encodeURIComponent(commentId)}`),
 
-  // Get comments for post
-  getComments: (api: any, postId: string) =>
-    api.get(`/comments/post/${postId}`),
+  getComments: <C>(api: AxiosInstance, postId: string): ApiResponse<CommentsPayload<C>> =>
+    api.get(`/comments/post/${encodeURIComponent(postId)}`),
 };
 
-// Notification API functions (if not already present)
 export const notificationApi = {
-  // Get user notifications
-  getNotifications: (api: any) => api.get("/notifications"),
+  getNotifications: <N>(api: AxiosInstance): ApiResponse<NotificationsPayload<N>> =>
+    api.get("/notifications"),
 
-  // Mark notification as read
-  markAsRead: (api: any, notificationId: string) =>
-    api.put(`/notifications/${notificationId}/read`),
+  markAsRead: <N>(api: AxiosInstance, notificationId: string): ApiResponse<NotificationsPayload<N>> =>
+    api.put(`/notifications/${encodeURIComponent(notificationId)}/read`),
 
-  // Mark all notifications as read
-  markAllAsRead: (api: any) => api.put("/notifications/read-all"),
+  markAllAsRead: <N>(api: AxiosInstance): ApiResponse<NotificationsPayload<N>> =>
+    api.put("/notifications/read-all"),
 
-  // Delete notification
-  deleteNotification: (api: any, notificationId: string) =>
-    api.delete(`/notifications/${notificationId}`),
+  deleteNotification: (
+    api: AxiosInstance,
+    notificationId: string
+  ): ApiResponse<{ message: string }> =>
+    api.delete(`/notifications/${encodeURIComponent(notificationId)}`),
 };

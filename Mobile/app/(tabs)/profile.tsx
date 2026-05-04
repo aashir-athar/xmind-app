@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
-import { Image, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { format } from "date-fns";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -155,15 +156,19 @@ export default function ProfileScreen() {
           />
         }
       >
-        {/* Banner */}
-        <Image
+        {/* Banner — 3:1 ratio mirrors Twitter/X header proportions, leaving
+            generous room for the avatar overlap below without dominating
+            the screen. expo-image keeps decode off the JS thread. */}
+        <ExpoImage
           source={
             currentUser.bannerImage
               ? { uri: currentUser.bannerImage }
               : require("../../assets/images/default-banner.jpeg")
           }
-          style={{ width: "100%", aspectRatio: 16 / 9 }}
-          resizeMode="cover"
+          style={{ width: "100%", aspectRatio: 3 / 1 }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
 
         {/* Identity card */}

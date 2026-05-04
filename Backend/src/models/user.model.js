@@ -73,11 +73,17 @@ userSchema.pre('save', function(next) {
 
 // Pre-update middleware to ensure username is always lowercase
 userSchema.pre('findOneAndUpdate', function(next) {
-  if (this._update.username) {
+  if (this._update?.username) {
     this._update.username = this._update.username.toLowerCase();
   }
   next();
 });
+
+// `clerkId` and `username` are already unique (declared on the field), which
+// auto-creates indexes. Email is also unique. Add a covering index for the
+// most common lookup patterns.
+userSchema.index({ followers: 1 });
+userSchema.index({ following: 1 });
 
 const User = mongoose.model("User", userSchema);
 
