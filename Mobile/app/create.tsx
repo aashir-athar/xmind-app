@@ -9,7 +9,7 @@
  *  centre create button.
  */
 import React, { useCallback, useEffect } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, TextInput, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -92,7 +92,10 @@ export default function CreateScreen() {
       </SafeAreaView>
 
       <KeyboardAvoidingView
-        behavior="padding"
+        // iOS uses `padding` so the inset grows under the composer; Android
+        // uses `height` because `padding` clashes with the system soft-keyboard
+        // resize on edge-to-edge layouts (RN's documented platform split).
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >

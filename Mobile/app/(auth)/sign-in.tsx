@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
@@ -8,26 +9,28 @@ import { Surface } from "@/components/ui/Surface";
 import { Text } from "@/components/ui/Text";
 import { useTheme } from "@/hooks/useTheme";
 import { useSocialAuth } from "@/hooks/useSocialAuth";
+import { storyRingGradient } from "@/constants/tokens";
 
 /**
  * Sign-in screen.
  *
- * Copy strategy (FAB framework — Feature, Advantage, Benefit):
- *  - Feature: continue with Apple / Google.
- *  - Advantage: one tap, no password to remember.
- *  - Benefit: less friction in, less data shared.
+ * Lever: FAB framework + decision-fatigue reduction.
+ *  Feature: continue with Apple / Google. Advantage: one tap, no
+ *  password to remember. Benefit: less friction in, less data shared.
  *
  * Design:
  *  - Two equally-weighted CTAs because both options are first-class
  *    auth providers; we don't lie about preference (no fake "recommended"
  *    badge — that's a dark pattern under the 2026 ethics rubric).
- *  - Visible "Continue with" label clarifies that these are sign-in
+ *  - Visible "Continue with" divider clarifies that these are sign-in
  *    options, not third-party share buttons (a small but real source
  *    of confusion for first-time users).
- *  - Logo, headline, providers, terms — four stops, scannable.
+ *  - Logo block carries the same coral-sunset gradient as the welcome
+ *    hero halo and the tab-bar Create button, so the brand signature
+ *    chains across every onboarding surface.
  */
 export default function SignInScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, radii } = useTheme();
   const { handleSocialAuth, isLoading } = useSocialAuth();
 
   const press = useCallback(
@@ -44,14 +47,35 @@ export default function SignInScreen() {
         <View className="flex-1 px-xl">
           <View className="flex-1 items-center justify-center">
             <View
-              className="w-[96px] h-[96px] rounded-xl items-center justify-center mb-xl"
-              style={{ backgroundColor: colors.tint.primary }}
+              style={{
+                width: 104,
+                height: 104,
+                borderRadius: radii.xxl,
+                overflow: "hidden",
+                marginBottom: spacing.xl,
+                shadowColor: colors.tint.primary,
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.32,
+                shadowRadius: 18,
+                elevation: 10,
+              }}
             >
-              <ExpoImage
-                source={require("../../assets/images/xMind-Logo1.png")}
-                style={{ width: 56, height: 56, tintColor: colors.text.onTint }}
-                contentFit="contain"
-              />
+              <LinearGradient
+                colors={storyRingGradient as unknown as [string, string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ExpoImage
+                  source={require("../../assets/images/xMind-Logo1.png")}
+                  style={{ width: 60, height: 60, tintColor: colors.text.onTint }}
+                  contentFit="contain"
+                />
+              </LinearGradient>
             </View>
 
             <Text variant="headline" tone="primary" align="center">
@@ -69,7 +93,7 @@ export default function SignInScreen() {
           </View>
 
           <View style={{ marginBottom: spacing.lg }}>
-            {/* Section label so the buttons read as auth providers,
+            {/* Section divider so the buttons read as auth providers,
                 not generic share buttons. */}
             <View
               style={{
@@ -124,7 +148,7 @@ interface ProviderButtonProps {
 }
 
 function ProviderButton({ label, icon, loading, onPress }: ProviderButtonProps) {
-  const { colors } = useTheme();
+  const { colors, radii, spacing } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -138,8 +162,17 @@ function ProviderButton({ label, icon, loading, onPress }: ProviderButtonProps) 
     >
       <Surface
         variant="solid"
-        className="h-[56px] px-lg flex-row items-center justify-center gap-md border border-subtle"
-        radius={999}
+        radius={radii.pill}
+        style={{
+          height: 56,
+          paddingHorizontal: spacing.lg,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing.md,
+          borderWidth: 1,
+          borderColor: colors.border.subtle,
+        }}
       >
         {loading ? (
           <ActivityIndicator color={colors.tint.primary} />
